@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Teste do parser - banco de frases</title>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;font-size:13px;margin:16px;color:#222}
+h1{font-size:16px} h2{font-size:14px;margin-top:20px}
+table{border-collapse:collapse;width:100%} td,th{border:1px solid #ccc;padding:3px 6px;text-align:left;vertical-align:top}
+th{background:#f0f0f0} .erro{color:#b00000;font-weight:bold} .aviso{color:#a65e00} .info{color:#555}
+.txt{font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap}
+#filtro{margin:6px 0}
+</style>
+</head>
+<body>
+<h1>Teste do parser - banco de frases (.txt)</h1>
+<p>Selecione o arquivo .txt do banco de frases. Nada é enviado nem gravado; a leitura é local.</p>
+<input type="file" id="arquivo" accept=".txt,text/plain">
+<div id="saida"></div>
+<script src="../js/parser.js"></script>
+<script>
+(function () {
+  var input = document.getElementById('arquivo');
+  var saida = document.getElementById('saida');
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function lerArquivo(file, enc, cb) {
+    var fr = new FileReader();
+    fr.onload = function () { cb(fr.result); };
+    fr.onerror = function () { cb(null); };
+    fr.readAsText(file, enc);
+  }
+  function linha(k, v) { return '<tr><th>' + esc(k) + '</th><td>' + esc(v) + '</td></tr>'; }
+
+  function mostrar(r, enc) {
+    var st = r.stats, h = [], k, i;
+    h.push('<h2>Estatísticas</h2><table>');
+    h.push(linha('Codificação lida', enc));
+    h.push(linha('Exames (sem TODOS)', st.exams));
+    h.push(linha('Exame global TODOS', st.globalExam ? 'sim' : 'não'));
+    h.push(linha('Templates', st.templates));
+    h.push(linha('Seções (total / com frases / só referência)', st.sections + ' / ' + st.sectionsWithPhrases + ' / ' + st.sectionReferences));
+    h.push(linha('Frases (com hipótese / com ajuda)', st.phrases + ' (' + st.phrasesWithHypothesis + ' / ' + st.phrasesWithHelp + ')'));
+    h.push(linha('Notas (por exame) / notas globais', st.notes + ' / ' + (r.globalNote ? 'sim, linha ' + r.globalNote.line + ' (' + st.globalNoteLines + ' linhas)' : 'não')));
+    h.push(linha('Bloco de exemplo ignorado', r.skippedExample ? 'linhas ' + r.skippedExample.from + '-' + r.skippedExample.to : 'não'));
+    h.push(linha('Seções: reutilizadas / reservadas', st.sectionReferences + ' / ' + st.sectionsReserved));
+    h.push(linha('Linhas críticas (***)', st.criticalLines));
+    h.push(linha('Campos decimais (*,*)', st.decimalFields));
+    h.push(linha('Inconsistências dentro das notas (fora do relatório)', st.notesIssues));
+    h.push(linha('Campos nas frases (* / ** / ?[ ])', st.fields.number + ' / ' + st.fields.text + ' / ' + st.fields.select));
+    h.push(linha('Campos nos templates (* / ** / ?[ ])', st.templateFields.number + ' / ' + st.templateFields.text + ' / ' + st.templateFields.select));
+    h.push('</table>');
+
+    h.push('<h2>Exames</h2><table><tr><th>Exame</th><th>Título completo</th><th>Templates</th><th>Seções</th><th>Frases</th><th>Notas</th></tr>');
+    for (i = 0; i < r.exams.length; i++) {
+      var e = r.exams[i], nf = 0, j;
+      for (j = 0; j < e.sections.length; j++) { nf += e.sections[j].phrases.length; }
+      h.push('<tr><td>' + esc(e.name) + '</td><td>' + esc(e.fullName) + '</td><td>' + e.templates.length +
+             '</td><td>' + e.sections.length + '</td><td>' + nf + '</td><td>' + e.notes.length + '</td></tr>');
+    }
+    h.push('</table>');
+
+    h.push('<h2>Linhas críticas (' + r.critical.length + ')</h2><table><tr><th>Exame</th><th>Linha</th><th>Local</th><th>Texto</th></tr>');
+    for (i = 0; i < r.critical.length; i++) {
+      var c = r.critical[i];
+      h.push('<tr><td>' + esc(c.exam) + '</td><td>' + c.line + (c.endLine !== c.line ? '-' + c.endLine : '') +
+             '</td><td>' + esc(c.where) + (c.kind === 'block' ? ' (bloco)' : '') + '</td><td class="txt erro">' + esc(c.text) + '</td></tr>');
+    }
+    h.push('</table>');
+
+    h.push('<h2>Seções vazias: resolução</h2><table><tr><th>Exame</th><th>Linha</th><th>Seção</th><th>Regra</th><th>Usa frases de</th></tr>');
+    for (i = 0; i < r.sectionResolution.length; i++) {
+      var sr = r.sectionResolution[i];
+      h.push('<tr><td>' + esc(sr.exam) + '</td><td>' + sr.line + '</td><td>' + esc(sr.section) + '</td><td>' +
+             (sr.rule ? esc(sr.rule) : '<span class="info">reservada</span>') + '</td><td>' +
+             (sr.targetSection ? esc(sr.targetSection + ' (' + sr.targetExam + ')') : '') + '</td></tr>');
+    }
+    h.push('</table>');
+
+    h.push('<h2>Inconsistências por tipo</h2><table><tr><th>Tipo</th><th>Gravidade</th><th>Descrição</th><th>Qtde</th></tr>');
+    for (k in st.issuesByType) {
+      if (st.issuesByType.hasOwnProperty(k)) {
+        var t = UltraParser.ISSUE_TYPES[k] || ['erro', k];
+        h.push('<tr><td>' + esc(k) + '</td><td class="' + t[0] + '">' + t[0] + '</td><td>' + esc(t[1]) + '</td><td>' + st.issuesByType[k] + '</td></tr>');
+      }
+    }
+    h.push('</table>');
+
+    h.push('<h2>Relatório de inconsistências (' + r.issues.length + ')</h2>');
+    h.push('<div id="filtro">Filtrar tipo: <select id="selTipo"><option value="">(todos)</option>');
+    for (k in st.issuesByType) { if (st.issuesByType.hasOwnProperty(k)) { h.push('<option>' + esc(k) + '</option>'); } }
+    h.push('</select></div><table id="tab"><tr><th>Linha</th><th>Tipo</th><th>Exame / local</th><th>Texto da linha</th></tr>');
+    for (i = 0; i < r.issues.length; i++) {
+      var it = r.issues[i];
+      h.push('<tr data-tipo="' + esc(it.type) + '"><td>' + it.line + '</td><td class="' + it.severity + '">' + esc(it.type) +
+             '</td><td>' + esc(it.exam) + (it.where ? '<br><small>' + esc(it.where) + '</small>' : '') +
+             '</td><td class="txt">' + esc(it.text) + '</td></tr>');
+    }
+    h.push('</table>');
+    saida.innerHTML = h.join('');
+
+    var sel = document.getElementById('selTipo');
+    sel.onchange = function () {
+      var rows = document.getElementById('tab').getElementsByTagName('tr'), x;
+      for (x = 1; x < rows.length; x++) {
+        rows[x].style.display = (!sel.value || rows[x].getAttribute('data-tipo') === sel.value) ? '' : 'none';
+      }
+    };
+  }
+
+  input.onchange = function () {
+    var file = input.files && input.files[0];
+    if (!file) { return; }
+    lerArquivo(file, 'UTF-8', function (txt) {
+      if (txt === null) { saida.innerHTML = '<p class="erro">Não foi possível ler o arquivo.</p>'; return; }
+      if (txt.indexOf('\uFFFD') >= 0) {           /* not UTF-8: retry as ANSI (Windows-1252) */
+        lerArquivo(file, 'windows-1252', function (t2) { mostrar(UltraParser.parse(t2 || ''), 'windows-1252'); });
+      } else {
+        mostrar(UltraParser.parse(txt), 'UTF-8');
+      }
+    });
+  };
+})();
+</script>
+</body>
+</html>
