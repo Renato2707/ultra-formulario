@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<title>Editor de Laudos — Ultrassonografia</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body class="theme-light">
+<div id="app">
+  <header id="topbar">
+    <h1 class="sr-only">Editor de Laudos — Ultrassonografia</h1>
+    <div id="editorToolbar" class="toolbar">
+      <button type="button" class="tb" data-cmd="bold" title="Negrito (Ctrl+B)"><b>N</b></button>
+      <button type="button" class="tb" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
+      <button type="button" class="tb" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>S</u></button>
+      <span class="sep"></span>
+      <button type="button" class="tb" data-cmd="justifyLeft" title="Alinhar à esquerda">&#8676;</button>
+      <button type="button" class="tb" data-cmd="justifyCenter" title="Centralizar">&#8596;</button>
+      <button type="button" class="tb" data-cmd="justifyRight" title="Alinhar à direita">&#8677;</button>
+      <button type="button" class="tb" data-cmd="justifyFull" title="Justificar">&#8801;</button>
+      <span class="sep"></span>
+      <button type="button" class="tb" data-cmd="undo" title="Desfazer (Ctrl+Z)">&#8630;</button>
+      <button type="button" class="tb" data-cmd="redo" title="Refazer (Ctrl+Y)">&#8631;</button>
+      <span class="sep"></span>
+      <span class="search">
+        <span class="sbox"><input type="text" id="repSearch" placeholder="Pesquisar no laudo..." autocomplete="off"><button type="button" class="sx" id="repSearchX" title="Limpar pesquisa (Esc)" aria-label="Limpar pesquisa" tabindex="-1" hidden>&#215;</button></span>
+        <span id="repSearchCount" class="count"></span>
+        <button type="button" class="tb" id="repPrev" title="Anterior">&#9650;</button>
+        <button type="button" class="tb" id="repNext" title="Próximo">&#9660;</button>
+      </span>
+      <span class="grow"></span>
+      <button type="button" class="pill pill-warn" id="btnCritCount" hidden></button>
+      <button type="button" class="pill" id="btnFieldCount" hidden></button>
+      <button type="button" class="btn btn-sm" id="btnClear" title="Apagar todo o laudo">Limpar</button>
+      <button type="button" class="btn btn-sm" id="btnCopy" title="Copiar o laudo (com revisão)">Copiar</button>
+      <button type="button" class="btn btn-sm" id="btnPrint" title="Imprimir (Ctrl+P)">Imprimir</button>
+      <button type="button" class="btn btn-sm btn-primary" id="btnGen" title="Gerar arquivo .txt">Gerar</button>
+      <button type="button" class="ib" id="btnSettings" title="Configurações" aria-label="Configurações">&#9881;</button>
+    </div>
+  </header>
+
+  <div id="main">
+    <!-- LEFT: drill-down navigator (exams > models > sections/phrases) -->
+    <aside id="left" aria-label="Navegador">
+      <div id="navHead">
+        <div class="navrow">
+          <button type="button" class="ib" id="navBack" title="Voltar (Backspace / Esc)" aria-label="Voltar">&#8249;</button>
+          <div id="crumb" class="crumb"></div>
+        </div>
+        <div class="navrow">
+          <span class="sbox sbox-nav"><input type="text" id="navSearch" autocomplete="off"><button type="button" class="sx" id="navSearchX" title="Limpar pesquisa (Esc)" aria-label="Limpar pesquisa" tabindex="-1" hidden>&#215;</button></span>
+          <span id="navCount" class="count"></span>
+          <div id="navTools" class="tools"></div>
+        </div>
+      </div>
+      <div id="navList" class="scroll"></div>
+      <div id="noBank" class="nobank" hidden>
+        <p>Nenhum banco de frases carregado.</p>
+        <label class="btn btn-file">Escolher arquivo (.txt)<input type="file" id="bankFile0" accept=".txt,text/plain"></label>
+      </div>
+    </aside>
+    <div class="split" id="splitL" role="separator" aria-orientation="vertical" tabindex="0" title="Arraste para redimensionar (ou use as setas)"></div>
+
+    <!-- CENTER: report editor only -->
+    <section id="center">
+      <div id="editorWrap">
+        <div id="editor" contenteditable="true" spellcheck="false" aria-label="Laudo" data-ph="Selecione um modelo ou comece a digitar..."></div>
+      </div>
+    </section>
+
+    <div class="split" id="splitR" role="separator" aria-orientation="vertical" tabindex="0" title="Arraste para redimensionar (ou use as setas)"></div>
+    <!-- RIGHT: calculators (placeholder) -->
+    <aside id="right" aria-label="Calculadoras">
+      <div class="rhead">
+        <button type="button" class="ib" id="rightToggle" title="Recolher/expandir calculadoras" aria-label="Recolher/expandir calculadoras">&#8250;</button>
+        <span class="rtitle">Calculadoras</span>
+      </div>
+      <div class="rbody"><p class="quiet">Calculadoras (em breve)</p></div>
+    </aside>
+  </div>
+</div>
+
+<div id="printHold" class="print-only">Impressão bloqueada: o laudo tem linhas críticas pendentes ou campos a preencher.<br>Feche esta janela e use o botão Imprimir do app (ou Ctrl+P) para revisar antes de imprimir.</div>
+<div id="modalBack" hidden>
+  <div id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="mhead"><h2 id="modalTitle"></h2><button type="button" class="ib" id="modalX" title="Fechar (Esc)" aria-label="Fechar">&#215;</button></div>
+    <div id="modalBody"></div>
+    <div id="modalFoot"></div>
+  </div>
+</div>
+<div id="popup" class="popup" hidden></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* show any script error on screen (helps diagnose "does not open" reports) */
+window.onerror = function (msg, src, line) {
+  try { var d = document.createElement('div'); d.className = 'jserr';
+    d.appendChild(document.createTextNode('Erro de script: ' + msg + ' (' + String(src || '').split('/').pop() + ':' + line + ')'));
+    document.body.appendChild(d); } catch (e) {}
+  return false;
+};
+</script>
+<script src="js/parser.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

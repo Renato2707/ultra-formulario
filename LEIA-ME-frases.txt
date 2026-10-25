@@ -1,0 +1,108 @@
+COMO DIZER ONDE UMA FRASE ENTRA NO LAUDO
+========================================
+
+Quem decide onde a frase entra é o seu arquivo de frases (.txt):
+basta UMA linha de instrução, que nunca aparece no laudo.
+Se uma seção não tiver instrução (ou o texto indicado não estiver no laudo),
+o programa procura no laudo a linha que começa com o nome da seção e troca
+o texto padrão; se não achar, coloca a frase no fim do laudo, antes da
+Hipótese diagnóstica.
+
+Existem duas instruções:
+
+1) @@SUBSTITUI = início da linha do laudo
+   Troca a linha do laudo que começa com esse texto.
+   Se essa linha já foi alterada, a frase entra logo abaixo dela.
+
+2) @@ABAIXO_DE = início da linha do laudo
+   Coloca a frase no fim do parágrafo que tem essa linha,
+   separada por uma linha em branco. Não apaga nada.
+
+Onde escrever a instrução
+-------------------------
+- Logo abaixo do título da frase  -> vale só para aquela frase.
+- Logo abaixo da linha ##SECTION  -> vale para todas as frases da seção.
+  (A instrução da frase vale mais que a da seção.)
+
+Exemplo 1 (só uma frase):
+
+  Ascite moderada [Ascite]:
+  @@SUBSTITUI = Texto da linha do modelo.
+  Presença de líquido livre em moderada quantidade na cavidade abdominal.
+
+Exemplo 2 (a seção inteira):
+
+  ##SECTION BAÇO ACESSÓRIO
+  @@ABAIXO_DE = Baço
+
+  Baço acessório:
+  Baço acessório medindo * mm.
+
+Dicas
+-----
+- Não precisa respeitar maiúsculas, acentos nem o ponto final.
+- Basta o começo da linha (ex.: "Baço" ou "Texto da linha").
+- Também vale escrever @@SUBSTITUI: ... ou @@ABAIXO DE ...
+- Se o texto não for encontrado no laudo, o programa usa a posição normal.
+- Listas de escolha ?[a|b] que ainda não foram escolhidas contam como
+  qualquer uma das suas opções. Ex.: @@SUBSTITUI = Embrião encontra a linha
+  "?[Embrião|Feto] identificado, ..." (também "?[EMBRIÃO|FETO] A").
+  Depois de escolhida, vale o texto escolhido.
+- O começo é comparado por palavras inteiras: "Placenta" NÃO encontra
+  "Dois discos placentários" nem "?[Um disco placentário|...]".
+- Se o texto aparece em mais de uma linha, vale a PRIMEIRA linha do laudo.
+
+Frase que entra sempre: @@SEMPRE
+---------------------------------
+Escreva @@SEMPRE logo abaixo do título da frase (junto com @@ABAIXO_DE ou
+@@SUBSTITUI, em qualquer ordem). Toda vez que um modelo for carregado (ou
+recarregado do zero), a frase já entra sozinha no lugar indicado.
+Se o texto indicado não existir naquele modelo, ela vai para a posição normal.
+Se o texto da frase já estiver no laudo, ela não é repetida.
+Vale também "@@SEMPRE:" e minúsculas. A linha @@SEMPRE nunca vai para o laudo.
+Na seção TODOS, vale para todos os exames.
+
+Exemplo (assinatura):
+
+  ##SECTION QUALIDADE DE IMAGEM/OUTRAS OBS.
+
+  Assinatura:
+  @@ABAIXO_DE = Considerações gerais
+  @@SEMPRE
+  NOME DO MÉDICO
+  CRM: 00000-0/UF
+  ESPECIALIDADE - RQE N.: 00000
+
+Seções repetidas
+----------------
+Uma ##SECTION repetida (mesmo nome em outro exame/modelo) sem frases e sem
+instrução serve só para marcar o lugar naquele modelo: ela usa as frases e a
+instrução da PRIMEIRA vez em que essa seção aparece no arquivo.
+Se a seção repetida tiver instrução própria, vale a dela.
+- Salve o arquivo do Word como "Texto sem formatação (.txt)".
+
+Onde colocar as instruções (@@SUBSTITUI, @@ABAIXO_DE, @@SEMPRE)
+---------------------------------------------------------------
+- Da seção: logo abaixo da linha ##SECTION.
+- Da frase: logo abaixo do título da frase (antes do texto).
+- Uma instrução escrita DEPOIS do texto de uma frase vale para essa frase, e
+  não para a próxima. O relatório de inconsistências avisa nesse caso.
+- Instrução dentro de um @@TEMPLATE não tem efeito.
+- Nome errado (ex.: @@SUBTITUI) não funciona e vira texto. O relatório mostra
+  o nome certo provável.
+
+Relatório de inconsistências (Configurações > Banco de frases)
+--------------------------------------------------------------
+Agrupado em Erros, Avisos e Informativos, e depois por tipo. Cada tipo diz o
+que significa e se precisa de ação. Cada item mostra a linha do .txt e o
+caminho exame > template > seção > frase. Por padrão aparecem só erros e
+avisos. "Informativos" e "informativos de rotina" mostram o resto.
+"Copiar como texto" copia os itens que estão visíveis.
+
+Duas abas ao mesmo tempo
+------------------------
+Cada aba guarda o seu próprio laudo. Recarregar a aba volta o laudo dela.
+Uma aba nova não pega o laudo de outra aba que ainda está aberta. Se uma aba
+foi fechada, a próxima aba nova recupera o laudo dela.
+Banco de frases e configurações são os mesmos para todas as abas. Uma
+mudança feita numa aba vale na hora nas outras.
