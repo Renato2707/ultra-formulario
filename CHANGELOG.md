@@ -11,6 +11,33 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-D2] Configurações com Salvar, histórico de pesquisa, editor do banco, ordem das diretivas — entregue, NÃO testado pelo usuário
+- Configurações: botões "Salvar alterações" e "Cancelar", sempre visíveis no rodapé.
+  Fechar pelo X, por Esc ou clicando fora **descarta** as mudanças; enquanto há
+  mudança aparece "Alterações não salvas" e o botão Salvar fica destacado.
+  O tema é só pré-visualizado até salvar. Botões de ação dentro da janela
+  (Trocar arquivo, Editar banco, Relatório, Armazenamento) salvam antes de agir.
+- Pesquisa: o texto digitado já era lembrado (recarregar/abas/reinício: confirmado
+  no Chrome real); corrigido um defeito real entre abas (uma aba sobrescrevia o
+  texto pesquisado na outra). Novo histórico por campo (exames, modelos, frases,
+  laudo): o termo entra ao confirmar (Enter, sair do campo, escolher resultado),
+  cada termo tem "x", ordem = último pesquisado no topo e depois frequência.
+- "Ordenar por frequência de uso" (modelos): o modelo usado por último em cada
+  exame fica no topo; os demais por frequência.
+- Editor do banco dentro do app (Configurações › Banco de frases › Editar banco):
+  números de linha, "Ir para a linha" (Ctrl+G), Ctrl+S, Salvar (cópia de
+  segurança do banco anterior, recarrega e revalida), Cancelar, aviso de
+  alterações não salvas. Cada item do relatório de inconsistências tem "editar"
+  que abre o editor na linha.
+- Diretivas: várias @@SUBSTITUI/@@ABAIXO_DE na mesma frase ou seção agora valem
+  na ordem escrita (de cima para baixo): vale a primeira cujo alvo existe
+  (antes valia a última). Precedência frase > seção > genérico mantida.
+  Palavras reservadas documentadas: "TOPO" e "Relatório" (sem linha "Relatório…"
+  no modelo = logo abaixo do título). O aviso DIRECTIVE_DUPLICATE virou informativo.
+- Relatório de inconsistências: TITLE_LIKE_IN_BODY ("linha terminada em ':'
+  colada ao texto") não é mais listado nem contado (o parser continua gerando).
+- Testes: `test/placement_test.py --diretivas` (banco genérico embutido).
+
 ## [etapa-D1] Armazenamento em pasta (pendrive) — entregue, NÃO testado pelo usuário
 - Nova "Pasta de dados" (Configurações › Armazenamento), escolhida uma vez pela
   File System Access API (Chrome/Edge). Arquivos comuns na pasta:
@@ -83,6 +110,15 @@ O banco de frases **nunca** faz parte do repositório.
 
 ## Não testado pelo usuário
 Tudo desde o início da etapa D foi entregue sem teste do usuário:
+- D2 (tudo): Salvar/Cancelar nas Configurações, histórico de pesquisa, ordem por
+  frequência com último no topo, editor do banco (inclusive salvar na pasta de
+  dados com backup), ordem das diretivas e "TOPO"/"Relatório", ocultação de
+  TITLE_LIKE_IN_BODY. Testado só em Chrome automatizado (headless e com janela,
+  perfil persistente), não no PC do usuário; Edge e IE11 não testados.
+- D2, editor do banco: salvar grava o texto em UTF-8 (se o arquivo original
+  era ANSI/Windows-1252, ele passa a ser UTF-8).
+- D2: o defeito "a pesquisa não persiste" relatado não foi reproduzido no Chrome
+  automatizado; só foi corrigida a sobrescrita entre abas.
 - D1, pasta de dados: janela real de escolher pasta; pendrive de verdade
   (inclusive retirá-lo com o app aberto); Microsoft Edge; permissão depois de
   reiniciar o Chrome; usar o mesmo pendrive em dois computadores.

@@ -70,7 +70,7 @@ var UFMain = function () {
     leftW: 260, rightW: 340, rightCollapsed: false, autoNextSec: true, hypUnderline: true, dragInReport: true, blockCopy: true
   };
   var S = {
-    bank: null, bankName: '', settings: {}, usage: UStore.get('usage', {}), order: UStore.get('order', []),
+    bank: null, bankName: '', settings: {}, usage: UStore.get('usage', {}), usageLast: UStore.get('usageLast', {}) || {}, order: UStore.get('order', []),
     userModels: UStore.get('userModels', []), userPhrases: UStore.get('userPhrases', []),
     overrides: UStore.get('overrides', {}), hidden: UStore.get('hidden', {}),
     models: [], activeModelId: null, activeExam: null, selCard: null, savedRange: null,
@@ -88,7 +88,14 @@ var UFMain = function () {
     S.navSearch = [String(q.nav1 || ''), String(q.nav2 || ''), String(q.nav3 || '')];
     S.repQuery = String(q.rep || '');
   })();
-  function saveSearch() { UStore.set('search', { nav1: S.navSearch[0], nav2: S.navSearch[1], nav3: S.navSearch[2], rep: S.repQuery || '' }); }
+  /* only the field(s) changed in THIS tab are written, so two tabs never overwrite each other's words (D2) */
+  var searchSeen = { nav1: S.navSearch[0], nav2: S.navSearch[1], nav3: S.navSearch[2], rep: S.repQuery };
+  function searchNow() { return { nav1: S.navSearch[0], nav2: S.navSearch[1], nav3: S.navSearch[2], rep: S.repQuery || '' }; }
+  function saveSearch() {
+    var cur = searchNow(), st = UStore.get('search', {}) || {}, k, ch = false;
+    for (k in cur) { if (cur.hasOwnProperty(k) && cur[k] !== searchSeen[k]) { st[k] = cur[k]; searchSeen[k] = cur[k]; ch = true; } }
+    if (ch) { UStore.set('search', st); }
+  }
   /* the small x inside a search field: visible only when the field has text */
   function sxShow(inp) { var x = inp && inp.nextSibling; if (x && hasCls(x, 'sx')) { x.hidden = !inp.value; } }
 
@@ -190,10 +197,16 @@ var UFMain = function () {
     var r = UltraParser.parse('@@EXAME X\n@@TEMPLATE M\n' + modelRaw(m));
     return r.exams[0] && r.exams[0].templates[0] ? r.exams[0].templates[0] : { body: '', fields: [], critical: [] };
   }
+  /* "Ordenar por frequência de uso" (D2): the model used LAST in each exam always first, then by use count */
   function sortedModels() {
-    var arr = S.models.slice(0), ord = S.order;
+    var arr = S.models.slice(0), ord = S.order, top = {}, i, ul = S.usageLast || {};
+    if (S.settings.sortByUsage) {
+      for (i = 0; i < arr.length; i++) { var t = ul[arr[i].id] || 0, ex = arr[i].exam; if (t && (!top[ex] || t > ul[top[ex]])) { top[ex] = arr[i].id; } }
+    }
     arr.sort(function (a, b) {
       if (S.settings.sortByUsage) {
+        var ta = top[a.exam] === a.id ? 1 : 0, tb = top[b.exam] === b.id ? 1 : 0;
+        if (ta !== tb) { return tb - ta; }
         var d = (S.usage[b.id] || 0) - (S.usage[a.id] || 0);
         if (d) { return d; }
       }
@@ -1287,10 +1300,21 @@ var UFMain = function () {
     return out;
   }
   function anchorHits(anchor, el) { var v = lineVariants(el), i; for (i = 0; i < v.length; i++) { if (anchor.test(v[i])) { return true; } } return false; }
+  /* a directive and its alternatives, in the order written in the txt (D2: the first one with a target wins) */
+  function placeChain(pd) { return pd ? [pd].concat(pd.alts || []) : []; }
+  /* reserved targets (documented in LEIA-ME-frases.txt): "TOPO" = right below the first line (title) of the
+     report; "Relatório" = the line starting with "Relatório" (e.g. "Relatório ...:") and, when the
+     template has no such line, the same as TOPO */
+  function topTarget(pd) { var f = cleanWords(pd.text).join(' '); return f === 'TOPO' || f === 'RELATORIO' ? f : ''; }
   /* rule built from a user directive (@@SUBSTITUI / @@ABAIXO_DE) */
   function directiveRule(pd) {
     var w = cleanWords(pd.text).join(' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     if (!w) { return null; }
+    if (topTarget(pd)) {
+      var tw = cleanWords(pd.text), tt = topTarget(pd);
+      return { id: 'u:' + tt, mode: 'appendAfter', anyLine: false, user: true, top: tt,
+               anchor: { test: function (folded) { return tt === 'RELATORIO' && prefixEq(String(folded).split(' '), tw); } } };
+    }
     var aw = cleanWords(pd.text);
     /* anchor = the line STARTS with these words (singular/plural tolerant: 'Rim' also matches 'Rins') */
     return { id: 'u:' + w.replace(/[^A-Z0-9]+/g, '_').substring(0, 40), mode: pd.mode, anyLine: true, user: true,
@@ -1302,7 +1326,7 @@ var UFMain = function () {
     for (i = 0; i < secs.length; i++) {
       for (j = 0; j < secs[i].cards.length; j++) {
         c = secs[i].cards[j];
-        var ps = [c.secPlace, c.ph && c.ph.place], k;
+        var ps = placeChain(c.secPlace).concat(placeChain(c.ph && c.ph.place)), k;
         for (k = 0; k < ps.length; k++) { if (ps[k] && (d = directiveRule(ps[k])) && d.id !== exceptId && !seen[d.id]) { seen[d.id] = 1; out.push(d.anchor); } }
       }
     }
@@ -1311,6 +1335,16 @@ var UFMain = function () {
   /* -> { range, replace, blank } or null when the anchor is missing */
   function ruleTarget(rule) {
     var L = editorLines(), i, r = document.createRange();
+    if (rule.top) {   /* reserved target: "Relatório" line if present, otherwise below the title (first line) */
+      var tr = rule.top === 'RELATORIO' ? ruleTarget({ id: rule.id, mode: 'appendAfter', anyLine: false, anchor: rule.anchor }) : null;
+      if (tr) { return tr; }
+      var t0 = -1, t1;
+      for (i = 0; i < L.length; i++) { if (L[i].getAttribute('data-rule') === rule.id) { t0 = i; } }   /* after phrases already placed on top */
+      if (t0 < 0) { for (i = 0; i < L.length; i++) { if (!isBlankLine(L[i])) { t0 = i; break; } } }
+      if (t0 < 0) { return null; }
+      t1 = t0; S.lastAnchor = lineText(L[t0]);
+      r.selectNodeContents(L[t1]); r.collapse(false); return { range: r, replace: false, blank: false };
+    }
     if (rule.mode === 'replaceLine') {
       var at = -1;
       for (i = 0; i < L.length; i++) { if (!isHypEl(L[i]) && anchorHits(rule.anchor, L[i])) { at = i; break; } }
@@ -1397,7 +1431,7 @@ var UFMain = function () {
     html = html.replace(/<div( class="([^"]*)")?>/g, function (t, a, cl) { return '<div class="' + (cl ? cl + ' ' : '') + 'chg" data-ins="' + tag + '">'; });
     if (hyp) { html = html.replace(/<div( class="[^"]*")?/g, function (t, cl) { return '<div' + (cl || '') + ' data-hyp="' + esc(hyp) + '"'; }); }
     /* precedence: phrase directive > section directive (both from the txt) > generic section-name matching */
-    var rule = null, kr = null, cand = [c.ph && c.ph.place ? directiveRule(c.ph.place) : null, c.secPlace ? directiveRule(c.secPlace) : null], ci;
+    var rule = null, kr = null, cand = placeChain(c.ph && c.ph.place).concat(placeChain(c.secPlace)).map(directiveRule), ci;
     for (ci = 0; ci < cand.length && !kr; ci++) { if (cand[ci]) { rule = cand[ci]; rule.secName = c.dispSec || c.section; kr = ruleTarget(rule); } }
     if (!kr) { rule = null; }
     var tgt = kr ? null : findSectionTarget([c.dispSec, c.section]), msg = 'Inserida: ' + c.ph.title, how;
@@ -1540,6 +1574,7 @@ var UFMain = function () {
     function doLoad() {
       S.activeModelId = m.id; S.activeExam = m.exam; S.navExam = m.exam; S.level = 3; S.selCard = null;
       S.usage[m.id] = (S.usage[m.id] || 0) + 1; UStore.set('usage', S.usage);
+      S.usageLast[m.id] = now(); UStore.set('usageLast', S.usageLast);
       loadIntoEditor(renderLines(tp.body, tp.fields, tp.critical));
       var na = insertAlways(m.exam);
       renderAll();
@@ -1696,7 +1731,11 @@ var UFMain = function () {
 
   /* ================= settings ================= */
   var SET_IDS = ['paperDark', 'hypUnderline', 'blockCopy', 'dragInReport', 'autoNextSec', 'dragReorder', 'sortByUsage', 'showUsage', 'normPunct', 'normSymbols', 'ascii', 'warnFields'];
+  /* D2: settings are saved only by "Salvar alterações" (or by an action button inside the dialog, which saves
+     first). Closing with X, Esc or a click outside discards the changes; the theme is only previewed meanwhile. */
+  var setSnap = null, setSaved = false;
   function readSettingsForm() {
+    setSaved = true;
     var st = S.settings, k, r;
     for (k = 0; k < SET_IDS.length; k++) { st[SET_IDS[k]] = $('st_' + SET_IDS[k]).checked; }
     r = document.getElementsByName('st_eol'); for (k = 0; k < r.length; k++) { if (r[k].checked) { st.eol = r[k].value; } }
@@ -1729,13 +1768,29 @@ var UFMain = function () {
       '<fieldset><legend>Banco de frases</legend><p>' + (S.bank ? esc(S.bankName || 'banco') + ': ' + S.bank.stats.exams + ' exames, ' + S.bank.stats.templates +
         ' modelos, ' + S.bank.stats.phrases + ' frases. ' + n + ' item(ns) no relatório' + (function (b) { return n ? ' (' + (b.erro || 0) + ' erro(s), ' + (b.aviso || 0) + ' aviso(s), ' + (b.info || 0) + ' informativo(s))' : ''; })(bySev) + '.' : 'Nenhum banco carregado.') + '</p>' +
       '<div class="btnrow"><label class="btn btn-file">' + (S.bank ? 'Trocar arquivo' : 'Escolher arquivo') + '<input type="file" id="bankFile1" accept=".txt,text/plain"></label>' +
-      (S.bank ? '<button type="button" class="btn" id="stIssues">Ver relatório de inconsistências</button>' : '') + '</div>' +
+      (S.bank ? '<button type="button" class="btn" id="stBankEdit" title="Editar o texto do banco aqui no app">Editar banco</button><button type="button" class="btn" id="stIssues">Ver relatório de inconsistências</button>' : '') + '</div>' +
       '</fieldset>' + storageFieldset();
-    modal('Configurações', body, [{ label: 'Fechar', cls: 'btn-primary', focus: true, click: function () { readSettingsForm(); } }]);
+    setSnap = JSON.stringify(S.settings); setSaved = false;
+    modal('Configurações', body, [{ label: 'Cancelar', id: 'stCancel' },
+      { label: 'Salvar alterações', cls: 'btn-primary', id: 'stSave', focus: true, click: function () { readSettingsForm(); toast('Configurações salvas.'); } }],
+      function () {
+        if (setSaved || !setSnap) { return; }
+        var was = JSON.parse(setSnap), q, changed = JSON.stringify(S.settings) !== setSnap || hasCls($('stSave'), 'dirty');
+        for (q in was) { if (was.hasOwnProperty(q)) { S.settings[q] = was[q]; } }
+        applyTheme();
+        if (changed) { toast('Alterações não salvas foram descartadas.'); }
+      });
+    var dirtyEl = document.createElement('span'); dirtyEl.id = 'stDirty'; dirtyEl.className = 'muted'; dirtyEl.hidden = true; dirtyEl.innerHTML = 'Alterações não salvas';
+    $('modalFoot').insertBefore(dirtyEl, $('modalFoot').firstChild);
+    on($('modalBody'), 'change', function (e) {
+      var t = e.target; if (!t || !t.id && !t.name || !/^st_/.test(t.id || t.name)) { return; }
+      dirtyEl.hidden = false; addCls($('stSave'), 'dirty');
+    });
     if ($('stIssues')) { on($('stIssues'), 'click', function () { readSettingsForm(); issuesDialog(); }); }
+    if ($('stBankEdit')) { on($('stBankEdit'), 'click', function () { readSettingsForm(); bankEditor(0, false); }); }
     var thr = document.getElementsByName('st_theme'), tq;
-    for (tq = 0; tq < thr.length; tq++) { on(thr[tq], 'change', function () { S.settings.theme = this.value; applyTheme(); saveSettings(); }); }
-    on($('st_paperDark'), 'change', function () { S.settings.paperDark = this.checked; applyTheme(); saveSettings(); });
+    for (tq = 0; tq < thr.length; tq++) { on(thr[tq], 'change', function () { S.settings.theme = this.value; applyTheme(); }); }   /* preview; saved by Salvar */
+    on($('st_paperDark'), 'change', function () { S.settings.paperDark = this.checked; applyTheme(); });
     on($('bankFile1'), 'change', function () { var f = this.files && this.files[0]; if (f) { readSettingsForm(); closeModal(); loadBankFile(f); } });
     storageWire();
   }
@@ -1776,7 +1831,7 @@ var UFMain = function () {
   function exportData() {
     saveDraft(); if (!$('modalBack').hidden && $('st_showUsage')) { readSettingsForm(); }
     var o = { formato: 'ultra-formulario-dados', versao: 1, exportadoEm: new Date().toISOString(), banco: UStore.get('bank', null),
-      configuracoes: UStore.get('settings', {}), dados: {} }, ks = ['userModels', 'userPhrases', 'overrides', 'hidden', 'order', 'usage', 'search'], i;
+      configuracoes: UStore.get('settings', {}), dados: {} }, ks = ['userModels', 'userPhrases', 'overrides', 'hidden', 'order', 'usage', 'usageLast', 'search', 'searchHist'], i;
     for (i = 0; i < ks.length; i++) { o.dados[ks[i]] = UStore.get(ks[i], null); }
     var d = new Date(), nm = 'ultra-formulario-dados_' + d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) + '.json',
       blob = new Blob([JSON.stringify(o, null, 2)], { type: 'application/json' });
@@ -1788,7 +1843,7 @@ var UFMain = function () {
   function importData(f) {
     var fr = new FileReader();
     fr.onload = function () {
-      var o, i, ks = ['userModels', 'userPhrases', 'overrides', 'hidden', 'order', 'usage', 'search'];
+      var o, i, ks = ['userModels', 'userPhrases', 'overrides', 'hidden', 'order', 'usage', 'usageLast', 'search', 'searchHist'];
       try { o = JSON.parse(fr.result); } catch (e) { o = null; }
       if (!o || o.formato !== 'ultra-formulario-dados') { toast('Arquivo inválido: escolha um arquivo exportado pelo app (.json).'); return; }
       saveDraft();
@@ -1843,7 +1898,7 @@ var UFMain = function () {
     DIRECTIVE_NO_NAME: ['c', 'Diretiva sem o nome depois dela (ex.: "@@EXAME" sozinho).'],
     DIRECTIVE_EMPTY_TARGET: ['c', '@@SUBSTITUI ou @@ABAIXO_DE sem dizer qual linha. A frase vai para o lugar padrão.'],
     DIRECTIVE_MISPLACED: ['r', 'Diretiva num lugar onde não tem efeito, ou depois do texto de uma frase (então vale para essa frase, não para a próxima).'],
-    DIRECTIVE_DUPLICATE: ['r', 'Duas diretivas de posição para a mesma frase ou seção. Só a última vale.'],
+    DIRECTIVE_DUPLICATE: ['c', 'Mais de uma diretiva de posição para a mesma frase ou seção. Vale a primeira (de cima para baixo) cujo alvo existe no modelo; as seguintes são alternativas.'],
     ALWAYS_DUPLICATE: ['r', '@@SEMPRE escrito duas vezes na mesma frase. Basta uma.'],
     DIRECTIVE_TARGET_MISSING: ['r', 'Nenhuma linha do template começa com o texto indicado na diretiva. A frase é inserida no fim da seção/laudo. Corrija o texto-alvo, ou ignore se o template realmente não tem essa linha.'],
     DIRECTIVE_SEPARATOR: ['n', 'Diretiva escrita com ":" ou "=" (ex.: "@@EXAME: X"). Funciona igual.'],
@@ -1906,6 +1961,7 @@ var UFMain = function () {
           var ps = [[c.secPlace, ''], [c.ph && c.ph.place, c.ph ? c.ph.title : '']], q;
           for (q = 0; q < ps.length; q++) {
             var pd = ps[q][0], rule = pd && directiveRule(pd); if (!rule) { continue; }
+            var chain = placeChain(pd).map(directiveRule).filter(function (x) { return !!x; });
             var key = pd.line + '|' + secs[i].name + '|' + (q ? ps[q][1] : '');
             var agg = byKey[key];
             if (!agg) { agg = byKey[key] = { pd: pd, sec: secs[i].name, ph: q ? ps[q][1] : '', hit: 0, all: [], some: [], seen: {} }; order.push(key); }
@@ -1914,7 +1970,7 @@ var UFMain = function () {
             var miss = [];
             for (k = 0; k < tl.length; k++) {
               var found = false, z;
-              for (z = 0; z < tl[k].lines.length && !found; z++) { found = anchorHits(rule.anchor, tl[k].lines[z]); }
+              for (z = 0; z < tl[k].lines.length && !found; z++) { for (var y = 0; y < chain.length && !found; y++) { found = !!chain[y].top || anchorHits(chain[y].anchor, tl[k].lines[z]); } }
               if (found) { agg.hit++; } else { miss.push(tl[k].name); }
             }
             if (miss.length === tl.length) { agg.all.push(ex[e]); } else if (miss.length) { agg.some.push(ex[e] + ': ' + miss.join(', ')); }
@@ -1934,10 +1990,13 @@ var UFMain = function () {
     }
     return out;
   }
+  var HIDDEN_ISSUES = ['TITLE_LIKE_IN_BODY'];
   function allIssues() {
     if (!S.bank) { return []; }
     if (!S.bank._dirIssues) { try { S.bank._dirIssues = directiveTargetIssues(); } catch (e) { S.bank._dirIssues = []; } }
-    return S.bank.issues.concat(S.bank._dirIssues);
+    /* hidden by request (D2): a line ending in ':' inside a phrase body is intended text; the parser still
+       reports it internally, it is just not listed nor counted */
+    return S.bank.issues.filter(function (it) { return HIDDEN_ISSUES.indexOf(it.type) < 0; }).concat(S.bank._dirIssues);
   }
   function issuePath(it) {
     var p = it.type === 'DIRECTIVE_TARGET_MISSING' ? [] : [it.exam || '(sem exame)'];
@@ -1990,6 +2049,101 @@ var UFMain = function () {
     }
     return t;
   }
+  /* ================= bank editor (D2) =================
+     the bank txt edited inside the app: plain textarea (fast with ~2500 lines / 1 MB, works in IE11),
+     line numbers in a gutter, "Ir para a linha". Salvar = keeps a backup of the previous bank, stores the new
+     text (data folder or browser), reloads and revalidates the bank. Cancelar discards. No confirmations. */
+  var BE = { open: false, dirty: false, fromReport: false, n: 0, lh: 18 };
+  function beBuild() {
+    if ($('beditBack')) { return; }
+    var d = document.createElement('div'); d.id = 'beditBack'; d.hidden = true;
+    d.innerHTML = '<div id="bedit" role="dialog" aria-label="Editar banco de frases">' +
+      '<div class="be-head"><b>Editar banco de frases</b><span class="muted" id="beName"></span><span class="grow"></span>' +
+      '<label class="be-go">Ir para a linha <input type="text" id="beGo" size="6" autocomplete="off"></label>' +
+      '<span id="beDirty" class="muted" hidden>Alterações não salvas</span>' +
+      '<button type="button" class="btn" id="beCancel">Cancelar</button><button type="button" class="btn btn-primary" id="beSave">Salvar</button></div>' +
+      '<div class="be-body"><div id="beGut" aria-hidden="true"></div><textarea id="beTxt" wrap="off" spellcheck="false" autocomplete="off"></textarea></div>' +
+      '<div class="be-foot muted"><span id="bePos"></span> <span class="grow"></span>Salvar guarda uma cópia do banco anterior (backup) e recarrega o banco.</div></div>';
+    document.body.appendChild(d);
+    var ta = $('beTxt'), gt = $('beGut'), gutTimer = null;
+    on(ta, 'scroll', function () { gt.scrollTop = ta.scrollTop; });
+    on(ta, 'input', function () { beDirty(true); clearTimeout(gutTimer); gutTimer = setTimeout(beGutter, 120); });
+    on(ta, 'keyup', bePos); on(ta, 'click', bePos);
+    on(ta, 'keydown', function (e) {
+      if (e.keyCode === 9) { e.preventDefault(); beInsert('\t'); }   /* Tab writes a tab, it does not leave the text */
+      if ((e.ctrlKey || e.metaKey) && e.keyCode === 83) { e.preventDefault(); beSave(); }   /* Ctrl+S */
+      if ((e.ctrlKey || e.metaKey) && e.keyCode === 71) { e.preventDefault(); $('beGo').focus(); $('beGo').select(); }   /* Ctrl+G */
+    });
+    on($('beGo'), 'keydown', function (e) { if (e.keyCode === 13) { e.preventDefault(); var n = parseInt(this.value, 10); if (n > 0) { beGoto(n); } } });
+    on($('beCancel'), 'click', function () { beClose(); });
+    on($('beSave'), 'click', function () { beSave(); });
+    on(d, 'keydown', function (e) {
+      e.stopPropagation();   /* the report shortcuts must not act while the bank editor is open */
+      if (e.keyCode === 27 && !BE.dirty) { e.preventDefault(); beClose(); }
+    });
+  }
+  function beInsert(t) {
+    var ta = $('beTxt');
+    if (typeof ta.selectionStart === 'number') {
+      var a = ta.selectionStart, b = ta.selectionEnd, st = ta.scrollTop;
+      ta.value = ta.value.substring(0, a) + t + ta.value.substring(b); ta.selectionStart = ta.selectionEnd = a + t.length; ta.scrollTop = st;
+    }
+    beDirty(true);
+  }
+  function beDirty(v) { BE.dirty = v; $('beDirty').hidden = !v; if (v) { addCls($('beSave'), 'dirty'); } else { rmCls($('beSave'), 'dirty'); } }
+  function beGutter() {
+    var v = $('beTxt').value, n = 1, i = -1, out = [], k;
+    while ((i = v.indexOf('\n', i + 1)) >= 0) { n++; }
+    if (n === BE.n) { return; }
+    BE.n = n;
+    for (k = 1; k <= n; k++) { out.push(k); }
+    $('beGut').innerHTML = out.join('<br>') + '<br><br>';
+    $('beGut').scrollTop = $('beTxt').scrollTop;
+  }
+  function bePos() {
+    var ta = $('beTxt'); if (typeof ta.selectionStart !== 'number') { return; }
+    var v = ta.value.substring(0, ta.selectionStart), ln = v.split('\n');
+    $('bePos').innerHTML = 'Linha ' + ln.length + ', coluna ' + (ln[ln.length - 1].length + 1);
+  }
+  function beGoto(n) {
+    var ta = $('beTxt'), v = ta.value, i = 0, k, e;
+    for (k = 1; k < n; k++) { var j = v.indexOf('\n', i); if (j < 0) { break; } i = j + 1; }
+    e = v.indexOf('\n', i); if (e < 0) { e = v.length; }
+    ta.focus();
+    if (ta.setSelectionRange) { ta.setSelectionRange(i, e); }
+    var line = v.substring(0, i).split('\n').length;
+    ta.scrollTop = Math.max(0, (line - 1) * BE.lh - ta.clientHeight / 3);
+    $('beGut').scrollTop = ta.scrollTop; bePos();
+  }
+  function bankEditor(line, fromReport) {
+    if (!S.bank) { toast('Nenhum banco carregado.'); return; }
+    var bk = UStore.get('bank', null), txt = bk && bk.text ? bk.text : S.srcLines.join('\n');
+    if (!$('modalBack').hidden) { closeModal(); }
+    beBuild(); BE.open = true; BE.fromReport = !!fromReport; BE.n = 0;
+    $('beName').innerHTML = ' ' + esc(S.bankName || 'banco') + (UFolder.status() === 'folder' ? ' — pasta de dados' : ' — navegador');
+    $('beTxt').value = String(txt).replace(/\r\n?/g, '\n'); beDirty(false); beGutter();
+    $('beditBack').hidden = false;
+    setTimeout(function () { beGoto(line > 0 ? line : 1); if (!(line > 0)) { $('beTxt').setSelectionRange && $('beTxt').setSelectionRange(0, 0); $('beTxt').scrollTop = 0; $('beGut').scrollTop = 0; } }, 0);
+  }
+  function beClose() { $('beditBack').hidden = true; BE.open = false; beDirty(false); $('beTxt').value = ''; BE.n = 0; }
+  function beSave() {
+    var txt = $('beTxt').value, name = S.bankName || 'banco-de-frases.txt', old = UStore.get('bank', null), fromRep = BE.fromReport;
+    if (UFolder.status() !== 'folder' && old && old.text && old.text !== txt) {   /* browser mode: keep the previous bank as a backup */
+      if (!UStore.set('bankBackup', { t: now(), name: old.name, text: old.text })) { UStore.remove('bankBackup'); }
+    }
+    setBank(txt, name, true);
+    if (!UStore.set('bank', { name: name, text: txt })) {
+      UStore.remove('bankBackup');
+      if (!UStore.set('bank', { name: name, text: txt })) { toast('Atenção: o banco foi recarregado, mas não coube no navegador (não será lembrado).'); }
+    }
+    if (UFolder.status() === 'folder') { UFolder.saveBank(txt, function (w) { if (!w) { toast('Atenção: não foi possível gravar o banco na pasta de dados.'); } }); }
+    beClose();
+    var n = allIssues().filter(function (it) { return it.severity !== 'info'; }).length;
+    toast('Banco salvo e recarregado. ' + (n ? n + ' erro(s)/aviso(s) no relatório.' : 'Nenhum erro ou aviso.'));
+    if (fromRep) { issuesDialog(); }
+  }
+  window.addEventListener('beforeunload', function (e) { if (BE.open && BE.dirty) { e.preventDefault(); e.returnValue = ''; return ''; } });
+
   function issuesDialog() {
     var all = allIssues(), cnt = { erro: 0, aviso: 0, info: 0 }, noiseN = 0, i;
     for (i = 0; i < all.length; i++) { cnt[all[i].severity] = (cnt[all[i].severity] || 0) + 1; if (all[i].severity === 'info' && ISSUE_NOISE[all[i].type]) { noiseN++; } }
@@ -2014,7 +2168,7 @@ var UFMain = function () {
             (hp ? '<div class="iss-help">' + esc(hp[1]) + '</div>' : '') + '<ul class="iss-items">';
           for (q = 0; q < ty.items.length; q++) {
             var it = ty.items[q];
-            h += '<li><span class="iss-ln">linha ' + it.line + '</span> ' + esc(issuePath(it)) +
+            h += '<li><span class="iss-ln">linha ' + it.line + '</span> ' + (it.line > 0 ? '<a href="#" class="iss-edit" data-line="' + it.line + '" title="Abrir o editor do banco nesta linha">editar</a> ' : '') + esc(issuePath(it)) +
               '<div class="iss-txt">' + esc(trim(String(it.text || '')).substring(0, 220)) + '</div>' +
               (it.miss ? '<div class="iss-msg">' + esc(it.miss) + '</div>' : '') +
               (it.message && it.message !== typeTitle(ty.type, ty.items) && ty.type !== 'DIRECTIVE_TARGET_MISSING' ? '<div class="iss-msg">' + esc(it.message) + '</div>' : '') + '</li>';
@@ -2024,6 +2178,8 @@ var UFMain = function () {
       }
       if (!h) { h = '<p>Nada a mostrar com os filtros escolhidos' + (cnt.erro + cnt.aviso === 0 ? ': nenhum erro e nenhum aviso.' : '.') + '</p>'; }
       $('isList').innerHTML = h;
+      var ed = qsa($('isList'), '.iss-edit'), z;
+      for (z = 0; z < ed.length; z++) { on(ed[z], 'click', function (e) { e.preventDefault(); bankEditor(parseInt(this.getAttribute('data-line'), 10), true); }); }
       $('modal').scrollTop = 0;
     }
     function bind(id, k) { on($(id), 'change', function () { issueView[k] = this.checked; render(); }); }
@@ -2379,6 +2535,74 @@ var UFMain = function () {
     }, true);
   });
 
+  /* ================= search history (D2) =================
+     per field ('nav1'..'nav3' = exam / model / phrase search, 'rep' = report search); a term enters only when
+     the search is confirmed (Enter, leaving the field, choosing a result), never on each letter.
+     Order: the LAST term searched always first, then by how often it was used. Each term has its own x. */
+  var HIST_MAX = 30, histOpen = null;
+  function histField(inp) { return inp && inp.id === 'repSearch' ? 'rep' : 'nav' + S.level; }
+  function histAll() { var h = UStore.get('searchHist', {}); return (h && typeof h === 'object') ? h : {}; }
+  function histList(field) {
+    var l = (histAll()[field] || []).slice(0), top = null, i;
+    for (i = 0; i < l.length; i++) { if (!top || l[i].l > top.l) { top = l[i]; } }
+    l.sort(function (a, b) { if (a === top) { return -1; } if (b === top) { return 1; } return (b.n - a.n) || (b.l - a.l); });
+    return l;
+  }
+  function histCommit(inp) {
+    var t = trim(inp.value); if (t.length < 2) { return; }
+    var h = histAll(), f = histField(inp), l = h[f] || [], k = foldKeep(t), i, hit = null;
+    for (i = 0; i < l.length; i++) { if (foldKeep(l[i].t) === k) { hit = l[i]; break; } }
+    if (hit && hit.l > now() - 1500 && hit.t === t) { return; }   /* the same confirmation seen twice (Enter, then blur) */
+    if (hit) { hit.n++; hit.l = now(); hit.t = t; } else { l.push({ t: t, n: 1, l: now() }); }
+    if (l.length > HIST_MAX) { l.sort(function (a, b) { return b.l - a.l; }); l.length = HIST_MAX; }
+    h[f] = l; UStore.set('searchHist', h);
+  }
+  function histRemove(field, t) {
+    var h = histAll(), l = h[field] || [], i;
+    for (i = l.length - 1; i >= 0; i--) { if (l[i].t === t) { l.splice(i, 1); } }
+    h[field] = l; UStore.set('searchHist', h);
+  }
+  function histRender() {
+    var box = $('shist'), inp = histOpen; if (!inp) { box.hidden = true; return; }
+    var f = histField(inp), q = foldKeep(trim(inp.value)), l = histList(f), html = '', i, n = 0;
+    for (i = 0; i < l.length && n < 10; i++) {
+      if (q && foldKeep(l[i].t).indexOf(q) < 0) { continue; }
+      if (q && foldKeep(l[i].t) === q) { continue; }   /* already typed */
+      html += '<div class="sh-item" data-t="' + esc(l[i].t) + '"><span class="sh-t">' + esc(l[i].t) + '</span>' +
+        '<button type="button" class="sh-x" tabindex="-1" title="Remover do histórico" aria-label="Remover do histórico">&#215;</button></div>';
+      n++;
+    }
+    if (!n) { box.hidden = true; return; }
+    box.innerHTML = html;
+    var r = inp.getBoundingClientRect();
+    box.style.left = Math.round(r.left) + 'px'; box.style.top = Math.round(r.bottom + 2) + 'px'; box.style.minWidth = Math.round(r.width) + 'px';
+    box.hidden = false;
+  }
+  function histShow(inp) { histOpen = inp; histRender(); }
+  function histHide() { histOpen = null; $('shist').hidden = true; }
+  function histPick(inp, t) {
+    inp.value = t;
+    if (inp.id === 'repSearch') { S.repQuery = t; saveSearch(); sxShow(inp); repSearch(false); }
+    else { S.navSearch[S.level - 1] = t; saveSearch(); renderNav(); }
+    histCommit(inp); histHide(); inp.focus();
+  }
+  on($('shist'), 'mousedown', function (e) { e.preventDefault(); });   /* keep the focus in the search field */
+  on($('shist'), 'click', function (e) {
+    var it = closest(e.target, function (n) { return hasCls(n, 'sh-item'); }, $('shist')), inp = histOpen; if (!it || !inp) { return; }
+    var t = it.getAttribute('data-t');
+    if (hasCls(e.target, 'sh-x')) { histRemove(histField(inp), t); histRender(); return; }
+    histPick(inp, t);
+  });
+  (function () {
+    var fs = [$('navSearch'), $('repSearch')], i;
+    for (i = 0; i < fs.length; i++) {
+      on(fs[i], 'focus', function () { histShow(this); });
+      on(fs[i], 'input', function () { histShow(this); });
+      on(fs[i], 'blur', function () { histCommit(this); histHide(); });
+      on(fs[i], 'keydown', function (e) { if (e.keyCode === 13) { histCommit(this); histHide(); } else if (e.keyCode === 27 || e.keyCode === 40) { histHide(); } }, true);
+    }
+  })();
+
   /* report search */
   on($('repSearch'), 'keyup', function (e) {
     if (e.keyCode === 13) { repStep(e.shiftKey ? -1 : 1); return; }
@@ -2442,7 +2666,7 @@ var UFMain = function () {
   on(document, 'keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.keyCode === 80) {   /* Ctrl+P = the app's Imprimir (with review) */
       e.preventDefault(); e.stopPropagation();
-      if ($('modalBack').hidden) { output('print'); }
+      if ($('modalBack').hidden && !BE.open) { output('print'); }
       return;
     }
     if (!$('popup').hidden) {
@@ -2472,7 +2696,14 @@ var UFMain = function () {
     } else if (k === 'bank') {
       var bk = UStore.get('bank', null);
       if (bk && bk.text) { setBank(bk.text, bk.name, true); buildModels(); renderNav(); toast('Banco de frases atualizado (carregado em outra aba).'); }
-    } else if (k === 'userModels' || k === 'userPhrases' || k === 'order' || k === 'overrides' || k === 'usage' || k === 'hidden') {
+    } else if (k === 'search') {
+      var sq = UStore.get('search', {}) || {}, si2 = $('navSearch');
+      S.navSearch = [String(sq.nav1 || ''), String(sq.nav2 || ''), String(sq.nav3 || '')]; S.repQuery = String(sq.rep || '');
+      searchSeen = searchNow();
+      if (document.activeElement !== si2) { renderNav(); }
+      if (document.activeElement !== $('repSearch') && $('repSearch').value !== S.repQuery) { $('repSearch').value = S.repQuery; sxShow($('repSearch')); try { repSearch(false); } catch (eRs2) {} }
+    } else if (k === 'searchHist') { if (histOpen) { histRender(); }
+    } else if (k === 'userModels' || k === 'userPhrases' || k === 'order' || k === 'overrides' || k === 'usage' || k === 'usageLast' || k === 'hidden') {
       S[k] = UStore.get(k, S[k]); buildModels(); renderNav();
     }
   }

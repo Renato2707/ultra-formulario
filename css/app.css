@@ -313,3 +313,42 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .theme-dark #fbar{color:#e6e6e6;background:#2b2b2b;border-color:#555}
 #stMode{margin:2px 0 6px}
 @media print{#fbar{display:none !important}}
+/* D2: settings save button highlighted while there are unsaved changes */
+#modalFoot #stDirty{margin-right:auto;font-size:12px;font-style:italic}
+#modal .btn.dirty{box-shadow:0 0 0 3px #9a9a9a}
+.theme-dark #modal .btn.dirty{box-shadow:0 0 0 3px #8a8a8a}
+/* D2: search history under the search fields */
+#shist{position:fixed;z-index:120;max-height:300px;overflow:auto;padding:2px 0;font-size:12px}
+#shist[hidden]{display:none}
+#shist .sh-item{display:flex;align-items:center;padding:0 2px 0 8px;cursor:pointer;min-height:26px}
+#shist .sh-item:hover{background:#ececec}
+.theme-dark #shist .sh-item:hover{background:#3a3a3a}
+#shist .sh-t{flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:6px}
+#shist .sh-x{width:24px;height:24px;border:0;background:transparent;color:#999;font-size:15px;cursor:pointer;border-radius:4px;padding:0}
+#shist .sh-x:hover{color:#333;background:rgba(0,0,0,.08)}
+.theme-dark #shist .sh-x:hover{color:#eee;background:rgba(255,255,255,.12)}
+@media print{#shist{display:none !important}}
+/* D2: bank editor */
+#beditBack{position:fixed;left:0;top:0;right:0;bottom:0;z-index:140;background:rgba(0,0,0,.35);display:flex;align-items:stretch;justify-content:center;padding:12px;box-sizing:border-box}
+#beditBack[hidden]{display:none}
+#bedit{display:flex;flex-direction:column;width:100%;max-width:1400px;background:#fff;color:#111;border:1px solid #b5b5b5;border-radius:5px;box-shadow:0 4px 20px rgba(0,0,0,.25);overflow:hidden}
+#bedit .be-head,#bedit .be-foot{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid #ddd;font-size:13px}
+#bedit .be-foot{border-bottom:0;border-top:1px solid #ddd;font-size:12px}
+#bedit .grow{flex:1 1 auto}
+#bedit .be-go input{width:60px;margin-left:4px}
+#bedit .be-body{flex:1 1 auto;display:flex;min-height:0}
+#beGut,#beTxt{font:13px/18px Consolas,"Courier New",monospace;margin:0;padding:6px 8px;box-sizing:border-box}
+#beGut{flex:0 0 auto;min-width:52px;text-align:right;color:#8a8a8a;background:#f3f3f3;border-right:1px solid #ddd;overflow:hidden;user-select:none;-ms-user-select:none}
+#beTxt{flex:1 1 auto;border:0;resize:none;outline:none;white-space:pre;overflow:auto;background:#fff;color:#111;tab-size:4}
+#beDirty{font-style:italic;font-size:12px}
+#bedit .btn.dirty{box-shadow:0 0 0 3px #9a9a9a}
+.theme-dark #bedit{background:#262626;color:#e6e6e6;border-color:#555}
+.theme-dark #bedit .be-head,.theme-dark #bedit .be-foot{border-color:#444}
+.theme-dark #beGut{background:#2e2e2e;color:#8f8f8f;border-color:#444}
+.theme-dark #beTxt{background:#1e1e1e;color:#e6e6e6}
+#modal .iss-edit{font-size:12px;color:#555;margin-right:4px}
+.theme-dark #modal .iss-edit{color:#bbb}
+@media print{#beditBack{display:none !important}}
+/* D2: dialog buttons always visible (footer stays at the bottom while the dialog scrolls) */
+#modalFoot{position:-webkit-sticky;position:sticky;bottom:-14px;z-index:2;background:#fff;background:var(--panel);margin:12px -18px -14px;padding:10px 18px 12px;border-top:1px solid #e2e2e2;align-items:center}
+.theme-dark #modalFoot{border-top-color:#3c3c3c}

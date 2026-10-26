@@ -48,6 +48,33 @@ Dicas
   qualquer uma das suas opções. Ex.: @@SUBSTITUI = Embrião encontra a linha
   "?[Embrião|Feto] identificado, ..." (também "?[EMBRIÃO|FETO] A").
   Depois de escolhida, vale o texto escolhido.
+
+Várias instruções: vale a primeira que acha a linha
+----------------------------------------------------
+Pode escrever mais de uma instrução para a mesma frase (ou a mesma seção).
+O programa tenta na ordem em que estão escritas, de cima para baixo: vale a
+PRIMEIRA cuja linha existe no laudo; as seguintes só são tentadas se a de
+cima não achar a linha. A instrução da frase continua valendo mais que a
+da seção. Exemplo:
+
+  ##SECTION NOME DA SEÇÃO
+  @@SUBSTITUI = Início da linha do modelo
+  @@ABAIXO_DE = Relatório
+
+  Título da frase:
+  Texto da frase.
+
+Se o modelo tem a linha "Início da linha do modelo...", ela é trocada.
+Se não tem, a frase entra no topo do relatório (veja abaixo).
+
+Palavras reservadas para o topo: TOPO e Relatório
+-------------------------------------------------
+- @@ABAIXO_DE = Relatório  -> abaixo da linha que começa com "Relatório"
+  (ex.: uma linha "Relatório ...:" do modelo). Se o modelo não tiver essa linha, a frase
+  entra logo abaixo da primeira linha do laudo (o título).
+- @@ABAIXO_DE = TOPO  -> sempre logo abaixo da primeira linha do laudo
+  (o título).
+Com @@SUBSTITUI essas duas palavras funcionam igual: nada é apagado.
 - O começo é comparado por palavras inteiras: "Placenta" NÃO encontra
   "Dois discos placentários" nem "?[Um disco placentário|...]".
 - Se o texto aparece em mais de uma linha, vale a PRIMEIRA linha do laudo.
@@ -91,6 +118,15 @@ Onde colocar as instruções (@@SUBSTITUI, @@ABAIXO_DE, @@SEMPRE)
 - Nome errado (ex.: @@SUBTITUI) não funciona e vira texto. O relatório mostra
   o nome certo provável.
 
+Editar o banco pelo próprio app
+-------------------------------
+Configurações > Banco de frases > "Editar banco" abre o texto do banco.
+"Ir para a linha" (ou Ctrl+G) pula para uma linha; Ctrl+S salva.
+Salvar guarda uma cópia do banco anterior (na pasta de dados: backups\;
+só no navegador: a última versão) e recarrega o banco na hora.
+Cancelar descarta o que foi mudado. No relatório de inconsistências, cada
+item tem "editar", que abre o editor já naquela linha.
+
 Relatório de inconsistências (Configurações > Banco de frases)
 --------------------------------------------------------------
 Agrupado em Erros, Avisos e Informativos, e depois por tipo. Cada tipo diz o
@@ -98,6 +134,8 @@ que significa e se precisa de ação. Cada item mostra a linha do .txt e o
 caminho exame > template > seção > frase. Por padrão aparecem só erros e
 avisos. "Informativos" e "informativos de rotina" mostram o resto.
 "Copiar como texto" copia os itens que estão visíveis.
+Linhas terminadas em ":" dentro do texto de uma frase não são listadas
+(são texto da frase).
 
 Duas abas ao mesmo tempo
 ------------------------

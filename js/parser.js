@@ -48,7 +48,7 @@ var UltraParser = (function () {
     DIRECTIVE_TYPO:           ['erro',  'Diretiva @@ com nome errado (provável erro de digitação) - a linha não funciona e vira texto'],
     DIRECTIVE_EMPTY_TARGET:   ['erro',  '@@SUBSTITUI / @@ABAIXO_DE sem o texto-alvo - diretiva ignorada'],
     DIRECTIVE_MISPLACED:      ['aviso', 'Diretiva em posição onde não tem efeito ou vale para outra frase'],
-    DIRECTIVE_DUPLICATE:      ['aviso', 'Mais de uma diretiva de posição para a mesma frase/seção - vale a última'],
+    DIRECTIVE_DUPLICATE:      ['info', 'Mais de uma diretiva de posição para a mesma frase/seção - vale a primeira (de cima para baixo) cujo alvo existe no modelo'],
     ALWAYS_DUPLICATE:         ['aviso', '@@SEMPRE repetido na mesma frase'],
     DIRECTIVE_TARGET_MISSING: ['aviso', 'Alvo da diretiva não encontrado no(s) template(s) - a frase vai para o fim da seção/laudo'],
     DROPDOWN_EMPTY_OPTION:    ['aviso', 'Opção vazia em ?[ ]'],
@@ -450,11 +450,12 @@ var UltraParser = (function () {
               else if (cur.ph.always) { issues.push(mk('ALWAYS_DUPLICATE', dd.line, dd.raw, dctx)); }
               else { cur.ph.always = true; }
             } else if (cur) {
-              if (cur.ph.place) { issues.push(mk('DIRECTIVE_DUPLICATE', dd.line, dd.raw, dctx)); }
-              cur.ph.place = pd;
+              /* several directives: kept in written order; the first whose target exists wins (D2) */
+              if (cur.ph.place) { issues.push(mk('DIRECTIVE_DUPLICATE', dd.line, dd.raw, dctx)); (cur.ph.place.alts = cur.ph.place.alts || []).push(pd); }
+              else { cur.ph.place = pd; }
             } else {
-              if (secPlaced) { issues.push(mk('DIRECTIVE_DUPLICATE', dd.line, dd.raw, dctx)); }
-              sec.place = pd; secPlaced = true;
+              if (secPlaced) { issues.push(mk('DIRECTIVE_DUPLICATE', dd.line, dd.raw, dctx)); (sec.place.alts = sec.place.alts || []).push(pd); }
+              else { sec.place = pd; secPlaced = true; }
             }
           }
         }

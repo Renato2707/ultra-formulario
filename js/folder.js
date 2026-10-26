@@ -14,7 +14,7 @@
 var UFolder = (function () {
   'use strict';
   var BANK = 'banco-de-frases.txt', CONF = 'configuracoes.json', DATA = 'dados.json', DRAFTS = 'rascunhos', BACKUPS = 'backups', MAX_BACKUPS = 10;
-  var DATA_KEYS = ['userModels', 'userPhrases', 'overrides', 'hidden', 'order', 'usage', 'search'];
+  var DATA_KEYS = ['userModels', 'userPhrases', 'overrides', 'hidden', 'order', 'usage', 'usageLast', 'search', 'searchHist'];
   var available = false;
   try { available = typeof window.showDirectoryPicker === 'function' && !!window.indexedDB && typeof window.Promise === 'function'; } catch (e0) { available = false; }
   var dir = null, state = available ? 'browser' : 'unavailable', listeners = [], pending = {}, timer = null, chain = null, decoder = null, lastErr = '';

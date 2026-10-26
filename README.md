@@ -16,6 +16,11 @@ vez. O app grava nela o banco, as configurações e os rascunhos como arquivos
 comuns (veja `LEIA-ME-frases.txt`). Se o navegador pedir permissão de novo,
 clique em **Reconectar**. Sem pasta, use **Exportar** / **Importar**.
 
+## Editar o banco pelo app
+⚙ Configurações › Banco de frases › **Editar banco**: edita o .txt dentro do app
+(números de linha, "Ir para a linha", Salvar com cópia de segurança). No
+relatório de inconsistências, "editar" abre o editor na linha do problema.
+
 ## O banco de frases NÃO está aqui
 Este repositório é público. Banco de frases, capturas de tela, rascunhos e
 dados de pacientes **nunca** são publicados (veja `.gitignore`). Os exemplos
@@ -27,6 +32,7 @@ do `LEIA-ME-frases.txt` são genéricos.
 - `test/placement_test.py`: teste de posicionamento com Playwright
   (`pip install playwright`, depois `python test/placement_test.py caminho/do/banco.txt`).
   Gera `test/placement-report.csv`, que **não** deve ser publicado.
+  `python test/placement_test.py --diretivas` testa a ordem das diretivas com um banco genérico embutido.
 
 ## Documentos
 - `CHANGELOG.md`: histórico por rodada.
