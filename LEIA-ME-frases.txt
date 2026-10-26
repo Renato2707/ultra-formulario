@@ -163,6 +163,8 @@ aparece uma barrinha "Pasta de dados desconectada" com o botão Reconectar
 (um clique). Enquanto isso o app funciona normalmente.
 Os rascunhos podem conter dados do paciente: "Apagar rascunhos" remove os
 rascunhos das outras abas (o laudo aberto fica).
+Se outra aba estiver aberta, o laudo dela continua na tela, mas deixa de ser
+guardado (aparece um aviso); volta a ser guardado se você editá-lo.
 Em outros navegadores (Firefox, Internet Explorer) os dados ficam só no
 navegador: use "Exportar" para gerar um arquivo .json e "Importar" para
 carregá-lo em outro computador. O arquivo exportado leva banco e

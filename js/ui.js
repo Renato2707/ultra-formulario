@@ -77,11 +77,18 @@ var UFMain = function () {
     phraseIndex: {}, repMarks: [], repCur: -1, phMatches: [], phCur: -1,
     level: 1, navExam: null, openSecs: {}, navSearch: ['', '', ''], navFocus: null
   };
-  (function () {
-    var st = UStore.get('settings', {}), k;
+  /* (re)load the saved settings (shared by all tabs) into S.settings */
+  function loadSettings() {
+    var st = UStore.get('settings', {}) || {}, k;
     for (k in DEFAULT_SETTINGS) { if (DEFAULT_SETTINGS.hasOwnProperty(k)) { S.settings[k] = st.hasOwnProperty(k) ? st[k] : DEFAULT_SETTINGS[k]; } }
-  })();
+  }
+  loadSettings();
   function saveSettings() { UStore.set('settings', S.settings); }
+  var fullAt = 0;
+  UStore.onFail(function () {   /* browser storage full: the value is kept in this window (and in the data folder, if any) */
+    if (now() - fullAt < 60000) { return; } fullAt = now();
+    setTimeout(function () { toast('Navegador sem espaço: a última alteração ficou só nesta janela' + (UFolder.status() === 'folder' ? ' e na pasta de dados.' : '.')); }, 0);
+  });
   /* typed search words, per field, shared by all tabs (key 'search'): survive navigation, reload, new tabs */
   (function () {
     var q = UStore.get('search', {}) || {};
@@ -498,7 +505,7 @@ var UFMain = function () {
     }
     undo = { pre: pre, items: undo };
     ensureNotEmpty();
-    S.lastChoice = null;
+    S.lastChoice = null; S.insStack = []; S.insRedo = [];
     S.lastRemoval = undo.items.length ? undo : null;
     afterChange(true);
   }
@@ -515,7 +522,7 @@ var UFMain = function () {
     if (editor.childNodes.length === 1 && isBlankLine(editor.firstChild) && u[0].par === editor) { editor.removeChild(editor.firstChild); }
     for (k = u.length - 1; k >= 0; k--) {   /* last first: each line's next sibling is already back */
       put(u[k]);
-      if (hasCls(u[k].el, 'crit')) { rmCls(u[k].el, 'crit-ok'); u[k].el.removeAttribute('data-res'); }
+      if (hasCls(u[k].el, 'crit')) { rmCls(u[k].el, 'crit-ok'); u[k].el.removeAttribute('data-res'); u[k].el.removeAttribute('data-conf'); }
     }
     afterChange(true);
     return true;
@@ -544,9 +551,10 @@ var UFMain = function () {
     var pend = [], instr = [], l = qsa(editor, '.crit'), i, el;
     for (i = 0; i < l.length; i++) {
       el = l[i];
-      if (hasCls(el, 'crit-ok')) { continue; }
-      if (el.getAttribute('data-orig') !== null && lineText(el) !== el.getAttribute('data-orig')) {
-        addCls(el, 'crit-ok'); el.setAttribute('data-res', 'editado'); continue;
+      /* only an explicit Confirmar in the review counts; changing a confirmed line makes it pending again (D3) */
+      if (hasCls(el, 'crit-ok')) {
+        if (el.getAttribute('data-conf') === null || lineText(el) === el.getAttribute('data-conf')) { continue; }
+        rmCls(el, 'crit-ok'); el.removeAttribute('data-res'); el.removeAttribute('data-conf');
       }
       pend.push(el);
     }
@@ -650,7 +658,7 @@ var UFMain = function () {
     UStore.set('drafts', idx);
   }
   function saveDraft() {
-    if (!TAB) { return; }
+    if (!TAB || S.noDraft) { return; }   /* noDraft: drafts were cleared in another tab; resumes on the next edit here */
     var html = editor.innerHTML.replace(/<mark class="hl( cur)?">|<\/mark>/g, '');
     var idx = draftIndex(); idx[TAB] = now(); UStore.set('drafts', idx);
     UStore.set('draft.' + TAB, { html: html, model: S.activeModelId, exam: S.activeExam, nav: { level: S.level, exam: S.navExam }, t: now() });
@@ -745,7 +753,7 @@ var UFMain = function () {
       /* own one-step undo for the choice (the DOM replace is not in the browser's undo stack) */
       var ne = null, cs = par.childNodes, q;
       for (q = 0; q < cs.length; q++) { if (cs[q].nodeType === 1 && hasCls(cs[q], 'f-ok') && cs[q].getAttribute('data-v') === String(i) && cs[q].textContent === opt) { ne = cs[q]; } }
-      S.lastChoice = ne ? { el: ne, html: oldHtml } : null;
+      S.lastChoice = ne ? { el: ne, html: oldHtml } : null; S.insStack = []; S.insRedo = [];
     }
     afterChange(true);
     nextField(false, true);
@@ -889,14 +897,19 @@ var UFMain = function () {
       if (a === 'anyway') { finish(); return; }
       var box = closest(b, function (n) { return hasCls(n, 'chk-item'); }), grp = items[parseInt(box.getAttribute('data-i'), 10)], q;
       if (a === 'edit') { closeModal(); gotoLine(grp[0]); return; }
-      if (a === 'ok') { for (q = 0; q < grp.length; q++) { addCls(grp[q], 'crit-ok'); grp[q].setAttribute('data-res', 'confirmado'); } }
+      if (a === 'ok') { for (q = 0; q < grp.length; q++) { addCls(grp[q], 'crit-ok'); grp[q].setAttribute('data-res', 'confirmado'); grp[q].setAttribute('data-conf', lineText(grp[q])); } }
       else if (a === 'rm') { removeGroup(grp); }
       addCls(box, 'done');
       var bs = box.getElementsByTagName('button'), k; for (k = 0; k < bs.length; k++) { bs[k].disabled = true; }
       left--;
       if (left <= 0) {
-        if (checkFields().length) { backToFields(); }   /* empty fields: never copy with '___' from here */
-        else { finish(); }                               /* inside the click: clipboard keeps the user gesture */
+        var nu = checkFields().length, any = qsa($('modalBody'), '[data-a=anyway]')[0];
+        if (!nu) { finish(); return; }                   /* inside the click: clipboard keeps the user gesture */
+        if (any) {   /* critical lines done: the empty-field choice is now available here (D3), still explicit */
+          any.disabled = false; any.removeAttribute('title');
+          var cf = qsa($('modalBody'), '.chk-fields')[0]; if (cf && cf.firstChild && cf.firstChild.nodeType === 3) { cf.firstChild.nodeValue = 'Linhas críticas revisadas. ' + nu + ' campo(s) vazio(s). '; }
+          any.focus();
+        } else { backToFields(); }
       }
     });
   }
@@ -1422,8 +1435,21 @@ var UFMain = function () {
     }
     return n;
   }
+  /* one-step undo of an inserted phrase (D3): snapshot before/after; the native undo needs 2-4 steps */
+  S.insStack = []; S.insRedo = [];
+  function edText() { return textLines(editor, '___').join('\n'); }
+  function edHtml() { return editor.innerHTML.replace(/<mark class="hl( cur)?">|<\/mark>/g, ''); }
+  function undoInsert(redo) {
+    var st = redo ? S.insRedo : S.insStack, top = st[st.length - 1];
+    if (!top || edText() !== (redo ? top.beforeText : top.afterText)) { S.insStack = []; S.insRedo = []; return false; }
+    st.pop(); (redo ? S.insStack : S.insRedo).push(top);
+    clearRepMarks(); editor.innerHTML = redo ? top.after : top.before; ensureNotEmpty();
+    S.lastChoice = null; S.lastRemoval = null; focusEditor(); afterChange(true);
+    return true;
+  }
   function insertCard(id, quiet) {
     var c = S.phraseIndex[id]; if (!c) { return; }
+    var undoBefore = quiet ? null : edHtml(), undoBeforeText = quiet ? '' : edText();
     var before = qsa(editor, '.fld'), i, f = null;
     var hyp = trim(c.ph.hypothesis || '');
     var html = renderLines(c.ph.body, c.ph.fields, c.ph.critical);   /* body only: no title/help/hypothesis */
@@ -1451,6 +1477,9 @@ var UFMain = function () {
     for (k = 0; k < ins.length; k++) { ins[k].removeAttribute('data-ins'); }
     if (hyp) { addHypothesis(hyp); }
     if (quiet) { S.lastPlacement = how; afterChange(false); return; }
+    S.insStack.push({ before: undoBefore, beforeText: undoBeforeText, after: edHtml(), afterText: edText() }); S.insRedo = [];
+    if (S.insStack.length > 30) { S.insStack.shift(); }
+    S.lastChoice = null; S.lastRemoval = null;
     flashBlock(ins);
     var after = qsa(editor, '.fld');
     for (i = 0; i < after.length; i++) { if (before.indexOf(after[i]) < 0 && !fieldFilled(after[i])) { f = after[i]; break; } }
@@ -1736,10 +1765,14 @@ var UFMain = function () {
   var setSnap = null, setSaved = false;
   function readSettingsForm() {
     setSaved = true;
-    var st = S.settings, k, r;
-    for (k = 0; k < SET_IDS.length; k++) { st[SET_IDS[k]] = $('st_' + SET_IDS[k]).checked; }
-    r = document.getElementsByName('st_eol'); for (k = 0; k < r.length; k++) { if (r[k].checked) { st.eol = r[k].value; } }
-    r = document.getElementsByName('st_theme'); for (k = 0; k < r.length; k++) { if (r[k].checked) { st.theme = r[k].value; } }
+    var was = setSnap ? JSON.parse(setSnap) : {}, form = {}, k, r;
+    for (k = 0; k < SET_IDS.length; k++) { form[SET_IDS[k]] = $('st_' + SET_IDS[k]).checked; }
+    r = document.getElementsByName('st_eol'); for (k = 0; k < r.length; k++) { if (r[k].checked) { form.eol = r[k].value; } }
+    r = document.getElementsByName('st_theme'); for (k = 0; k < r.length; k++) { if (r[k].checked) { form.theme = r[k].value; } }
+    loadSettings();   /* another tab may have saved meanwhile: keep its changes, write only what changed here */
+    for (k in form) { if (form.hasOwnProperty(k) && form[k] !== was[k]) { S.settings[k] = form[k]; } }
+    setSnap = JSON.stringify(S.settings);
+    if ($('stDirty')) { $('stDirty').hidden = true; } if ($('stSave')) { rmCls($('stSave'), 'dirty'); }
     applyTheme(); saveSettings(); renderAll();
   }
   function settingsDialog() {
@@ -1775,8 +1808,8 @@ var UFMain = function () {
       { label: 'Salvar alterações', cls: 'btn-primary', id: 'stSave', focus: true, click: function () { readSettingsForm(); toast('Configurações salvas.'); } }],
       function () {
         if (setSaved || !setSnap) { return; }
-        var was = JSON.parse(setSnap), q, changed = JSON.stringify(S.settings) !== setSnap || hasCls($('stSave'), 'dirty');
-        for (q in was) { if (was.hasOwnProperty(q)) { S.settings[q] = was[q]; } }
+        var changed = JSON.stringify(S.settings) !== setSnap || hasCls($('stSave'), 'dirty');
+        loadSettings();   /* discard = back to the saved settings (not to an old snapshot: another tab may have saved) */
         applyTheme();
         if (changed) { toast('Alterações não salvas foram descartadas.'); }
       });
@@ -1784,7 +1817,7 @@ var UFMain = function () {
     $('modalFoot').insertBefore(dirtyEl, $('modalFoot').firstChild);
     on($('modalBody'), 'change', function (e) {
       var t = e.target; if (!t || !t.id && !t.name || !/^st_/.test(t.id || t.name)) { return; }
-      dirtyEl.hidden = false; addCls($('stSave'), 'dirty');
+      setSaved = false; dirtyEl.hidden = false; addCls($('stSave'), 'dirty');
     });
     if ($('stIssues')) { on($('stIssues'), 'click', function () { readSettingsForm(); issuesDialog(); }); }
     if ($('stBankEdit')) { on($('stBankEdit'), 'click', function () { readSettingsForm(); bankEditor(0, false); }); }
@@ -1799,6 +1832,7 @@ var UFMain = function () {
     var st = UFolder.status(), nm = esc(UFolder.folderName() || 'pasta');
     if (!UStore.persistent()) { return 'Somente memória — os dados serão perdidos ao fechar.'; }
     if (st === 'folder') { return 'Pasta de dados: <b>' + nm + '</b> (conectada). Banco, configurações e rascunhos são gravados nela.'; }
+    if (st === 'loading') { return 'Pasta de dados: <b>' + nm + '</b> — lendo a pasta (pendrive lento?). O app usa a cópia do navegador e atualiza a tela quando terminar.'; }
     if (st === 'needperm') { return 'Pasta de dados: <b>' + nm + '</b> — desconectada (o navegador pede permissão de novo). Clique em Reconectar.'; }
     if (st === 'error') { return 'Pasta de dados: <b>' + nm + '</b> — não foi possível gravar (pendrive removido?). Clique em Reconectar.'; }
     if (st === 'unavailable') { return 'Só o navegador deste computador. Este navegador não grava em pasta (use Chrome ou Edge); para levar os dados use Exportar / Importar.'; }
@@ -1849,21 +1883,24 @@ var UFMain = function () {
       saveDraft();
       if (o.configuracoes) { UStore.set('settings', o.configuracoes); }
       for (i = 0; i < ks.length; i++) { if (o.dados && o.dados[ks[i]] !== null && o.dados[ks[i]] !== undefined) { UStore.set(ks[i], o.dados[ks[i]]); } }
-      if (o.banco && o.banco.text) { UStore.set('bank', o.banco); if (UFolder.status() === 'folder') { UFolder.saveBank(o.banco.text); } }
       toast('Dados importados.');
-      var p = UFolder.status() === 'folder' ? UFolder.flush() : null;
       function go() { setTimeout(function () { window.location.reload(); }, 400); }
-      if (p && p.then) { p.then(go, go); } else { go(); }
+      function fl() { var p = UFolder.status() === 'folder' ? UFolder.flush() : null; if (p && p.then) { p.then(go, go); } else { go(); } }
+      if (o.banco && o.banco.text) {
+        UStore.set('bank', o.banco);
+        if (UFolder.status() === 'folder') { UFolder.saveBank(o.banco.text, fl); return; }   /* wait for the bank file: the reload reads the folder */
+      }
+      fl();
     };
     fr.readAsText(f, 'UTF-8');
   }
   function storageWire() {
-    if ($('stPick')) { on($('stPick'), 'click', pickFolder); }
-    if ($('stRecon')) { on($('stRecon'), 'click', reconnectFolder); }
+    if ($('stPick')) { on($('stPick'), 'click', function () { readSettingsForm(); pickFolder(); }); }
+    if ($('stRecon')) { on($('stRecon'), 'click', function () { readSettingsForm(); reconnectFolder(); }); }
     if ($('stBrowser')) { on($('stBrowser'), 'click', function () { UFolder.useBrowser(function () { toast('Usando só o navegador. Os arquivos da pasta não foram apagados.'); reopenSettings(); }); hideBar(); }); }
     on($('stExport'), 'click', exportData);
     on($('stImport'), 'change', function () { var f = this.files && this.files[0]; if (f) { importData(f); } this.value = ''; });
-    on($('stDrafts'), 'click', function () { saveDraft(); var n = UFolder.clearDrafts(TAB); toast(n ? n + ' rascunho(s) apagado(s).' : 'Nenhum outro rascunho guardado.'); });
+    on($('stDrafts'), 'click', function () { readSettingsForm(); S.noDraft = false; saveDraft(); var n = UFolder.clearDrafts(TAB); toast(n ? n + ' rascunho(s) apagado(s).' : 'Nenhum outro rascunho guardado.'); });
   }
   /* small bar: folder disconnected / bank edited outside the app (no dialogs) */
   var barAction = null;
@@ -1873,6 +1910,16 @@ var UFMain = function () {
   function hideBar() { $('fbar').hidden = true; barAction = null; }
   on($('fbarBtn'), 'click', function () { if (barAction) { barAction(); } });
   on($('fbarX'), 'click', hideBar);
+  function refreshFromStore() {   /* data folder read finished after the app had started (slow pendrive) */
+    loadSettings(); applyTheme(); applyLayout();
+    var ks = ['usage', 'usageLast', 'order', 'userModels', 'userPhrases', 'overrides', 'hidden'], i;
+    for (i = 0; i < ks.length; i++) { S[ks[i]] = UStore.get(ks[i], S[ks[i]]); }
+    var bk = UStore.get('bank', null);
+    if (bk && bk.text && (!S.bank || S.srcLines.join('\n') !== String(bk.text).split(/\r?\n/).join('\n'))) { setBank(bk.text, bk.name, true); }
+    buildModels(); renderNav(); afterChange(true);
+    toast('Dados da pasta carregados.');
+  }
+  UFolder.onLate(refreshFromStore);
   function folderStatus(st) {
     if (st === 'needperm') { showBar('Pasta de dados desconectada.', 'Reconectar', reconnectFolder); }
     else if (st === 'error') { showBar('Não foi possível gravar na pasta de dados (pendrive removido?).', 'Reconectar', reconnectFolder); }
@@ -2121,13 +2168,15 @@ var UFMain = function () {
     if (!$('modalBack').hidden) { closeModal(); }
     beBuild(); BE.open = true; BE.fromReport = !!fromReport; BE.n = 0;
     $('beName').innerHTML = ' ' + esc(S.bankName || 'banco') + (UFolder.status() === 'folder' ? ' — pasta de dados' : ' — navegador');
+    BE.eol = /\r\n/.test(String(txt)) || !/\n/.test(String(txt)) ? '\r\n' : '\n';   /* original line ending; CRLF when none (Bloco de Notas) */
     $('beTxt').value = String(txt).replace(/\r\n?/g, '\n'); beDirty(false); beGutter();
     $('beditBack').hidden = false;
     setTimeout(function () { beGoto(line > 0 ? line : 1); if (!(line > 0)) { $('beTxt').setSelectionRange && $('beTxt').setSelectionRange(0, 0); $('beTxt').scrollTop = 0; $('beGut').scrollTop = 0; } }, 0);
   }
   function beClose() { $('beditBack').hidden = true; BE.open = false; beDirty(false); $('beTxt').value = ''; BE.n = 0; }
   function beSave() {
-    var txt = $('beTxt').value, name = S.bankName || 'banco-de-frases.txt', old = UStore.get('bank', null), fromRep = BE.fromReport;
+    var txt = $('beTxt').value.replace(/\r\n?/g, '\n').replace(/\n/g, BE.eol || '\r\n'), name = S.bankName || 'banco-de-frases.txt', old = UStore.get('bank', null), fromRep = BE.fromReport;
+    if (!BE.dirty) { beClose(); toast('Nenhuma alteração para salvar.'); if (fromRep) { issuesDialog(); } return; }
     if (UFolder.status() !== 'folder' && old && old.text && old.text !== txt) {   /* browser mode: keep the previous bank as a backup */
       if (!UStore.set('bankBackup', { t: now(), name: old.name, text: old.text })) { UStore.remove('bankBackup'); }
     }
@@ -2383,8 +2432,11 @@ var UFMain = function () {
     var chip = closest(e.target, function (n) { return hasCls(n, 'fld') && n.getAttribute('data-t') === 's'; }, editor);
     if (chip) { var r = document.createRange(); r.selectNode(chip); setRange(r); saveRange(); openSelect(chip); }
   });
-  on(editor, 'input', function () { S.lastChoice = null; S.lastRemoval = null; });
+  on(editor, 'input', function () { S.lastChoice = null; S.lastRemoval = null; S.noDraft = false; });
   on(editor, 'keydown', function (e) {
+    var cz = (e.ctrlKey || e.metaKey) && !e.altKey;
+    if (cz && !e.shiftKey && e.keyCode === 90 && !S.lastChoice && !S.lastRemoval && S.insStack.length && undoInsert(false)) { e.preventDefault(); return; }
+    if (cz && ((e.shiftKey && e.keyCode === 90) || (!e.shiftKey && e.keyCode === 89)) && S.insRedo.length && undoInsert(true)) { e.preventDefault(); return; }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.keyCode === 90 && (S.lastChoice || S.lastRemoval)) {
       if (!S.lastChoice) { e.preventDefault(); undoRemoval(); return; }
       var lc = S.lastChoice; S.lastChoice = null;
@@ -2523,7 +2575,13 @@ var UFMain = function () {
   var tbs = qsa($('editorToolbar'), '.tb'), ti;
   for (ti = 0; ti < tbs.length; ti++) {
     on(tbs[ti], 'mousedown', function (e) { e.preventDefault(); });
-    on(tbs[ti], 'click', function () { restoreRange(); exec(this.getAttribute('data-cmd')); saveRange(); afterChange(false); });
+    on(tbs[ti], 'click', function () {
+      var cmd = this.getAttribute('data-cmd');
+      if (cmd === 'undo' && !S.lastChoice && !S.lastRemoval && S.insStack.length && undoInsert(false)) { return; }
+      if (cmd === 'undo' && S.lastRemoval) { undoRemoval(); return; }
+      if (cmd === 'redo' && S.insRedo.length && undoInsert(true)) { return; }
+      restoreRange(); exec(cmd); saveRange(); afterChange(false);
+    });
   }
   on($('btnCritCount'), 'click', jumpNextCrit);
   on($('btnFieldCount'), 'click', function () { editor.focus(); nextField(false); });
@@ -2690,8 +2748,12 @@ var UFMain = function () {
     var k = e && e.key; if (!k || k.indexOf('uf.') !== 0) { return; }
     k = k.slice(3);
     if (k === 'settings') {
-      var st = UStore.get('settings', {}), q;
-      for (q in DEFAULT_SETTINGS) { if (DEFAULT_SETTINGS.hasOwnProperty(q)) { S.settings[q] = st.hasOwnProperty(q) ? st[q] : DEFAULT_SETTINGS[q]; } }
+      loadSettings();
+      if (!$('modalBack').hidden && $('stSave') && !setSaved) {   /* settings dialog open here: keep the theme preview */
+        var tr = document.getElementsByName('st_theme'), q;
+        for (q = 0; q < tr.length; q++) { if (tr[q].checked) { S.settings.theme = tr[q].value; } }
+        if ($('st_paperDark')) { S.settings.paperDark = $('st_paperDark').checked; }
+      }
       applyTheme(); applyLayout(); afterChange(true);
     } else if (k === 'bank') {
       var bk = UStore.get('bank', null);
@@ -2702,6 +2764,12 @@ var UFMain = function () {
       searchSeen = searchNow();
       if (document.activeElement !== si2) { renderNav(); }
       if (document.activeElement !== $('repSearch') && $('repSearch').value !== S.repQuery) { $('repSearch').value = S.repQuery; sxShow($('repSearch')); try { repSearch(false); } catch (eRs2) {} }
+    } else if (k === 'draftsCleared') {
+      var dc = UStore.get('draftsCleared', null);
+      if (dc && dc.keep !== TAB) {
+        S.noDraft = true; clearTimeout(saveTimer); UStore.remove('draft.' + TAB, true);
+        showBar('Rascunhos apagados em outra aba: este laudo continua na tela, mas não está mais guardado (volta a ser guardado se você editá-lo).', 'Ok', hideBar);
+      }
     } else if (k === 'searchHist') { if (histOpen) { histRender(); }
     } else if (k === 'userModels' || k === 'userPhrases' || k === 'order' || k === 'overrides' || k === 'usage' || k === 'usageLast' || k === 'hidden') {
       S[k] = UStore.get(k, S[k]); buildModels(); renderNav();

@@ -11,6 +11,28 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-D3] Correções da revisão completa — entregue, NÃO testado pelo usuário
+- Configurações entre abas: fechar sem salvar volta ao que está salvo (não a uma cópia antiga); Salvar grava
+  só o que foi mudado naquela janela; a pré-visualização do tema não some quando outra aba salva.
+- Importar com pasta de dados: a página só recarrega depois de o banco importado estar gravado na pasta.
+- Editor do banco: salvar sem mudança não cria cópia de segurança; mantém o final de linha do arquivo
+  (CRLF/Windows se o original era CRLF ou não tinha quebras; LF se era LF).
+- Desfazer: cada frase inserida (com a linha de hipótese, se houver) sai com um único Ctrl+Z (ou o botão
+  Desfazer), sem deixar linha em branco; Ctrl+Y refaz.
+- Revisão: depois de revisar as linhas críticas, "Copiar/Imprimir/Gerar assim mesmo" fica disponível na
+  mesma janela (continua bloqueado enquanto houver crítica pendente).
+- Linha crítica: alterar o texto NÃO conta como revisada; só "Confirmar" na revisão. Alterar uma linha já
+  confirmada faz ela voltar a ficar pendente.
+- Pasta lenta (mais de 4 s para ler): o app abre com a cópia do navegador e atualiza a tela quando a leitura
+  termina; o que foi mudado nesse meio-tempo é mantido e gravado na pasta.
+- Navegador sem espaço: a alteração fica nesta janela (e na pasta de dados, com o valor novo); aviso discreto.
+- "Escolher pasta", "Reconectar" e "Apagar rascunhos" salvam as configurações antes de agir.
+- "Apagar rascunhos": outra aba aberta deixa de regravar o rascunho dela; o laudo continua na tela dessa
+  aba com uma barrinha de aviso e volta a ser guardado só se for editado de novo.
+- Testes: `test/d3_test.py` (banco genérico embutido; pasta simulada `test/fakefs.js`).
+- Não testado pelo usuário: tudo da D3. Testado só em Chromium automatizado (headless), com pasta de dados
+  simulada; Edge, IE11, pendrive real e impressora não testados.
+
 ## [etapa-D2] Configurações com Salvar, histórico de pesquisa, editor do banco, ordem das diretivas — entregue, NÃO testado pelo usuário
 - Configurações: botões "Salvar alterações" e "Cancelar", sempre visíveis no rodapé.
   Fechar pelo X, por Esc ou clicando fora **descarta** as mudanças; enquanto há
@@ -110,13 +132,15 @@ O banco de frases **nunca** faz parte do repositório.
 
 ## Não testado pelo usuário
 Tudo desde o início da etapa D foi entregue sem teste do usuário:
+- D3 (tudo): ver a entrada [etapa-D3]. Os 2 itens da D1 em tema escuro ("Reconectar com um clique",
+  "Apagar rascunhos") foram reverificados em teste automático com tema escuro fixo e passaram.
 - D2 (tudo): Salvar/Cancelar nas Configurações, histórico de pesquisa, ordem por
   frequência com último no topo, editor do banco (inclusive salvar na pasta de
   dados com backup), ordem das diretivas e "TOPO"/"Relatório", ocultação de
   TITLE_LIKE_IN_BODY. Testado só em Chrome automatizado (headless e com janela,
   perfil persistente), não no PC do usuário; Edge e IE11 não testados.
 - D2, editor do banco: salvar grava o texto em UTF-8 (se o arquivo original
-  era ANSI/Windows-1252, ele passa a ser UTF-8).
+  era ANSI/Windows-1252, ele passa a ser UTF-8). Desde a D3 o final de linha original é mantido.
 - D2: o defeito "a pesquisa não persiste" relatado não foi reproduzido no Chrome
   automatizado; só foi corrigida a sobrescrita entre abas.
 - D1, pasta de dados: janela real de escolher pasta; pendrive de verdade

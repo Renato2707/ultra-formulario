@@ -18,6 +18,7 @@ var UFolder = (function () {
   var available = false;
   try { available = typeof window.showDirectoryPicker === 'function' && !!window.indexedDB && typeof window.Promise === 'function'; } catch (e0) { available = false; }
   var dir = null, state = available ? 'browser' : 'unavailable', listeners = [], pending = {}, timer = null, chain = null, decoder = null, lastErr = '';
+  var touched = {}, lateFns = [];   /* D3: keys written by the app while the folder was still being read (slow pendrive) */
 
   function setState(s, msg) { state = s; if (msg) { lastErr = msg; } for (var i = 0; i < listeners.length; i++) { try { listeners[i](s); } catch (e) {} } }
   function mode() { return UStore.get('storeMode', null) || 'auto'; }   /* 'folder' | 'browser' | 'auto' (unknown: look for a saved folder) */
@@ -115,6 +116,7 @@ var UFolder = (function () {
   }
   UStore.onWrite(function (key) {
     var f = mirrorKey(key); if (!f) { return; }
+    if (state === 'loading') { touched[key] = 1; pending[f] = key; if (key.indexOf('draft.') !== 0) { UStore.set('folderDirty', 1, true); } return; }   /* written after the late read finishes */
     if (state !== 'folder') { if (dir && key.indexOf('draft.') !== 0) { UStore.set('folderDirty', 1, true); } return; }
     pending[f] = key; if (!timer) { timer = setTimeout(flush, 400); }
   });
@@ -136,11 +138,11 @@ var UFolder = (function () {
   function importAll() {   /* -> 'exported' (folder was empty) | 'imported' (something changed) | 'same' */
     var had = false, before = snap();
     return readJSON(CONF).then(function (c) {
-      if (c && typeof c === 'object') { had = true; UStore.set('settings', c, true); }
+      if (c && typeof c === 'object') { had = true; if (!touched.settings) { UStore.set('settings', c, true); } }
       return readJSON(DATA);
     }).then(function (d) {
       var i;
-      if (d && typeof d === 'object') { had = true; for (i = 0; i < DATA_KEYS.length; i++) { if (d[DATA_KEYS[i]] !== null && d[DATA_KEYS[i]] !== undefined) { UStore.set(DATA_KEYS[i], d[DATA_KEYS[i]], true); } } }
+      if (d && typeof d === 'object') { had = true; for (i = 0; i < DATA_KEYS.length; i++) { if (d[DATA_KEYS[i]] !== null && d[DATA_KEYS[i]] !== undefined && !touched[DATA_KEYS[i]]) { UStore.set(DATA_KEYS[i], d[DATA_KEYS[i]], true); } } }
       return getFile(BANK);
     }).then(function (f) {
       if (!f) { return null; }
@@ -148,7 +150,7 @@ var UFolder = (function () {
       return new Promise(function (ok) {
         decode(f, function (txt) {
           var cur = UStore.get('bank', null);
-          if (!cur || cur.text !== txt) { UStore.set('bank', { name: BANK, text: txt }, true); }
+          if (!touched.bank && (!cur || cur.text !== txt)) { UStore.set('bank', { name: BANK, text: txt }, true); }
           UStore.set('folderBankMod', f.lastModified, true); ok();
         });
       });
@@ -161,7 +163,7 @@ var UFolder = (function () {
           try { o = JSON.parse(t); } catch (e) { return; }
           if (!o || !o.html) { return; }
           loc = UStore.get('draft.' + id, null);
-          if (!loc || (o.t || 0) > (loc.t || 0)) { UStore.set('draft.' + id, o, true); idx[id] = o.t || 1; }
+          if (!touched['draft.' + id] && (!loc || (o.t || 0) > (loc.t || 0))) { UStore.set('draft.' + id, o, true); idx[id] = o.t || 1; }
         })['catch'](function () {});
       })).then(function () { UStore.set('drafts', idx, true); });
     }).then(function () {
@@ -203,19 +205,27 @@ var UFolder = (function () {
     var done = false;
     function go() { if (!done) { done = true; start(); } }
     if (!available || mode() === 'browser') { go(); return; }
-    setTimeout(function () { if (!done) { setState('needperm'); go(); } }, 4000);   /* never block the app */
+    var late = false;
+    /* never block the app: after 4 s it starts with the browser copy; when the folder read ends the screen is refreshed (D3) */
+    setTimeout(function () { if (!done) { late = true; setState('loading'); go(); } }, 4000);
+    function ready(how) {
+      if (!late) { setState('folder'); go(); return; }
+      setState('folder'); touched = {}; UStore.remove('folderDirty', true);
+      if (!timer) { timer = setTimeout(flush, 0); }   /* what was changed meanwhile goes to the folder */
+      for (var i = 0; i < lateFns.length; i++) { try { lateFns[i](how); } catch (e) {} }
+    }
     idbGet(function (h) {
       if (!h) { go(); return; }
       UStore.set('storeMode', 'folder', true);
       dir = h;
       var qp = h.queryPermission ? h.queryPermission({ mode: 'readwrite' }) : Promise.resolve('granted');
       qp.then(function (p) {
-        if (p !== 'granted') { setState('needperm'); go(); return; }
+        if (p !== 'granted') { pending = {}; touched = {}; setState('needperm'); go(); return; }
         if (UStore.get('folderDirty', 0)) {   /* edits made while disconnected (last session) go to the folder first */
-          return exportAll(true).then(function () { UStore.remove('folderDirty', true); return importAll(); }).then(function () { setState('folder'); go(); });
+          return exportAll(true).then(function () { UStore.remove('folderDirty', true); return importAll(); }).then(ready);
         }
-        return importAll().then(function () { setState('folder'); go(); });
-      })['catch'](function (e) { setState('needperm', String(e)); go(); });
+        return importAll().then(ready);
+      })['catch'](function (e) { if (state === 'loading') { UStore.set('folderDirty', 1, true); } setState('needperm', String(e)); go(); });
     });
   }
   function useHandle(h, cb) {   /* after the picker (or a test stand-in handle) */
@@ -249,7 +259,8 @@ var UFolder = (function () {
   function useBrowser(cb) { dir = null; UStore.set('storeMode', 'browser', true); idbPut(null, function () { setState(available ? 'browser' : 'unavailable'); if (cb) { cb(); } }); }
   function saveBank(blobOrText, cb) {   /* "Trocar arquivo": backup the old bank, write the new one byte-for-byte */
     if (state !== 'folder') { if (cb) { cb(null); } return; }
-    backupBank().then(function () { return writeFile(BANK, blobOrText); }).then(function (f) { noteBank(f); if (cb) { cb(f); } });
+    backupBank().then(function () { return writeFile(BANK, blobOrText); }).then(function (f) { noteBank(f); if (cb) { cb(f); } },
+      function (e) { fail(e); if (cb) { cb(null); } });   /* the caller always gets an answer */
   }
   function checkBank(cb) {   /* external edit? cb(file) when banco-de-frases.txt changed since we last read/wrote it */
     if (state !== 'folder' || !dir) { return; }
@@ -262,6 +273,7 @@ var UFolder = (function () {
     var ks = UStore.keys(), i, idx = UStore.get('drafts', {}) || {}, n = 0;
     for (i = 0; i < ks.length; i++) { if (ks[i].indexOf('draft.') === 0 && ks[i] !== 'draft.' + keep) { UStore.remove(ks[i]); delete idx[ks[i].slice(6)]; n++; } }
     UStore.remove('draft', true); UStore.set('drafts', idx);
+    UStore.set('draftsCleared', { t: new Date().getTime(), keep: keep }, true);   /* D3: other open tabs stop re-saving theirs */
     if (state === 'folder') {
       listDir(DRAFTS).then(function (fs) { fs.forEach(function (f) { if (f.name !== keep + '.json') { removeFile(DRAFTS + '/' + f.name); } }); });
     }
@@ -272,6 +284,6 @@ var UFolder = (function () {
     saveBank: saveBank, writeBankText: function (t) { return state === 'folder' ? writeBankText(t) : Promise.resolve(null); },
     checkBank: checkBank, acceptBank: acceptBank, clearDrafts: clearDrafts, flush: flush, exportAll: exportAll,
     status: function () { return state; }, folderName: function () { return dir && dir.name || ''; }, lastError: function () { return lastErr; },
-    onStatus: function (fn) { listeners.push(fn); }, setDecoder: function (fn) { decoder = fn; }
+    onStatus: function (fn) { listeners.push(fn); }, onLate: function (fn) { lateFns.push(fn); }, setDecoder: function (fn) { decoder = fn; }
   };
 })();
