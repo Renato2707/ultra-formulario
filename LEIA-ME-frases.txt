@@ -106,3 +106,26 @@ Uma aba nova não pega o laudo de outra aba que ainda está aberta. Se uma aba
 foi fechada, a próxima aba nova recupera o laudo dela.
 Banco de frases e configurações são os mesmos para todas as abas. Uma
 mudança feita numa aba vale na hora nas outras.
+
+Pasta de dados (pendrive)
+-------------------------
+No Chrome ou no Edge, em Configurações > Armazenamento, clique em "Escolher
+pasta" e escolha uma pasta (por exemplo, no pendrive). Faça isso uma vez.
+O app passa a guardar nessa pasta, como arquivos comuns:
+  banco-de-frases.txt   o banco de frases (igual ao arquivo escolhido)
+  configuracoes.json    as configurações
+  dados.json            modelos e frases próprios, ordem, contadores, pesquisas
+  rascunhos\            o laudo em andamento de cada aba
+  backups\              os 10 bancos anteriores (a cada "Trocar arquivo")
+Ao abrir o app, o banco é lido da pasta sozinho. Se você editar o
+banco-de-frases.txt em outro programa, ao voltar para o app aparece
+"Banco de frases alterado fora do app" com o botão Recarregar.
+Depois de reiniciar o computador, o navegador pode pedir permissão de novo:
+aparece uma barrinha "Pasta de dados desconectada" com o botão Reconectar
+(um clique). Enquanto isso o app funciona normalmente.
+Os rascunhos podem conter dados do paciente: "Apagar rascunhos" remove os
+rascunhos das outras abas (o laudo aberto fica).
+Em outros navegadores (Firefox, Internet Explorer) os dados ficam só no
+navegador: use "Exportar" para gerar um arquivo .json e "Importar" para
+carregá-lo em outro computador. O arquivo exportado leva banco e
+configurações, mas não leva rascunhos.
