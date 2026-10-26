@@ -1,10 +1,11 @@
 /*
  * ui.js - Editor de Laudos (Etapa B). Strict ES5, no dependencies.
- * Needs parser.js (UltraParser) and store.js (UStore).
+ * Needs parser.js (UltraParser), store.js (UStore) and folder.js (UFolder).
+ * UFMain runs after UFolder.boot (the data folder, if any, is read first).
  * Clinical text from the bank is never modified: it is rendered as-is
  * (only the leading *** critical markers are hidden, see parser.js).
  */
-(function () {
+var UFMain = function () {
   'use strict';
 
   /* ================= helpers ================= */
@@ -1729,14 +1730,111 @@
         ' modelos, ' + S.bank.stats.phrases + ' frases. ' + n + ' item(ns) no relatório' + (function (b) { return n ? ' (' + (b.erro || 0) + ' erro(s), ' + (b.aviso || 0) + ' aviso(s), ' + (b.info || 0) + ' informativo(s))' : ''; })(bySev) + '.' : 'Nenhum banco carregado.') + '</p>' +
       '<div class="btnrow"><label class="btn btn-file">' + (S.bank ? 'Trocar arquivo' : 'Escolher arquivo') + '<input type="file" id="bankFile1" accept=".txt,text/plain"></label>' +
       (S.bank ? '<button type="button" class="btn" id="stIssues">Ver relatório de inconsistências</button>' : '') + '</div>' +
-      '<p class="muted">Armazenamento: ' + (UStore.persistent() ? 'navegador (localStorage)' : 'somente memória — será perdido ao fechar') + '.</p></fieldset>';
+      '</fieldset>' + storageFieldset();
     modal('Configurações', body, [{ label: 'Fechar', cls: 'btn-primary', focus: true, click: function () { readSettingsForm(); } }]);
     if ($('stIssues')) { on($('stIssues'), 'click', function () { readSettingsForm(); issuesDialog(); }); }
     var thr = document.getElementsByName('st_theme'), tq;
     for (tq = 0; tq < thr.length; tq++) { on(thr[tq], 'change', function () { S.settings.theme = this.value; applyTheme(); saveSettings(); }); }
     on($('st_paperDark'), 'change', function () { S.settings.paperDark = this.checked; applyTheme(); saveSettings(); });
     on($('bankFile1'), 'change', function () { var f = this.files && this.files[0]; if (f) { readSettingsForm(); closeModal(); loadBankFile(f); } });
+    storageWire();
   }
+  /* ---- Armazenamento (Etapa D): pasta de dados / navegador, exportar / importar ---- */
+  function storageText() {
+    var st = UFolder.status(), nm = esc(UFolder.folderName() || 'pasta');
+    if (!UStore.persistent()) { return 'Somente memória — os dados serão perdidos ao fechar.'; }
+    if (st === 'folder') { return 'Pasta de dados: <b>' + nm + '</b> (conectada). Banco, configurações e rascunhos são gravados nela.'; }
+    if (st === 'needperm') { return 'Pasta de dados: <b>' + nm + '</b> — desconectada (o navegador pede permissão de novo). Clique em Reconectar.'; }
+    if (st === 'error') { return 'Pasta de dados: <b>' + nm + '</b> — não foi possível gravar (pendrive removido?). Clique em Reconectar.'; }
+    if (st === 'unavailable') { return 'Só o navegador deste computador. Este navegador não grava em pasta (use Chrome ou Edge); para levar os dados use Exportar / Importar.'; }
+    return 'Só o navegador deste computador. Para guardar no pendrive: Escolher pasta (ou Exportar / Importar).';
+  }
+  function storageFieldset() {
+    var st = UFolder.status(), b = '';
+    if (UFolder.available) { b += '<button type="button" class="btn" id="stPick">' + (st === 'browser' ? 'Escolher pasta' : 'Trocar pasta') + '</button>'; }
+    if (st === 'needperm' || st === 'error') { b += '<button type="button" class="btn btn-primary" id="stRecon">Reconectar</button>'; }
+    if (st !== 'browser' && st !== 'unavailable') { b += '<button type="button" class="btn" id="stBrowser">Usar só o navegador</button>'; }
+    b += '<button type="button" class="btn" id="stExport">Exportar</button><label class="btn btn-file">Importar<input type="file" id="stImport" accept=".json,application/json"></label>' +
+      '<button type="button" class="btn" id="stDrafts" title="Apaga os rascunhos guardados de outras abas (o laudo aberto nesta aba fica)">Apagar rascunhos</button>';
+    return '<fieldset><legend>Armazenamento</legend><p id="stMode">' + storageText() + '</p><div class="btnrow">' + b + '</div></fieldset>';
+  }
+  function reopenSettings() { if (!$('modalBack').hidden) { readSettingsForm(); closeModal(); } settingsDialog(); }
+  function pickFolder() {
+    saveDraft();
+    UFolder.choose(function (err, how) {
+      if (err) { if (!/abort/i.test(String(err.name || err))) { toast('Não foi possível usar a pasta (' + (err.message || err.name || err) + ').'); } return; }
+      afterConnect(how);
+    });
+  }
+  function afterConnect(how) {
+    hideBar();
+    if (how === 'imported') { saveDraft(); toast('Dados carregados da pasta.'); setTimeout(function () { window.location.reload(); }, 300); return; }
+    toast('Pasta de dados pronta: dados gravados em "' + UFolder.folderName() + '".');
+    if (!$('modalBack').hidden) { reopenSettings(); }
+  }
+  function reconnectFolder() { saveDraft(); UFolder.reconnect(function (err, how) { if (err) { toast('Não foi possível reconectar (' + (err.message || err) + ').'); return; } afterConnect(how); }); }
+  function exportData() {
+    saveDraft(); if (!$('modalBack').hidden && $('st_showUsage')) { readSettingsForm(); }
+    var o = { formato: 'ultra-formulario-dados', versao: 1, exportadoEm: new Date().toISOString(), banco: UStore.get('bank', null),
+      configuracoes: UStore.get('settings', {}), dados: {} }, ks = ['userModels', 'userPhrases', 'overrides', 'hidden', 'order', 'usage', 'search'], i;
+    for (i = 0; i < ks.length; i++) { o.dados[ks[i]] = UStore.get(ks[i], null); }
+    var d = new Date(), nm = 'ultra-formulario-dados_' + d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) + '.json',
+      blob = new Blob([JSON.stringify(o, null, 2)], { type: 'application/json' });
+    if (window.navigator.msSaveOrOpenBlob) { window.navigator.msSaveOrOpenBlob(blob, nm); return; }
+    var a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = nm; document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(u); }, 1000);
+    toast('Dados exportados (' + nm + '). Rascunhos não são incluídos.');
+  }
+  function importData(f) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var o, i, ks = ['userModels', 'userPhrases', 'overrides', 'hidden', 'order', 'usage', 'search'];
+      try { o = JSON.parse(fr.result); } catch (e) { o = null; }
+      if (!o || o.formato !== 'ultra-formulario-dados') { toast('Arquivo inválido: escolha um arquivo exportado pelo app (.json).'); return; }
+      saveDraft();
+      if (o.configuracoes) { UStore.set('settings', o.configuracoes); }
+      for (i = 0; i < ks.length; i++) { if (o.dados && o.dados[ks[i]] !== null && o.dados[ks[i]] !== undefined) { UStore.set(ks[i], o.dados[ks[i]]); } }
+      if (o.banco && o.banco.text) { UStore.set('bank', o.banco); if (UFolder.status() === 'folder') { UFolder.saveBank(o.banco.text); } }
+      toast('Dados importados.');
+      var p = UFolder.status() === 'folder' ? UFolder.flush() : null;
+      function go() { setTimeout(function () { window.location.reload(); }, 400); }
+      if (p && p.then) { p.then(go, go); } else { go(); }
+    };
+    fr.readAsText(f, 'UTF-8');
+  }
+  function storageWire() {
+    if ($('stPick')) { on($('stPick'), 'click', pickFolder); }
+    if ($('stRecon')) { on($('stRecon'), 'click', reconnectFolder); }
+    if ($('stBrowser')) { on($('stBrowser'), 'click', function () { UFolder.useBrowser(function () { toast('Usando só o navegador. Os arquivos da pasta não foram apagados.'); reopenSettings(); }); hideBar(); }); }
+    on($('stExport'), 'click', exportData);
+    on($('stImport'), 'change', function () { var f = this.files && this.files[0]; if (f) { importData(f); } this.value = ''; });
+    on($('stDrafts'), 'click', function () { saveDraft(); var n = UFolder.clearDrafts(TAB); toast(n ? n + ' rascunho(s) apagado(s).' : 'Nenhum outro rascunho guardado.'); });
+  }
+  /* small bar: folder disconnected / bank edited outside the app (no dialogs) */
+  var barAction = null;
+  function showBar(msg, label, fn) {
+    var b = $('fbar'); $('fbarMsg').innerHTML = esc(msg); $('fbarBtn').innerHTML = esc(label); barAction = fn; b.hidden = false;
+  }
+  function hideBar() { $('fbar').hidden = true; barAction = null; }
+  on($('fbarBtn'), 'click', function () { if (barAction) { barAction(); } });
+  on($('fbarX'), 'click', hideBar);
+  function folderStatus(st) {
+    if (st === 'needperm') { showBar('Pasta de dados desconectada.', 'Reconectar', reconnectFolder); }
+    else if (st === 'error') { showBar('Não foi possível gravar na pasta de dados (pendrive removido?).', 'Reconectar', reconnectFolder); }
+    else if (st === 'folder' && barAction === reconnectFolder) { hideBar(); }
+    if (!$('modalBack').hidden && $('stMode')) { $('stMode').innerHTML = storageText(); }
+  }
+  UFolder.onStatus(folderStatus);
+  function checkBankFile() {
+    UFolder.checkBank(function (f) {
+      showBar('Banco de frases alterado fora do app.', 'Recarregar', function () {
+        UFolder.acceptBank(f, function (txt) { hideBar(); setBank(txt, 'banco-de-frases.txt', true); UStore.set('bank', { name: 'banco-de-frases.txt', text: txt }); toast('Banco de frases recarregado.'); });
+      });
+    });
+  }
+  on(window, 'focus', checkBankFile);
+  on(document, 'visibilitychange', function () { if (!document.hidden) { checkBankFile(); } });
+
   /* ---- Relatório de inconsistências ---- */
   /* plain-Portuguese explanation of each type + whether he needs to act (c = corrigir, r = revisar, n = nada) */
   var ISSUE_HELP = {
@@ -1974,6 +2072,7 @@
     readBankFile(f, function (txt) {
       setBank(txt, f.name);
       if (!UStore.set('bank', { name: f.name, text: txt })) { toast('Banco carregado (não será lembrado na próxima vez).'); }
+      if (UFolder.status() === 'folder') { UFolder.saveBank(f, function (w) { if (!w) { toast('Atenção: não foi possível gravar o banco na pasta de dados.'); } }); }
     });
   }
   on($('bankFile0'), 'change', function () { var f = this.files && this.files[0]; if (f) { loadBankFile(f); } this.value = ''; });
@@ -2382,6 +2481,7 @@
 
   /* ================= start ================= */
   applyTheme(); applyLayout();
+  folderStatus(UFolder.status());
   var saved = UStore.get('bank', null);
   if (saved && saved.text) { setBank(saved.text, saved.name, true); }
   pickTab(); setInterval(function () { markAlive(true); }, 5000);
@@ -2401,4 +2501,4 @@
 
   /* hook for automated tests (no effect on normal use) */
   window.UFApp = { state: S, reportText: reportText };
-})();
+};
