@@ -33,6 +33,7 @@ do `LEIA-ME-frases.txt` são genéricos.
   (`pip install playwright`, depois `python test/placement_test.py caminho/do/banco.txt`).
   Gera `test/placement-report.csv`, que **não** deve ser publicado.
   `python test/placement_test.py --diretivas` testa a ordem das diretivas com um banco genérico embutido.
+- `test/d3_test.py`: correções da D3 (banco genérico embutido, pasta de dados simulada por `test/fakefs.js`).
 
 ## Documentos
 - `CHANGELOG.md`: histórico por rodada.
