@@ -1,0 +1,94 @@
+# Histórico de mudanças — Ultra Formulário
+
+Editor de laudos de ultrassonografia (HTML/JS estático, ES5, sem dependências).
+O banco de frases **nunca** faz parte do repositório.
+
+> Marcadores de rodada: o conector usado para publicar não cria tags git, e as
+> rodadas anteriores a este repositório não têm commit próprio. Cada rodada
+> abaixo tem um marcador `[etapa-XX]` que faz o papel de tag. O primeiro backup
+> publicado (estado B25) está nos commits iniciais de `main`; D1 entra nos
+> commits seguintes.
+>
+> Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
+
+## [etapa-D1] Armazenamento em pasta (pendrive) — entregue, NÃO testado pelo usuário
+- Nova "Pasta de dados" (Configurações › Armazenamento), escolhida uma vez pela
+  File System Access API (Chrome/Edge). Arquivos comuns na pasta:
+  `banco-de-frases.txt`, `configuracoes.json`, `dados.json`, `rascunhos/`,
+  `backups/` (últimos 10 bancos).
+- Banco carregado sozinho da pasta ao abrir; "Trocar arquivo" grava o novo banco
+  byte a byte e guarda o anterior em `backups/`.
+- Edição externa do banco detectada ao voltar à janela: barrinha
+  "Banco de frases alterado fora do app — Recarregar" (sem diálogo).
+- Permissão perdida (reinício do navegador): barrinha "Reconectar" (um clique);
+  o app continua funcionando com a cópia do navegador.
+- Sem a API (Firefox, IE11) ou "Usar só o navegador": localStorage como antes,
+  com Exportar/Importar (.json com banco e configurações, sem rascunhos).
+- "Apagar rascunhos" (rascunhos de outras abas; o laudo aberto fica).
+- Isolamento de rascunho por aba (B21) e sincronização de configurações mantidos.
+- Novo `js/folder.js`; `js/store.js` ganhou ganchos de gravação; `ui.js` passa a
+  iniciar depois da leitura da pasta (`UFolder.boot(UFMain)`).
+- Por quê: levar banco, configurações e rascunhos no pendrive entre computadores.
+
+## [etapa-B25] Tema escuro
+- Claro / Escuro / Seguir o sistema (padrão Claro), aplicado na hora, salvo e
+  compartilhado entre abas. Todas as telas tematizadas, contraste WCAG AA.
+- A folha do laudo continua branca; opção "Laudo escuro também" (desligada).
+- Impressão e cópia sempre claras; IE11 cai no tema claro.
+
+## [etapa-B24] Barras compactadas
+- Barra de formatação, Copiar/Imprimir/Gerar e pesquisa unificadas numa só faixa
+  no topo; mais altura útil para o laudo. Botões grandes do diálogo de revisão e
+  a seta de inserir mantidos.
+
+## [etapa-B23] Todas as saídas passam pela revisão
+- Imprimir, Ctrl+P, Gerar e Copiar usam a mesma revisão obrigatória de linhas
+  críticas e campos vazios. Menu de impressão do navegador: proteção por CSS de
+  impressão (o conteúdo é ocultado e aparece um aviso enquanto há pendências).
+
+## [etapa-B22] Pesquisa e correção de remoção em grupo
+- Botão "x" para limpar todos os campos de pesquisa (Esc também limpa); texto
+  pesquisado lembrado entre navegação, recarga e abas.
+- Corrigido: remover um grupo de linhas críticas apagava também as linhas
+  seguintes. Remoção passou a ser feita direto no documento, com desfazer.
+
+## [etapa-B21] Abas, navegação por Tab e relatório de inconsistências
+- Cada aba com seu próprio rascunho; configurações e banco sincronizados ao vivo.
+- Tab / Shift+Tab percorrem todos os campos, com ou sem menu aberto.
+- Relatório de inconsistências do banco agrupado por gravidade e tipo, com linha,
+  caminho e "Copiar como texto".
+
+## [etapa-B20] Revisão em grupo
+- Linhas críticas consecutivas revisadas como um único item; a assinatura
+  automática é um grupo próprio.
+
+## [etapa-B19] Frases que entram sempre e inserção
+- Instrução `@@SEMPRE` (ex.: assinatura) inserida automaticamente no modelo.
+- Seta de inserir no cartão aberto; botão de inserir no topo; dica de instruções.
+
+## [etapa-B18] Posicionamento de frases
+- Ajustes de `@@SUBSTITUI` / `@@ABAIXO_DE` testados no Chrome real; seção
+  posicionada corretamente quando o alvo está no topo.
+
+## [etapa-B17] Instruções de posicionamento e bloqueio de cópia
+- Frases substituem a linha indicada do modelo; opção de bloquear cópia fora do
+  botão Copiar.
+
+## [etapa-B16] Configurações e arrastar
+- Configurações alinhadas; arrastar texto dentro do laudo (opção).
+
+## [etapa-B15] Laudo
+- Sublinhar o título da hipótese diagnóstica (opção); seções sem rótulo; busca
+  global; bloqueio de cópia.
+
+## Não testado pelo usuário
+Tudo desde o início da etapa D foi entregue sem teste do usuário:
+- D1, pasta de dados: janela real de escolher pasta; pendrive de verdade
+  (inclusive retirá-lo com o app aberto); Microsoft Edge; permissão depois de
+  reiniciar o Chrome; usar o mesmo pendrive em dois computadores.
+- D1, testes automáticos: na variante tema escuro, 2 itens falharam
+  ("Reconectar com um clique" e "Apagar rascunhos"). Foram atribuídos ao próprio
+  teste (ele força o tema a cada recarga), mas **não foram reverificados**.
+- D1: Exportar/Importar e "Usar só o navegador" só em teste automático.
+- IE11: nunca testado em IE11 real (só o caminho sem a API foi simulado).
+- B23: Ctrl+P e menu de impressão com teclado/impressora física.
