@@ -2168,7 +2168,7 @@ var UFMain = function () {
     if (!$('modalBack').hidden) { closeModal(); }
     beBuild(); BE.open = true; BE.fromReport = !!fromReport; BE.n = 0;
     $('beName').innerHTML = ' ' + esc(S.bankName || 'banco') + (UFolder.status() === 'folder' ? ' — pasta de dados' : ' — navegador');
-    BE.eol = /\r\n/.test(String(txt)) || !/\n/.test(String(txt)) ? '\r\n' : '\n';   /* original line ending; CRLF when none (Bloco de Notas) */
+    BE.eol = /\r\n/.test(String(txt)) ? '\r\n' : /\n/.test(String(txt)) ? '\n' : /\r/.test(String(txt)) ? '\r' : '\r\n';   /* original line ending (CRLF, LF or CR-only); CRLF when none (Bloco de Notas) */
     $('beTxt').value = String(txt).replace(/\r\n?/g, '\n'); beDirty(false); beGutter();
     $('beditBack').hidden = false;
     setTimeout(function () { beGoto(line > 0 ? line : 1); if (!(line > 0)) { $('beTxt').setSelectionRange && $('beTxt').setSelectionRange(0, 0); $('beTxt').scrollTop = 0; $('beGut').scrollTop = 0; } }, 0);

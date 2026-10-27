@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-D3b] Final de linha CR preservado no editor do banco — entregue, NÃO testado pelo usuário
+- Editor do banco: banco que usa só CR como quebra de linha continua só CR ao salvar (antes virava CRLF).
+  CRLF e LF continuam como antes; texto sem quebras continua ganhando CRLF.
+- Trocar arquivo, Importar, pasta de dados e cópias de segurança já gravavam o banco byte a byte (sem mudança).
+- Testado só em Chromium automatizado (`test/d3b_test.py`).
+
 ## [etapa-D3] Correções da revisão completa — entregue, NÃO testado pelo usuário
 - Configurações entre abas: fechar sem salvar volta ao que está salvo (não a uma cópia antiga); Salvar grava
   só o que foi mudado naquela janela; a pré-visualização do tema não some quando outra aba salva.
