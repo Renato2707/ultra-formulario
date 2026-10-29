@@ -11,6 +11,15 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C5] Doppler: relação IP umbilical / IP cerebral média e RCP — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Novo `js/calc-dop.js` (`UFCalcDop`), com a caixa "Doppler: IP umbilical/cerebral média e RCP" no painel (ligada).
+- Lê o IP digitado logo abaixo de "Artéria Umbilical:" e de "Artéria Cerebral Média:". IP de artérias uterinas e IR não entram na conta. Se houver mais de um IP para a mesma artéria, nada é calculado. Só feto único.
+- Preenche "- Relação: IP umbilical / IP cerebral média = ___ (V.R.: < 1)." com IP AU ÷ IP ACM, 2 casas com vírgula. O "V.R.: < 1" não muda.
+- RCP (IP ACM ÷ IP AU), só numa linha com "cerebroplacentária" ou "RCP" (o banco atual não tem). Se a linha tiver "(p5 para ___ semanas: ___)", preenche as semanas completas da IG relatada e o p5 de Ebbing 2007 (UOG 30:287, Tabela 5).
+- **Interpolação declarada:** entre semanas inteiras, o p5 é interpolado linearmente por dia (ex.: 32s4d = p5(32) + (p5(33) − p5(32))·4/7). Fora de 21s0d a 39s0d, o p5 não é preenchido.
+- " (abaixo do p5)" entra logo após o valor da RCP, num pedaço não editável, quando a RCP mostrada (2 casas) é menor que o p5 mostrado (2 casas). Some quando deixa de valer. Nenhuma linha nova é criada.
+- Edição manual, desfazer/refazer e cursor: mesmo comportamento da C2/C3. Teste automático: test/c5_test.py.
+
 ## [etapa-C4] Percentis Hadlock ao lado de cada medida da biometria — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Pela IG relatada (painel, C1), entre 14s0d e 40s0d. Sem IG ou fora dessa faixa, nada aparece.
 - DBP, CC, CA, CF: z = (medida em cm − média de Hadlock 1984) ÷ DP fixo (DBP 0,3 cm; CC 1 cm; CA 1,34 cm; CF 0,3 cm). As equações da Tabela III diferem da tabela no máximo 0,1 cm (DBP, CC, CF) e 0,2 cm (CA).
