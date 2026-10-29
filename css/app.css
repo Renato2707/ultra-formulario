@@ -376,3 +376,19 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 /* C2 cálculo no laudo */
 .uc-chk{display:block;font-size:13px;cursor:pointer}
 .uc-note{font-size:12px;color:#6b6b6b;color:var(--muted);margin-top:4px}
+/* C6 TI-RADS */
+.tr-nod{border:1px solid #d9d9d9;border:1px solid var(--line);border-radius:6px;margin:8px 0;padding:4px 6px}
+.tr-head{display:flex;align-items:center}
+.tr-tg{flex:1 1 auto;text-align:left;font:inherit;font-weight:bold;background:none;border:0;color:inherit;cursor:pointer;padding:4px 2px}
+.tr-row{display:flex;align-items:center;margin:4px 0;font-size:13px}
+.tr-lab{width:96px;flex:0 0 auto;color:#6b6b6b;color:var(--muted)}
+.tr-sel{flex:1 1 auto;font:inherit;font-size:13px;background:#fff;background:var(--panel);color:inherit;border:1px solid #c8c8c8;border:1px solid var(--line2);border-radius:4px}
+.tr-mm{width:60px}
+.tr-cat{border:0;border-top:1px solid #d9d9d9;border-top:1px solid var(--line);margin:6px 0 0;padding:4px 0 0}
+.tr-cat legend{font-size:12px;font-weight:bold;padding:0 4px 0 0}
+.tr-pts{font-weight:normal;color:#6b6b6b;color:var(--muted)}
+.tr-opt{display:block;font-size:13px;cursor:pointer;margin:1px 0}
+.tr-opt input[disabled]+*{opacity:.5}
+.tr-res{font-weight:bold;margin:8px 0 2px}
+.tr-size{font-size:12px;margin:2px 0 6px;padding:3px 5px;border-left:3px solid #5a6f8f;border-left:3px solid var(--accent)}
+.tr-size:empty{display:none}

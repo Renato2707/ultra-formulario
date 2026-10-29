@@ -11,6 +11,16 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6] Calculadora ACR TI-RADS (tireoide) — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Novo `js/calc-tirads.js` (`UFTirads`), com a seção "TI-RADS (ACR 2017)" no painel e o botão "Adicionar nódulo". Cada nódulo tem seu próprio painel, que pode ser recolhido ou removido. Os nódulos ficam só na sessão.
+- Fonte dos pontos, níveis e cortes: Tessler et al., ACR TI-RADS White Paper, JACR 2017;14:587-595. O texto de saída copia o protótipo do Dr. Renato (xlsx): 6 linhas "Rótulo: valor".
+- Espongiforme vale 0 no total (TR1): as outras categorias ficam desativadas e há aviso na tela. Composição indeterminável por calcificação vale 2 e fixa a ecogenicidade em 1 ponto, como manda o artigo. Margem indeterminável vale 0. Em focos ecogênicos, "Nenhum" desmarca os outros.
+- Total ≤1 conta como TR1, como no protótipo. O artigo não tem nível para 1 ponto.
+- O tamanho só gera um destaque no painel, sem linha nova no laudo. Cortes: TR3 PAAF ≥25 mm e seguimento ≥15 mm; TR4 15/10 mm; TR5 10/5 mm.
+- "Inserir no laudo" põe um cabeçalho e as 6 linhas abaixo da linha do cursor salvo. Sem cursor no laudo, o bloco vai para o fim, com aviso. Um Ctrl+Z desfaz o bloco inteiro.
+- Para inserir, `js/ui.js` ganhou `window.UFInsertLines(lines)`, que reaproveita `insertBlock` e a pilha de desfazer de uma vez (D3). O resto do ui.js não mudou.
+- Teste automático: test/c6_test.py (2000 combinações conferidas contra um cálculo independente em Python).
+
 ## [etapa-C5] Doppler: relação IP umbilical / IP cerebral média e RCP — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Novo `js/calc-dop.js` (`UFCalcDop`), com a caixa "Doppler: IP umbilical/cerebral média e RCP" no painel (ligada).
 - Lê o IP digitado logo abaixo de "Artéria Umbilical:" e de "Artéria Cerebral Média:". IP de artérias uterinas e IR não entram na conta. Se houver mais de um IP para a mesma artéria, nada é calculado. Só feto único.

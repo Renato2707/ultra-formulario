@@ -2322,6 +2322,19 @@ var UFMain = function () {
     if (c.getAttribute('data-model') !== null && e.detail > 1) { return; }
     activateNav(c);
   });
+  /* C6: insert plain text lines as one block at the saved caret (or at the very end of the report when there is
+     no caret in the report); one Ctrl+Z undoes the whole block (same snapshot as insertCard). Returns 'caret'/'end'. */
+  window.UFInsertLines = function (lines) {
+    var undoBefore = edHtml(), undoBeforeText = edText(), html = '', i, how, r = S.savedRange;
+    for (i = 0; i < lines.length; i++) { html += '<div>' + (lines[i] ? esc(lines[i]) : '<br>') + '</div>'; }
+    if (r && editor.contains(r.commonAncestorContainer)) { how = 'caret'; }
+    else { how = 'end'; ensureNotEmpty(); focusEditor(); var e = document.createRange(); e.selectNodeContents(editor); e.collapse(false); setRange(e); saveRange(); }
+    insertBlock(html);
+    S.insStack.push({ before: undoBefore, beforeText: undoBeforeText, after: edHtml(), afterText: edText() }); S.insRedo = [];
+    if (S.insStack.length > 30) { S.insStack.shift(); }
+    S.lastChoice = null; S.lastRemoval = null; S.userCaret = true;
+    return how;
+  };
   window.UFTest = { S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel,
                     insertCard: insertCard, editorLines: editorLines, lineText: lineText, openSelect: openSelect, chooseOption: chooseOption, reportText: reportText, directiveRule: directiveRule, anchorHits: anchorHits };
   on(navList, 'dblclick', function (e) {
