@@ -8,6 +8,7 @@
 | D | Armazenamento em pasta/pendrive (D1); Salvar nas configurações, histórico de pesquisa, editor do banco, ordem das diretivas (D2) | D1 e D2 entregues, **não testadas pelo usuário** |
 | D3 | Correções da revisão completa (abas, importar, backups, desfazer, revisão de críticas, pasta lenta, navegador sem espaço, final de linha, rascunhos) | Entregue, **não testada pelo usuário** |
 | D3b | Editor do banco mantém final de linha só CR | Entregue, **não testada pelo usuário** |
+| D3c | Clique no meio do campo em branco substitui o campo inteiro | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | E, F | — | Não definidas nos registros disponíveis |
 
 ## Regras

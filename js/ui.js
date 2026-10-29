@@ -2424,7 +2424,24 @@ var UFMain = function () {
 
   /* editor */
   on(editor, 'keyup', function (e) { var k = e.keyCode; if ((k >= 33 && k <= 40) || k === 13 || k === 8 || k === 46 || k > 47) { S.userCaret = true; } saveRange(); afterChange(false); });
-  on(editor, 'mouseup', function () { S.userCaret = true; saveRange(); });
+  on(editor, 'mouseup', function (e) {
+    S.userCaret = true; saveRange();
+    /* D3c: a click anywhere on a blank field (also its very edges) selects the whole placeholder, so typing replaces it */
+    var x = e.clientX, y = e.clientY;
+    setTimeout(function () {
+      var sel = window.getSelection(), r, n, k, c = [], i, f, rc;
+      if (!sel || !sel.rangeCount || !sel.isCollapsed) { return; }
+      r = sel.getRangeAt(0); n = r.startContainer;
+      if (n.nodeType === 3) { c.push(n.parentNode); if (r.startOffset === 0) { c.push(n.previousSibling); } if (r.startOffset === n.nodeValue.length) { c.push(n.nextSibling); } }
+      else { k = n.childNodes; c.push(n, k[r.startOffset - 1], k[r.startOffset]); }
+      for (i = 0; i < c.length; i++) {
+        f = c[i];
+        if (!f || f.nodeType !== 1 || !hasCls(f, 'fld') || f.getAttribute('data-t') === 's' || !editor.contains(f) || fieldFilled(f)) { continue; }
+        rc = f.getBoundingClientRect();
+        if (x >= rc.left - 2 && x <= rc.right + 2 && y >= rc.top - 2 && y <= rc.bottom + 2) { r = document.createRange(); r.selectNodeContents(f); setRange(r); saveRange(); return; }
+      }
+    }, 0);
+  });
   on(editor, 'input', function () { afterChange(false); });
   on(editor, 'blur', saveRange);
   on(document, 'selectionchange', function () { if (document.activeElement === editor) { saveRange(); } });

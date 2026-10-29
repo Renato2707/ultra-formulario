@@ -11,6 +11,10 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-D3c] Clique no meio do campo em branco substitui o campo inteiro — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Clicar com o mouse em qualquer ponto de um campo em branco (número, decimal, texto), inclusive nas bordas, seleciona o campo todo; digitar "50" resulta em "50" (antes ficava "_50_"). Campos já preenchidos continuam editáveis no ponto do clique.
+- Teste automático: test/d3c_test.py.
+
 ## [etapa-D3b] Final de linha CR preservado no editor do banco — entregue, NÃO testado pelo usuário
 - Editor do banco: banco que usa só CR como quebra de linha continua só CR ao salvar (antes virava CRLF).
   CRLF e LF continuam como antes; texto sem quebras continua ganhando CRLF.
