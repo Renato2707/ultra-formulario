@@ -373,3 +373,6 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .uc-u{margin:0 10px 0 4px;color:#6b6b6b;color:var(--muted);font-size:13px}
 .uc-msg{font-size:12px;color:#c62828;color:var(--warn);min-height:15px;margin-top:3px}
 #btnCalc.on{background:#f0f0f0;background:var(--hover)}
+/* C2 cálculo no laudo */
+.uc-chk{display:block;font-size:13px;cursor:pointer}
+.uc-note{font-size:12px;color:#6b6b6b;color:var(--muted);margin-top:4px}

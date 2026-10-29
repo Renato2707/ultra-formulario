@@ -11,6 +11,13 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C2] Volume e índice esplênico calculados no próprio laudo — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Novo `js/calc-vol.js` (`UFCalcVol`, registrado no painel como "Cálculo no laudo", com caixa para ligar/desligar nesta janela).
+- Volume (elipsoide): L × AP × T × 0,523, medidas em mm, ÷ 1000 → cm³ inteiro. Só preenche um campo de volume que já existe ("volume ~ ___ cm³", "(~ ___ cm³)", "volume estimado em ___ cm³"), quando há exatamente 3 medidas "___ x ___ x ___ mm" na mesma frase, ou na linha imediatamente anterior se a linha do campo começa com "Volume". Duas linhas seguidas de medidas (ex.: lobos da tireoide) não são calculadas. Aceita vírgula ou ponto.
+- Índice esplênico triplanar: C × L × E em cm → inteiro, só se a frase do índice tiver as 3 medidas antes do campo. O banco atual não tem essas medidas na frase do índice, então nada é calculado ali (aguardando orientação).
+- Medida apagada: o volume calculado volta ao campo vazio. Volume digitado à mão é mantido até alguma medida mudar. Desfazer/refazer continuam funcionando (o volume acompanha as medidas).
+- Teste automático: test/c2_test.py.
+
 ## [etapa-C1] Painel de calculadoras, calculadora livre e IG relatada — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Novo `js/calc.js` (namespace `UFCalc`): o painel lateral direito ("Calculadoras") ganhou conteúdo; botão discreto "±" na barra (antes de "Limpar") abre/fecha o mesmo painel (mesma preferência do botão do próprio painel).
 - Calculadora livre: só + − × ÷, vírgula na exibição (aceita vírgula ou ponto), teclado na tela e teclado físico com a calculadora focada (0-9 , . + - * / Enter, Backspace, Esc limpa). Contas em sequência são feitas da esquerda para a direita (2 + 3 × 4 = 20). Divisão por zero mostra "erro". Até 10 dígitos significativos, sem zeros à direita e sem notação científica.

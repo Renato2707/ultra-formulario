@@ -37,7 +37,7 @@ with sync_playwright() as p:
     ck('painel alterna', op0 != op1 and op1 != op2 == op0, (op0, op1, op2))
     pg.evaluate('UFCalc.close()'); ck('close()', not pg.evaluate('UFCalc.isOpen()') and not pg.is_visible('#ucDisp'))
     pg.evaluate('UFCalc.open()'); ck('open()', pg.evaluate('UFCalc.isOpen()') and pg.is_visible('#ucDisp'))
-    ck('secoes registradas', pg.evaluate("[].map.call(document.querySelectorAll('[data-calc]'), function(e){return e.getAttribute('data-calc')}).join()") == 'livre,ig')
+    ck('secoes registradas', pg.evaluate("[].map.call(document.querySelectorAll('[data-calc]'), function(e){return e.getAttribute('data-calc')}).join()").startswith('livre,ig'))
     ck('registrar modulo futuro', pg.evaluate("UFCalc.register({id:'x', title:'X', build:function(b){b.appendChild(document.createTextNode('ok'))}}) && !!document.querySelector('[data-calc=x]')"))
     pg.evaluate("var s=document.querySelector('[data-calc=x]'); s.parentNode.removeChild(s)")
     # cursor do laudo: colocar caret em 'beta' e conferir que não muda ao usar o painel
