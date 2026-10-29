@@ -6,8 +6,47 @@
    Campos do banco em mm; cm só dentro do cálculo. Só preenche campos que já existem. ES5 estrito. */
 (function () {
   'use strict';
-  var H = null, editor = null, busy = false;
-  var on = { pfe: true, ig: true, igp: false };
+  var H = null, editor = null, busy = false, gen = 0;
+  var on = { pfe: true, ig: true, igp: false, pct: true };
+  /* C4 percentis: médias Hadlock 1984 (cm) com DP fixo; PFE Hadlock 1991 (ln, DP 0,12) */
+  var MEAN = {
+    bpd: function (a) { return -3.08 + 0.41 * a - 0.000061 * a * a * a; },
+    hc: function (a) { return -11.48 + 1.56 * a - 0.0002548 * a * a * a; },
+    ac: function (a) { return -13.3 + 1.61 * a - 0.00998 * a * a; },
+    fl: function (a) { return -3.91 + 0.427 * a - 0.0034 * a * a; }
+  };
+  var SD = { bpd: 0.3, hc: 1.0, ac: 1.34, fl: 0.3 };
+  function phi(x) {   /* Φ(x) por série de Taylor (Marsaglia 2004), erro ~1e-15 para |x| < 8 */
+    if (x < -8) { return 0; } if (x > 8) { return 1; }
+    var sum = x, term = x, x2 = x * x, i;
+    for (i = 3; i < 400; i += 2) { term = term * x2 / i; sum += term; if (Math.abs(term) < 1e-17 * Math.abs(sum)) { break; } }
+    return 0.5 + sum * Math.exp(-x2 / 2 - 0.91893853320467274178);
+  }
+  function pctLabel(z) {
+    var p = phi(z) * 100;
+    if (p < 3) { return '<p3'; } if (p > 97) { return '>p97'; }
+    return 'p' + Math.round(p);
+  }
+  function pctMeasure(k, mm, days) { var a = days / 7; return pctLabel((mm / 10 - MEAN[k](a)) / SD[k]); }
+  function pctPfe(g, days) { var a = days / 7; return pctLabel((Math.log(g) - (0.578 + 0.332 * a - 0.00354 * a * a)) / 0.12); }
+  function igDays() { var d = window.UFCalc && UFCalc.getIgRelatada ? UFCalc.getIgRelatada() : null; return (d !== null && d >= 98 && d <= 280) ? d : null; }
+  /* trecho " (pNN)" num span não editável logo após a palavra (mm/gramas) que segue o campo */
+  function tagOf(f) { var n = f.nextSibling, x = n && n.nodeType === 3 ? n.nextSibling : null; return x && H.hasCls(x, 'uc-pct') ? x : null; }
+  function setTag(f, word, txt) {
+    var s = tagOf(f), n = f.nextSibling, m;
+    if (txt === null) {
+      if (!s) { return false; }
+      var p = s.parentNode, prev = s.previousSibling; p.removeChild(s);
+      if (prev && prev.nodeType === 3 && prev.nextSibling && prev.nextSibling.nodeType === 3) { prev.nodeValue += prev.nextSibling.nodeValue; p.removeChild(prev.nextSibling); }
+      return true;
+    }
+    if (s) { s.ucGen = gen; if (s.textContent !== txt) { s.textContent = txt; return true; } return false; }
+    if (!n || n.nodeType !== 3 || !(m = word.exec(n.nodeValue))) { return false; }
+    var rest = n.splitText(m[0].length), sp = document.createElement('span');
+    sp.ucGen = gen; sp.className = 'uc-pct'; sp.setAttribute('contenteditable', 'false'); sp.textContent = txt;
+    rest.parentNode.insertBefore(sp, rest);
+    return true;
+  }
   var LAB = [
     ['bpd', /(^|\()\s*(diâmetro biparietal|dbp)\b/i],
     ['hc', /(^|\()\s*(circunferência cefálica|perímetro cefálico|cc)\b/i],
@@ -85,10 +124,10 @@
   function setSuf(f, txt) {   /* " e N dia(s)" logo depois da palavra "semanas" que segue o campo */
     var s = sufOf(f), n = f.nextSibling, m;
     if (txt === null) { if (s) { var p = s.parentNode, prev = s.previousSibling; p.removeChild(s); if (prev && prev.nextSibling && prev.nextSibling.nodeType === 3) { prev.nodeValue += prev.nextSibling.nodeValue; p.removeChild(prev.nextSibling); } } return; }
-    if (s) { if (s.textContent !== txt) { s.textContent = txt; } return; }
+    if (s) { s.ucGen = gen; if (s.textContent !== txt) { s.textContent = txt; } return; }
     if (!n || n.nodeType !== 3 || !(m = /^\s*semanas/i.exec(n.nodeValue))) { return; }
     var rest = n.splitText(m[0].length), sp = document.createElement('span');
-    sp.className = 'uc-suf'; sp.setAttribute('contenteditable', 'false'); sp.textContent = txt;
+    sp.ucGen = gen; sp.className = 'uc-suf'; sp.setAttribute('contenteditable', 'false'); sp.textContent = txt;
     rest.parentNode.insertBefore(sp, rest);
   }
   function put(f, val, key, suf) {
@@ -116,13 +155,16 @@
   }
   function run() {
     if (busy || !editor) { return; }
-    busy = true;
+    busy = true; gen++;
     var changed = false, sc, i, b, r, o, sd;
     try {
       sc = scan();
       for (i = 0; i < sc.blocks.length; i++) {
         b = sc.blocks[i]; b.r = compute(b);
-        if (b.pfe) { if (put(b.pfe, on.pfe && b.r.pfe !== null ? String(b.r.pfe) : null, b.r.key)) { changed = true; } }
+        var dd = on.pct ? igDays() : null, kk, fv;
+        for (kk in MEAN) { if (MEAN.hasOwnProperty(kk) && b.m[kk]) { fv = H.fldVal(b.m[kk]); if (setTag(b.m[kk], /^\s*mm\b/i, dd !== null && fv !== null && fv > 0 ? ' (' + pctMeasure(kk, fv, dd) + ')' : null)) { changed = true; } } }
+        if (b.pfe) { if (put(b.pfe, on.pfe && b.r.pfe !== null ? String(b.r.pfe) : null, b.r.key)) { changed = true; }
+          fv = H.fldVal(b.pfe); if (setTag(b.pfe, /^\s*gramas\b/i, dd !== null && fv !== null && fv > 0 ? ' (' + pctPfe(fv, dd) + ')' : null)) { changed = true; } }
       }
       for (i = 0; i < sc.outs.length; i++) {
         o = sc.outs[i]; r = o.block ? o.block.r : null;
@@ -130,6 +172,10 @@
         sd = v !== null ? semDias(v) : null;
         if (put(o.f, sd ? String(sd.w) : null, r ? o.kind + ':' + r.key : '', sd ? ' e ' + sd.d + (sd.d <= 1 ? ' dia' : ' dias') : null)) { changed = true; }
       }
+      /* trechos órfãos (campo apagado, bloco desfeito): remover */
+      var sp = editor.querySelectorAll('.uc-pct, .uc-suf'), q;
+      for (q = sp.length - 1; q >= 0; q--) { if (sp[q].ucGen !== gen) { var pr = sp[q].previousSibling, par = sp[q].parentNode; par.removeChild(sp[q]);
+        if (pr && pr.nodeType === 3 && pr.nextSibling && pr.nextSibling.nodeType === 3) { pr.nodeValue += pr.nextSibling.nodeValue; par.removeChild(pr.nextSibling); } changed = true; } }
       if (changed) {
         var ev;
         try { ev = new Event('input', { bubbles: true }); } catch (e) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); }
@@ -153,14 +199,16 @@
     editor = document.getElementById('editor'); H = window.UFCalcVol && UFCalcVol._h;
     if (!editor || !H) { return; }
     if (editor.addEventListener) { editor.addEventListener('input', onInput, false); } else { editor.attachEvent('oninput', onInput); }
+    if (window.UFCalc && UFCalc.onIgChange) { UFCalc.onIgChange(function () { run(); }); }
     run();
   }
   function setter(k) { return function (v) { on[k] = !!v; run(); }; }
-  window.UFCalcBio = { init: init, run: run, scan: scan, pfe: pfe, igComp: igComp, igPeso: igPeso, semDias: semDias,
+  window.UFCalcBio = { init: init, run: run, scan: scan, pfe: pfe, igComp: igComp, igPeso: igPeso, semDias: semDias, phi: phi, pctMeasure: pctMeasure, pctPfe: pctPfe, MEAN: MEAN,
     set: function (k, v) { setter(k)(v); }, get: function (k) { return on[k]; } };
   if (window.UFCalcVol) {
     UFCalcVol.addToggle('ucPfe', 'Peso fetal estimado (PFE)', true, setter('pfe'));
     UFCalcVol.addToggle('ucIgc', 'IG pela biometria composta', true, setter('ig'));
     UFCalcVol.addToggle('ucIgp', 'IG pelo PFE', false, setter('igp'));
+    UFCalcVol.addToggle('ucPct', 'Percentis Hadlock (pela IG relatada)', true, setter('pct'));
   }
 })();

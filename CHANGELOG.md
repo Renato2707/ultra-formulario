@@ -11,6 +11,14 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C4] Percentis Hadlock ao lado de cada medida da biometria — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Pela IG relatada (painel, C1), entre 14s0d e 40s0d. Sem IG ou fora dessa faixa, nada aparece.
+- DBP, CC, CA, CF: z = (medida em cm − média de Hadlock 1984) ÷ DP fixo (DBP 0,3 cm; CC 1 cm; CA 1,34 cm; CF 0,3 cm). As equações da Tabela III diferem da tabela no máximo 0,1 cm (DBP, CC, CF) e 0,2 cm (CA).
+- PFE: z = (ln PFE − ln p50) ÷ 0,12, com ln p50 = 0,578 + 0,332·IG − 0,00354·IG² (Hadlock 1991), usando o valor mostrado no campo (calculado ou digitado).
+- Percentil = Φ(z)·100 arredondado; abaixo de 3 mostra "<p3", acima de 97 mostra ">p97". Φ por série de Taylor (erro < 1e-15).
+- Texto: "80 mm (p40)." e "1740 gramas (p17) (+- 15%)". O trecho fica num pedaço não editável depois de "mm"/"gramas". É trocado sem acumular quando a medida ou a IG mudam, e some se a medida ou a IG forem apagadas. Entra no texto copiado/impresso. Caixa "Percentis Hadlock" no painel (ligada).
+- Teste automático: test/c4_test.py (referência independente em Python).
+
 ## [etapa-C3] Biometria fetal calculada no próprio laudo (PFE, IG composta, IG pelo PFE) — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Novo `js/calc-bio.js` (`UFCalcBio`), com caixas no painel "Cálculo no laudo": PFE (ligada), IG pela biometria composta (ligada), IG pelo PFE (desligada).
 - Reconhece o bloco de biometria (DBP, CC/perímetro cefálico, CA, CF/comprimento femoral, cada um "___ mm", em qualquer ordem) e preenche só campos que já existem: "Peso fetal estimado em(:) ___ gramas" e "Biometria fetal composta ... equivalente a ___ semanas".
