@@ -168,16 +168,29 @@
     run();
   }
 
-  var api = { run: run, scan: scan, init: init, setEnabled: function (on) { enabled = !!on; if (enabled) { run(); } }, isEnabled: function () { return enabled; } };
+  var toggles = [];
+  /* outros módulos de "Cálculo no laudo" acrescentam caixas liga/desliga nesta seção */
+  function addToggle(id, label, checked, fn) { toggles.push({ id: id, label: label, checked: checked, fn: fn }); if (secBody) { drawToggle(toggles[toggles.length - 1]); } }
+  var secBody = null;
+  function drawToggle(t) {
+    var lab = document.createElement('label'), cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = !!t.checked; cb.id = t.id;
+    cb.onchange = function () { t.fn(cb.checked); };
+    lab.className = 'uc-chk'; lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + t.label));
+    secBody.insertBefore(lab, secBody.lastChild);
+  }
+  var api = { run: run, scan: scan, init: init, addToggle: addToggle,
+    _h: { lines: lines, isNumFld: isNumFld, fldVal: fldVal, nextText: nextText, hasCls: hasCls }, setEnabled: function (on) { enabled = !!on; if (enabled) { run(); } }, isEnabled: function () { return enabled; } };
   window.UFCalcVol = api;
   if (window.UFCalc) {
     UFCalc.register({ id: 'auto', title: 'Cálculo no laudo', build: function (b) {
       var lab = document.createElement('label'), cb = document.createElement('input'), p = document.createElement('div');
       cb.type = 'checkbox'; cb.checked = true; cb.id = 'ucAuto';
       cb.onchange = function () { api.setEnabled(cb.checked); };
-      lab.className = 'uc-chk'; lab.appendChild(cb); lab.appendChild(document.createTextNode(' Preencher volume e índice esplênico'));
-      p.className = 'uc-note'; p.appendChild(document.createTextNode('Volume = L × AP × T × 0,523 (mm → cm³). Índice esplênico = C × L × E (cm). Só onde o texto já tem o campo.'));
-      b.appendChild(lab); b.appendChild(p);
+      lab.className = 'uc-chk'; lab.appendChild(cb); lab.appendChild(document.createTextNode(' Volume e índice esplênico'));
+      p.className = 'uc-note'; p.appendChild(document.createTextNode('Volume = L × AP × T × 0,523 (mm → cm³). Índice esplênico = C × L × E (cm). PFE: Hadlock 1985 (4 parâmetros). IG composta: Hadlock 1984. IG pelo PFE: inverso de Hadlock 1991. Só onde o texto já tem o campo.'));
+      b.appendChild(lab); b.appendChild(p); secBody = b;
+      for (var i = 0; i < toggles.length; i++) { drawToggle(toggles[i]); }
     } });
   }
 })();

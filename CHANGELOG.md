@@ -11,6 +11,15 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C3] Biometria fetal calculada no próprio laudo (PFE, IG composta, IG pelo PFE) — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Novo `js/calc-bio.js` (`UFCalcBio`), com caixas no painel "Cálculo no laudo": PFE (ligada), IG pela biometria composta (ligada), IG pelo PFE (desligada).
+- Reconhece o bloco de biometria (DBP, CC/perímetro cefálico, CA, CF/comprimento femoral, cada um "___ mm", em qualquer ordem) e preenche só campos que já existem: "Peso fetal estimado em(:) ___ gramas" e "Biometria fetal composta ... equivalente a ___ semanas".
+- PFE: Hadlock 1985 (4 parâmetros, cm), grama inteiro. IG composta: Hadlock 1984 (cm), mostrada como "32 semanas e 3 dias" ("dia" no singular para 0 e 1; arredonda ao dia mais próximo): o número vai no campo e " e N dias" entra logo depois da palavra "semanas" do texto.
+- IG pelo PFE: inverso de Hadlock 1991 (raiz menor), a partir do PFE já arredondado mostrado no laudo; só entre 14 e 42 semanas, e só numa linha com "pelo peso fetal ... ___ semanas" (o banco atual não tem essa linha).
+- Gemelar: blocos "BIOMETRIA FETAL A/B" (ou depois de "FETO A/B") ficam separados; "composta do feto A/B" usa o bloco certo; linha sem feto com dois blocos não é preenchida.
+- Proteções técnicas (não são valores clínicos): medidas devem ser > 0; PFE só até 10.000 g e IG composta só entre 10 e 45 semanas, senão o campo fica em branco.
+- Edição manual, mudança de medida e desfazer/refazer com o mesmo comportamento da C2. Teste automático: test/c3_test.py.
+
 ## [etapa-C2] Volume e índice esplênico calculados no próprio laudo — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Novo `js/calc-vol.js` (`UFCalcVol`, registrado no painel como "Cálculo no laudo", com caixa para ligar/desligar nesta janela).
 - Volume (elipsoide): L × AP × T × 0,523, medidas em mm, ÷ 1000 → cm³ inteiro. Só preenche um campo de volume que já existe ("volume ~ ___ cm³", "(~ ___ cm³)", "volume estimado em ___ cm³"), quando há exatamente 3 medidas "___ x ___ x ___ mm" na mesma frase, ou na linha imediatamente anterior se a linha do campo começa com "Volume". Duas linhas seguidas de medidas (ex.: lobos da tireoide) não são calculadas. Aceita vírgula ou ponto.
