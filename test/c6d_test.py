@@ -55,7 +55,7 @@ def fresh(b, model):
     pg.goto(IDX); pg.evaluate('localStorage.clear(); sessionStorage.clear()'); pg.reload(); pg.wait_for_timeout(200)
     pg.set_input_files('#bankFile0', tf.name); pg.wait_for_timeout(300)
     pg.click('[data-exam]'); pg.wait_for_timeout(600); pg.locator('[data-model]').nth(model).dblclick(); pg.wait_for_timeout(400)
-    if not pg.evaluate('UFCalc.isOpen()'): pg.click('#btnCalc'); pg.wait_for_timeout(150)
+    if not pg.evaluate('UFCalc.isOpen()'): pg.evaluate('UFCalc.open()'); pg.wait_for_timeout(150)
     return pg
 def rep(pg): return pg.evaluate('UFTest.reportText()').splitlines()
 def L(pg, s, n=0): return ([l for l in rep(pg) if s in l] + ['', ''])[n]
@@ -70,7 +70,7 @@ def typ(pg, i, txt):
 def lobe(pg, start, vals, nth=0):
     i = ix(pg, start, nth)
     for k, v in enumerate(vals): typ(pg, i + k, v)
-def st(pg): return pg.evaluate("document.getElementById('ucAutoSt').textContent")
+def st(pg): return pg.evaluate("document.getElementById('ucAutoDot').title")
 D, E = (45, 15, 18), (40, 14, 16)
 with sync_playwright() as p:
     b = p.chromium.launch()
@@ -83,7 +83,7 @@ with sync_playwright() as p:
     ck('total = soma dos 2 lobos (%d cm³), nódulo e istmo não entram' % exp, L(pg, 'Volume glandular').strip() == 'Volume glandular estimado em %d cm³.' % exp, L(pg, 'Volume glandular'))
     typ(pg, ix(pg, 'Istmo'), '4'); 
     ck('istmo preenchido não muda o total', ('em %d cm³' % exp) in L(pg, 'Volume glandular'))
-    ck('painel: soma de 2 lobos', 'soma de 2 lobos' in st(pg) and 'istmo não entra' in st(pg), st(pg))
+    ck('painel: soma de 2 lobos', 'soma dos lobos' in st(pg) and 'sem o istmo' in st(pg), st(pg))
     vi = ix(pg, 'Volume glandular'); typ(pg, vi, '20')
     typ(pg, ix(pg, 'Istmo'), '5')
     ck('edição manual do total respeitada (medidas iguais)', 'em 20 cm³' in L(pg, 'Volume glandular'), L(pg, 'Volume glandular'))
@@ -99,12 +99,12 @@ with sync_playwright() as p:
     ck('"Glândula tireoide ... de volume ___ cm³" (linha acima) recebe a soma', ('de volume %d cm³' % rnd(vl(*D) + vl(*E))) in L(pg, 'Glândula tireoide'), L(pg, 'Glândula tireoide'))
     pg = fresh(b, 3)
     lobe(pg, 'O lobo esquerdo', [str(x) for x in E])
-    ck('um lobo só (ex.: lobectomia): total = esse lobo', ('em %d cm³' % rnd(vl(*E))) in L(pg, 'Volume glandular') and 'no laudo' in st(pg), [L(pg, 'Volume glandular'), st(pg)])
+    ck('um lobo só (ex.: lobectomia): total = esse lobo', ('em %d cm³' % rnd(vl(*E))) in L(pg, 'Volume glandular') and 'Pronto' in st(pg), [L(pg, 'Volume glandular'), st(pg)])
     pg = fresh(b, 4)
     lobe(pg, 'O lobo direito', [str(x) for x in D], 0); lobe(pg, 'O lobo direito', [str(x) for x in E], 1)
     ck('dois "lobo direito": ambíguo, não calcula', 'estimado em ___ cm³' in L(pg, 'Volume glandular'), L(pg, 'Volume glandular'))
     pg = fresh(b, 5)
-    ck('sem linha de volume total: aviso no painel', 'sem linha de volume total' in st(pg), st(pg))
+    ck('sem linha de volume total: aviso no painel', 'não há linha de volume total' in st(pg), st(pg))
     ck('sem erros de console', not ERR, ERR)
     b.close()
 print('%d/%d' % (sum(R), len(R)))

@@ -11,6 +11,28 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6e] Painel limpo, laudo colado com campos, TI-RADS unificado — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Layout:
+  - botões de formatação (N I S, alinhamento, desfazer/refazer) numa barra própria logo acima do laudo;
+  - botões das frases (+ ⇩ ✎ →) numa linha acima da pesquisa de frases, que agora ocupa a largura do painel;
+  - pesquisa no laudo mais larga.
+- Backspace na pesquisa de frases vazia não volta mais aos modelos (voltar: botão ‹ ou Esc).
+- Laudo colado (2 ou mais linhas): cada linha que corresponde a uma linha do banco (modelos e frases) volta com os campos, já preenchidos com os valores colados; escolhas viram campos de escolha; linhas que não são do banco ficam texto simples. As calculadoras funcionam em cima disso. Um Ctrl+Z desfaz a colagem. O rascunho recarregado mantém os campos.
+- Painel de calculadoras:
+  - cartões Calculadora, Obstetrícia (IG relatada, PFE, IG composta, IG pelo PFE, percentis, Doppler AU/ACM e RCP), Volume e TI-RADS;
+  - todos começam recolhidos; o cartão abre sozinho uma vez quando fica pronto;
+  - estado só por um ponto: verde = pronto, cinza = sem linha / faltam dados / desligado; o motivo fica na dica do ponto; fórmula e fonte na dica do nome;
+  - textos removidos: "linha encontrada no laudo", "AU/ACM = …", "Ordem na linha…", "desligado", "sem linha correspondente…";
+  - botão ± removido (o painel fica sempre disponível; ainda dá para recolher pelo ›);
+  - ordem do Doppler: botão ⇅.
+- Chaves: o estado da caixa sempre igual ao efeito. Volume desligado agora tira o valor calculado do laudo (antes ficava).
+- TI-RADS num cartão só:
+  - "Calcular pelo texto do laudo": com as 5 escolhas da frase "Observa-se nódulo … TI-RADS ___", escreve o número e as 6 linhas (Pontuação / Categoria TIRADS / Nível de Risco / Risco de Malignidade / Recomendação de PAAF / Sugestão de Acompanhamento) logo depois da frase; atualiza ao trocar opção ou medida; somem se ficar incompleto ou desligado; linhas coladas iguais não duplicam;
+  - com medida no nódulo, a maior medida é comparada aos cortes ACR 2017 já da C6 e o resultado vai entre parênteses nas linhas de PAAF e acompanhamento, ex.: "(indicada: 12 mm)" / "(não indicada: 7 mm)" — único acréscimo ao modelo das 6 linhas;
+  - formulário (composição, ecogenicidade, forma, margem com pontos, focos, terço, lobo, L×AP×T, resultado ao vivo) e "Inserir nódulo": escreve a frase do próprio banco carregado com as escolhas já feitas e os campos editáveis, no lugar do campo de escolha do nódulo se houver; as 6 linhas vêm junto. Um Ctrl+Z desfaz. Banco sem essa frase: insere o bloco da C6;
+  - a frase do banco aceita um tipo de foco: o formulário escreve o de maior pontuação (a pontuação usa todos os marcados).
+- Testes: `test/c6e_test.py` (45 verificações; na versão 6d2b1eb: 5 passam, 28 falham e o teste para no formulário que não existia). Atualizados para o novo painel: c1 (sem ±, cartões), c6 (UI do formulário novo; 25 verificações), c6c e c6d (estado lido pela dica do ponto).
+
 ## [etapa-C6d] Volume da tireoide = soma dos lobos — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Aprovado pelo Dr. Renato.
 - Cada lobo usa a regra da C2: L × AP × T × 0,523 (mm → cm³). Conta como lobo a frase "O lobo direito/esquerdo mede cerca de # x # x # mm".

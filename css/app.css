@@ -148,7 +148,7 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 
 @media print{
   body,#editor{background:#fff !important;color:#000 !important}
-  #topbar,#left,#right,.split,#editorToolbar{display:none !important}
+  #topbar,#left,#right,.split,#editorToolbar,#fmtBar{display:none !important}
   #editorWrap{padding:0;background:#fff;overflow:visible}
   #editor{border:0;box-shadow:none;padding:0}
   #editor .crit{text-decoration:none}
@@ -395,7 +395,7 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .uc-num.uc-bad{border-color:#c62828;border-color:var(--warn)}
 .uc-u{margin:0 10px 0 4px;color:#6b6b6b;color:var(--muted);font-size:13px}
 .uc-msg{font-size:12px;color:#c62828;color:var(--warn);min-height:15px;margin-top:3px}
-#btnCalc.on{background:#f0f0f0;background:var(--hover)}
+
 /* C2 cálculo no laudo */
 .uc-chk{display:block;font-size:13px;cursor:pointer}
 .uc-note{font-size:12px;color:#6b6b6b;color:var(--muted);margin-top:4px}
@@ -415,3 +415,28 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .tr-res{font-weight:bold;margin:8px 0 2px}
 .tr-size{font-size:12px;margin:2px 0 6px;padding:3px 5px;border-left:3px solid #5a6f8f;border-left:3px solid var(--accent)}
 .tr-size:empty{display:none}
+/* C6e: barra de formatação acima do laudo, pesquisas mais largas, cartões com ponto de estado */
+.fmtbar{border-bottom:1px solid #d9d9d9;border-bottom:1px solid var(--line)}
+#topbar #repSearch{width:240px}
+.navtools .tools{display:flex;flex-wrap:wrap;width:100%}
+.navtools .tools:empty{display:none}
+.uc-dot{display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;margin-left:8px;background:#b5b5b5;vertical-align:middle;cursor:help}
+.uc-dot.on{background:#2e9e44}
+.uc-row{display:flex;align-items:center}
+.uc-row .uc-chk{flex:1 1 auto;display:block}
+.uc-mini{flex:0 0 auto;margin-left:6px;height:22px;min-width:24px;padding:0 4px;font:inherit;font-size:13px;border:1px solid #c8c8c8;border:1px solid var(--line2);border-radius:4px;background:transparent;color:inherit;cursor:pointer}
+.uc-mini:hover{background:#1f5fbf;color:#fff}
+.uc-lab{font-size:13px;margin-right:8px}
+.tr-form .tr-sel{display:block;width:100%;box-sizing:border-box;height:26px;margin:0 0 5px;font:inherit;font-size:12px;border:1px solid #c8c8c8;border:1px solid var(--line2);border-radius:4px;background:#fff;background:var(--panel);color:inherit}
+.tr-foc{margin:0 0 5px}
+.tr-chip{display:inline-block;font-size:12px;margin:0 8px 3px 0;cursor:pointer;white-space:nowrap}
+.tr-loc{display:flex}
+.tr-loc .tr-half{flex:1 1 50%;width:50%}
+.tr-loc .tr-half + .tr-half{margin-left:5px}
+.tr-mmr{display:flex;align-items:center;margin-bottom:6px}
+.tr-mmr .uc-u{margin:0 4px}
+.tr-foot{display:flex;align-items:center}
+.tr-res{flex:1 1 auto;font-weight:bold;font-size:13px}
+.tr-ins[disabled]{opacity:.5;cursor:default}
+.uc-trl{color:inherit}
+#navCount:empty{display:none}

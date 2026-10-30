@@ -58,81 +58,6 @@
     return 'Pelo tamanho (' + fmtMm(mm) + ' mm): abaixo dos cortes de PAAF e de seguimento.';
   }
 
-  /* ---------- UI ---------- */
-  var list = null, seq = 0, nods = [];
-  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) { e.className = cls; } if (txt != null) { e.appendChild(document.createTextNode(txt)); } return e; }
-  function on(e, ev, fn) { if (e.addEventListener) { e.addEventListener(ev, fn, false); } else { e.attachEvent('on' + ev, fn); } }
-  function setTxt(e, t) { e.innerHTML = ''; e.appendChild(document.createTextNode(t)); }
-  function addNodule() {
-    var id = ++seq, n = { id: id, lado: '', terco: '', mm: '', st: { comp: null, eco: null, forma: null, marg: null, focos: [] } }, box = el('div', 'tr-nod'), head = el('div', 'tr-head'),
-      tg = el('button', 'tr-tg', ''), rm = el('button', 'btn btn-sm tr-rm', 'Remover'), body = el('div', 'tr-body'), i, j, c;
-    tg.type = 'button'; rm.type = 'button'; tg.setAttribute('aria-expanded', 'true'); box.setAttribute('data-nod', String(id));
-    head.appendChild(tg); head.appendChild(rm); box.appendChild(head); box.appendChild(body);
-    function sel(lab, opts, key) {
-      var w = el('label', 'tr-row'), s = el('select', 'tr-sel'), k; w.appendChild(el('span', 'tr-lab', lab));
-      for (k = 0; k < opts.length; k++) { var o = el('option', null, opts[k][1]); o.value = opts[k][0]; s.appendChild(o); }
-      s.setAttribute('data-k', key); on(s, 'change', function () { n[key] = s.value; upd(); }); w.appendChild(s); body.appendChild(w); return s;
-    }
-    sel('Lado', [['', '—'], ['direito', 'Lobo direito'], ['esquerdo', 'Lobo esquerdo'], ['istmo', 'Istmo']], 'lado');
-    sel('Localização', [['', '—'], ['superior', 'Terço superior'], ['médio', 'Terço médio'], ['inferior', 'Terço inferior']], 'terco');
-    var sw = el('label', 'tr-row'), si = el('input', 'uc-num tr-mm'); si.type = 'text'; si.setAttribute('inputmode', 'decimal'); si.setAttribute('data-k', 'mm'); si.setAttribute('aria-label', 'Maior diâmetro em mm');
-    sw.appendChild(el('span', 'tr-lab', 'Maior diâmetro')); sw.appendChild(si); sw.appendChild(el('span', 'uc-u', 'mm')); body.appendChild(sw);
-    on(si, 'input', function () { n.mm = si.value; upd(); }); on(si, 'keyup', function () { n.mm = si.value; upd(); });
-    var inputs = {}, ptsEl = {};
-    for (i = 0; i < CAT.length; i++) {
-      c = CAT[i]; var fs = el('fieldset', 'tr-cat'), lg = el('legend', null, c.t + ' '), pe = el('span', 'tr-pts', '');
-      lg.appendChild(pe); ptsEl[c.id] = pe; fs.appendChild(lg); fs.setAttribute('data-cat', c.id); inputs[c.id] = [];
-      for (j = 0; j < c.o.length; j++) {
-        var lb = el('label', 'tr-opt'), inp = el('input');
-        inp.type = c.one ? 'radio' : 'checkbox'; inp.name = 'tr' + id + c.id; inp.value = c.o[j][0];
-        inp.setAttribute('data-cat', c.id);
-        lb.appendChild(inp); lb.appendChild(document.createTextNode(' ' + c.o[j][1] + ' (' + c.o[j][2] + (c.o[j][2] === 1 ? ' pt)' : ' pts)')));
-        fs.appendChild(lb); inputs[c.id].push(inp);
-        (function (cat, inp2) { on(inp2, 'click', function () { pick(cat, inp2); }); })(c.id, inp);
-      }
-      body.appendChild(fs);
-    }
-    var res = el('div', 'tr-res'), note = el('div', 'uc-note tr-note'), size = el('div', 'tr-size'), ins = el('button', 'btn btn-sm btn-primary tr-ins', 'Inserir no laudo'), msg = el('div', 'uc-note tr-msg');
-    ins.type = 'button'; body.appendChild(res); body.appendChild(note); body.appendChild(size); body.appendChild(ins); body.appendChild(msg);
-    function pick(cat, inp) {
-      if (cat === 'focos') {
-        var k, a = inputs.focos;
-        if (inp.value === 'nenhum' && inp.checked) { for (k = 0; k < a.length; k++) { if (a[k] !== inp) { a[k].checked = false; } } }
-        else if (inp.checked) { for (k = 0; k < a.length; k++) { if (a[k].value === 'nenhum') { a[k].checked = false; } } }
-        n.st.focos = []; for (k = 0; k < a.length; k++) { if (a[k].checked) { n.st.focos.push(a[k].value); } }
-      } else { n.st[cat] = inp.value; }
-      upd();
-    }
-    function upd() {
-      var r = score(n.st), k, q, dis;
-      for (k = 0; k < CAT.length; k++) {
-        q = CAT[k].id; dis = r.esp && q !== 'comp' || (q === 'eco' && n.st.comp === 'ind');
-        for (var z = 0; z < inputs[q].length; z++) { inputs[q][z].disabled = dis; }
-        setTxt(ptsEl[q], r.per[q] === null ? '' : '— ' + r.per[q] + (r.per[q] === 1 ? ' pt' : ' pts'));
-      }
-      var L = level(r.total);
-      setTxt(res, r.complete ? 'Total: ' + r.total + (r.total === 1 ? ' ponto' : ' pontos') + ' — ' + L + ' (' + LV[L][0] + ')' + (r.total === 1 ? ' [1 ponto: tratado como TR1]' : '') : 'Total parcial: ' + r.total + ' — preencha todas as categorias');
-      setTxt(note, r.notes.join(' '));
-      setTxt(size, r.complete ? sizeNote(r.total, n.mm) : '');
-      ins.disabled = !r.complete;
-      setTxt(tg, (body.style.display === 'none' ? '\u25b8 ' : '\u25be ') + 'Nódulo ' + id + (r.complete ? ' — ' + L + ' (' + r.total + ' pts)' : ''));
-    }
-    on(tg, 'click', function () { var h = body.style.display === 'none'; body.style.display = h ? '' : 'none'; tg.setAttribute('aria-expanded', h ? 'true' : 'false'); upd(); });
-    on(rm, 'click', function () { box.parentNode.removeChild(box); for (var k = 0; k < nods.length; k++) { if (nods[k] === n) { nods.splice(k, 1); break; } } });
-    on(ins, 'click', function () {
-      var r = score(n.st); if (!r.complete || !window.UFInsertLines) { return; }
-      var how = window.UFInsertLines([header(n)].concat(lines(r.total)));
-      setTxt(msg, how === 'end' ? 'Inserido no fim do laudo (não havia cursor no laudo).' : 'Inserido na posição do cursor.');
-    });
-    n.box = box; n.upd = upd; n.inputs = inputs; nods.push(n); list.appendChild(box); upd();
-    return n;
-  }
-  function build(b) {
-    var add = el('button', 'btn btn-sm', 'Adicionar nódulo'); add.type = 'button'; add.id = 'trAdd';
-    list = el('div', 'tr-list'); b.appendChild(add); b.appendChild(list);
-    b.appendChild(el('div', 'uc-note', 'ACR TI-RADS (Tessler et al., JACR 2017). Os nódulos ficam só nesta janela.'));
-    on(add, 'click', function () { var n = addNodule(); var f = n.box.querySelector('select'); if (f) { f.focus(); } });
-  }
   /* ---------- C6c: TI-RADS a partir das opções escolhidas no próprio texto do laudo ----------
      Frase do banco: "Observa-se nódulo ?[composição], ?[ecogenicidade], ?[forma], margens ?[margem], ?[focos]. ... TI-RADS *."
      Cada opção do texto é ligada a uma opção ACR já implementada acima (mesmos pontos); nada novo. */
@@ -163,7 +88,10 @@
       if (!/n[óo]dulo/i.test(txt)) { continue; }
       for (j = 0; j < k; j++) { if (all[j].getAttribute('data-t') === 's') { chips.push(all[j]); } }
       if (chips.length < 5) { continue; }
-      seen.push(ln); out.push({ chips: chips.slice(0, 5), out: f });
+      var nums = [], last = -1;
+      for (j = 0; j < k; j++) { if (all[j] === chips[4]) { last = j; } }
+      for (j = last + 1; j < k; j++) { var tt = all[j].getAttribute('data-t'); if (tt === 'n' || tt === 'd') { nums.push(all[j]); } }
+      seen.push(ln); out.push({ chips: chips.slice(0, 5), out: f, nums: nums, line: ln });
     }
     return out;
   }
@@ -184,24 +112,170 @@
     if (cur === val) { return false; }
     f.textContent = val; f.setAttribute('data-auto', val); return true;
   }
+  function num(f) { var t = String(f.textContent || '').replace(/^\s+|\s+$/g, ''); return /^\d+([.,]\d+)?$/.test(t) ? parseFloat(t.replace(',', '.')) : null; }
+  function maxMm(n) { var i, v, m = null; for (i = 0; i < n.nums.length; i++) { v = num(n.nums[i]); if (v !== null && (m === null || v > m)) { m = v; } } return m; }
+  /* C6e: as 6 linhas do protótipo; com tamanho informado, o veredito pelos cortes ACR 2017 vai entre parênteses */
+  function recLines(t, mm) {
+    var L = lines(t), v = LV[level(t)], fm;
+    if (mm !== null && v[4] !== null) {
+      fm = fmtMm(mm) + ' mm';
+      L[4] += mm >= v[4] ? ' (indicada: ' + fm + ')' : ' (não indicada: ' + fm + ')';
+      L[5] += mm >= v[5] ? ' (indicado: ' + fm + ')' : ' (não indicado: ' + fm + ')';
+    }
+    return L;
+  }
+  function isRec(n) { return n && n.nodeType === 1 && (' ' + n.className + ' ').indexOf(' uc-trl ') >= 0; }
+  /* bloco de 6 linhas logo depois da linha do nódulo (não editável; some se o nódulo ficar incompleto) */
+  function setRec(ln, L) {
+    var cur = [], n = ln.nextSibling, i, d, ch = false, LB = /^(Pontua\u00e7\u00e3o|Categoria TIRADS|N\u00edvel de Risco|Risco de Malignidade|Recomenda\u00e7\u00e3o de PAAF|Sugest\u00e3o de Acompanhamento):/, nx;
+    /* um laudo colado/importado já traz as 6 linhas como texto: elas passam a ser as linhas calculadas (sem duplicar) */
+    while (L && n && n.nodeType === 1 && !isRec(n) && !n.querySelector('.fld') && LB.test(n.textContent || '')) { nx = n.nextSibling; n.parentNode.removeChild(n); ch = true; n = nx; }
+    n = ln.nextSibling;
+    while (n && (n.nodeType === 3 && !/\S/.test(n.nodeValue) ? true : isRec(n))) { if (isRec(n)) { cur.push(n); } n = n.nextSibling; }
+    if (!L) { for (i = 0; i < cur.length; i++) { cur[i].parentNode.removeChild(cur[i]); ch = true; } return ch; }
+    for (i = 0; i < L.length; i++) {
+      if (cur[i]) { if (cur[i].textContent !== L[i]) { cur[i].textContent = L[i]; ch = true; } cur[i].ucGen = gen; continue; }
+      d = document.createElement('div'); d.className = 'uc-trl'; d.setAttribute('contenteditable', 'false'); d.textContent = L[i]; d.ucGen = gen;
+      var ref = i ? cur[i - 1] : ln; ref.parentNode.insertBefore(d, ref.nextSibling); cur[i] = d; ch = true;
+    }
+    for (i = L.length; i < cur.length; i++) { cur[i].parentNode.removeChild(cur[i]); ch = true; }
+    return ch;
+  }
+  var gen = 0;
   function runTxt() {
     if (busyT || !ed) { return; }
-    busyT = true;
+    busyT = true; gen++;
     try {
-      var L = textNodules(), i, r, sc, ch = false;
-      for (i = 0; i < L.length; i++) {
-        r = readTxt(L[i]); sc = r.miss ? null : score(r.st);
-        if (putT(L[i].out, txtOn && sc && sc.complete ? level(sc.total).substring(2) : null)) { ch = true; }
-        L[i].out.title = sc && sc.complete ? 'ACR TI-RADS: ' + sc.total + (sc.total === 1 ? ' ponto' : ' pontos') + ' (' + level(sc.total) + ')' : '';
+      var NL = textNodules(), i, r, sc, ch = false, ok, q, old;
+      for (i = 0; i < NL.length; i++) {
+        r = readTxt(NL[i]); sc = r.miss ? null : score(r.st); ok = txtOn && sc && sc.complete;
+        if (putT(NL[i].out, ok ? level(sc.total).substring(2) : null)) { ch = true; }
+        if (setRec(NL[i].line, ok ? recLines(sc.total, maxMm(NL[i])) : null)) { ch = true; }
       }
+      old = ed.querySelectorAll('.uc-trl');
+      for (q = old.length - 1; q >= 0; q--) { if (old[q].ucGen !== gen) { old[q].parentNode.removeChild(old[q]); ch = true; } }
       if (ch) { var ev; try { ev = new Event('input', { bubbles: true }); } catch (x) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); } ed.dispatchEvent(ev); }
     } finally { busyT = false; }
   }
   function txtStatus() {
-    var L = textNodules(), i, r, sc, parts = [];
-    if (!L.length) { return { txt: 'sem frase de nódulo com "TI-RADS ___" no laudo', cls: 'none' }; }
-    for (i = 0; i < L.length; i++) { r = readTxt(L[i]); sc = r.miss ? null : score(r.st); parts.push(sc ? level(sc.total) + ' (' + sc.total + ' pts)' : 'faltam ' + r.miss + ' opç' + (r.miss > 1 ? 'ões' : 'ão')); }
-    return { txt: 'nódulo no texto: ' + parts.join(' · '), cls: /TR/.test(parts.join('')) ? 'ok' : 'wait' };
+    var NL = textNodules(), i, r, sc, done = [];
+    if (!NL.length) { return { ready: false, tip: 'Sem a frase "Observa-se nódulo ... TI-RADS ___" no laudo' }; }
+    for (i = 0; i < NL.length; i++) { r = readTxt(NL[i]); sc = r.miss ? null : score(r.st); if (sc) { done.push(level(sc.total) + ' (' + sc.total + ' pts)'); } }
+    return done.length ? { ready: true, tip: 'Pronto: ' + done.join(', ') } : { ready: false, tip: 'Escolha as 5 características do nódulo no texto' };
+  }
+
+  /* ---------- C6e: cartão TI-RADS: formulário único que escreve a frase do banco no laudo ---------- */
+  var F = null;
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) { e.className = cls; } if (txt != null) { e.appendChild(document.createTextNode(txt)); } return e; }
+  function on(e, ev, fn) { if (e.addEventListener) { e.addEventListener(ev, fn, false); } else { e.attachEvent('on' + ev, fn); } }
+  function setTxt(e, t) { e.innerHTML = ''; e.appendChild(document.createTextNode(t)); }
+  function ptsLab(p) { return p + (p === 1 ? ' pt' : ' pts'); }
+  function formState() {
+    var st = { focos: [] }, i;
+    for (i = 0; i < 4; i++) { st[CAT[i].id] = F.sel[CAT[i].id].value || null; }
+    for (i = 0; i < F.foc.length; i++) { if (F.foc[i].checked) { st.focos.push(F.foc[i].value); } }
+    return st;
+  }
+  function updForm() {
+    var st = formState(), r = score(st), i;
+    F.sel.eco.disabled = st.comp === 'esp' || st.comp === 'ind'; F.sel.forma.disabled = F.sel.marg.disabled = st.comp === 'esp';
+    for (i = 0; i < F.foc.length; i++) { F.foc[i].disabled = st.comp === 'esp'; }
+    setTxt(F.res, r.complete ? level(r.total) + ' · ' + ptsLab(r.total) : '');
+    F.res.title = r.complete ? LV[level(r.total)][0] : '';
+    F.ins.disabled = !r.complete;
+  }
+  function choiceHtml(opts, i) {
+    var o = JSON.stringify(opts).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    if (i < 0) { return '<span class="fld f-sel" contenteditable="false" data-t="s" data-o="' + o + '">escolher</span>'; }
+    return '<span class="fld f-sel f-ok" contenteditable="false" data-t="s" data-v="' + i + '" data-o="' + o + '" title="Clique para trocar">' + esc(opts[i]) + '</span>';
+  }
+  function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  /* a frase do nódulo vem do banco carregado (nunca uma cópia no código) */
+  function bankSentence() {
+    var S = window.UFTest && UFTest.S, B = S && S.bank, i, j, k, x, bodies = [];
+    if (!B || !window.UltraParser) { return null; }
+    for (i = 0; i < B.exams.length; i++) {
+      for (j = 0; j < B.exams[i].templates.length; j++) { bodies.push(B.exams[i].templates[j].body); }
+      for (j = 0; j < (B.exams[i].sections || []).length; j++) { for (k = 0; k < B.exams[i].sections[j].phrases.length; k++) { bodies.push(B.exams[i].sections[j].phrases[k].body); } }
+    }
+    for (i = 0; i < bodies.length; i++) {
+      var fs = UltraParser.fieldsOf(bodies[i]);
+      for (j = 0; j < fs.length; j++) {
+        if (fs[j].type !== 'select') { continue; }
+        for (k = 0; k < fs[j].options.length; k++) { x = fs[j].options[k]; if (/^\s*Observa-se n[óo]dulo\s*\?\[/i.test(x) && /TI-RADS\s*\*/i.test(x)) { return { opt: x, raw: fs[j].raw }; } }
+        if (/^\s*Observa-se n[óo]dulo\s*$/i.test(bodies[i].substring(0, fs[j].offset).split('\n').pop()) && /TI-RADS\s*\*/.test(bodies[i])) { return { opt: bodies[i].split('\n')[0], raw: null }; }
+      }
+    }
+    return null;
+  }
+  function pickIdx(opts, cat, key) { for (var i = 0; i < opts.length; i++) { if (mapTxt(cat, opts[i]) === key) { return i; } } return -1; }
+  function sentenceHtml(opt, st, f) {
+    var fs = UltraParser.fieldsOf(opt), out = '', pos = 0, i, si = 0, ni = 0, x, idx, foc = null, best = -1, k, mm = [f.l, f.ap, f.t];
+    for (k = 0; k < st.focos.length; k++) { x = pts('focos', st.focos[k]); if (x > best) { best = x; foc = st.focos[k]; } }   /* a frase aceita 1 foco: o de maior pontuação */
+    for (i = 0; i < fs.length; i++) {
+      out += esc(opt.substring(pos, fs[i].offset)); pos = fs[i].offset + fs[i].raw.length;
+      if (fs[i].type === 'select') {
+        idx = -1;
+        if (si < 5) { idx = pickIdx(fs[i].options, ORDER[si], ORDER[si] === 'focos' ? foc : st[ORDER[si]]); }
+        else if (si === 5 && f.terco) { idx = fs[i].options.indexOf(f.terco); }
+        else if (si === 6 && f.lado && f.lado !== 'istmo') { idx = fs[i].options.indexOf(f.lado); }
+        out += choiceHtml(fs[i].options, idx); si++;
+      } else {
+        var t = fs[i].type === 'text' ? 't' : (fs[i].decimal ? 'd' : 'n'), ph = t === 't' ? 'texto' : (t === 'd' ? '__,_' : '___'), v = ni < 3 ? mm[ni] : '';
+        out += v ? '<span class="fld f-ok" data-t="' + t + '" data-ph="' + ph + '">' + esc(v) + '</span>' : '<span class="fld" data-t="' + t + '" data-ph="' + ph + '">' + ph + '</span>';
+        ni++;
+      }
+    }
+    return out + esc(opt.substring(pos));
+  }
+  function insertForm() {
+    var st = formState(), r = score(st), bs, f = { lado: F.lado.value, terco: F.terco.value, l: clean(F.mm[0].value), ap: clean(F.mm[1].value), t: clean(F.mm[2].value) }, how;
+    if (!r.complete) { return; }
+    bs = bankSentence();
+    if (bs && window.UFInsertHtml) { how = window.UFInsertHtml(sentenceHtml(bs.opt, st, f), bs.opt, runTxt); }
+    else if (window.UFInsertLines) {   /* banco sem a frase: o bloco da C6 */
+      var mx = null, k; for (k = 0; k < 3; k++) { var v = parseMm(F.mm[k].value); if (v !== null && (mx === null || v > mx)) { mx = v; } }
+      how = window.UFInsertLines([header({ lado: f.lado, terco: f.terco, mm: mx === null ? '' : String(mx) })].concat(lines(r.total)));
+    }
+    F.ins.title = how === 'end' ? 'Inserido no fim do laudo (não havia cursor no laudo)' : '';
+    setTimeout(runTxt, 0);
+  }
+  function clean(v) { v = String(v || '').replace(/^\s+|\s+$/g, ''); return /^\d+([.,]\d+)?$/.test(v) ? v : ''; }
+  function build(b) {
+    F = { sel: {}, foc: [] };
+    var g = el('div', 'tr-form'), i, j, c, s;
+    for (i = 0; i < 4; i++) {
+      c = CAT[i]; s = el('select', 'tr-sel'); s.setAttribute('data-cat', c.id); s.setAttribute('aria-label', c.t);
+      var o0 = el('option', null, c.t); o0.value = ''; s.appendChild(o0);
+      for (j = 0; j < c.o.length; j++) { var o = el('option', null, c.o[j][1] + ' · ' + c.o[j][2]); o.value = c.o[j][0]; s.appendChild(o); }
+      on(s, 'change', updForm); F.sel[c.id] = s; g.appendChild(s);
+    }
+    var fw = el('div', 'tr-foc'); fw.setAttribute('role', 'group'); fw.setAttribute('aria-label', 'Focos ecogênicos');
+    var SH = { nenhum: 'Sem focos / cometa grande', macro: 'Macrocalcificações', perif: 'Periféricas', punct: 'Puntiformes' };
+    for (j = 0; j < CAT[4].o.length; j++) {
+      var lb = el('label', 'tr-chip'), cb = el('input'); cb.type = 'checkbox'; cb.value = CAT[4].o[j][0]; cb.checked = cb.value === 'nenhum'; cb.setAttribute('data-cat', 'focos');
+      lb.title = CAT[4].o[j][1]; lb.appendChild(cb); lb.appendChild(document.createTextNode(' ' + SH[cb.value] + ' · ' + CAT[4].o[j][2]));
+      (function (box) { on(box, 'click', function () {
+        var k; if (box.checked) { for (k = 0; k < F.foc.length; k++) { if ((box.value === 'nenhum') !== (F.foc[k].value === 'nenhum')) { F.foc[k].checked = false; } } }
+        updForm(); }); })(cb);
+      F.foc.push(cb); fw.appendChild(lb);
+    }
+    g.appendChild(fw);
+    var loc = el('div', 'tr-loc');
+    F.terco = el('select', 'tr-sel tr-half'); F.terco.setAttribute('aria-label', 'Terço');
+    var T = [['', 'Terço'], ['superior', 'superior'], ['médio', 'médio'], ['inferior', 'inferior']], L2 = [['', 'Lobo'], ['direito', 'direito'], ['esquerdo', 'esquerdo'], ['istmo', 'istmo']];
+    for (j = 0; j < T.length; j++) { var ot = el('option', null, T[j][1]); ot.value = T[j][0]; F.terco.appendChild(ot); }
+    F.lado = el('select', 'tr-sel tr-half'); F.lado.setAttribute('aria-label', 'Lobo');
+    for (j = 0; j < L2.length; j++) { var ol = el('option', null, L2[j][1]); ol.value = L2[j][0]; F.lado.appendChild(ol); }
+    loc.appendChild(F.terco); loc.appendChild(F.lado); g.appendChild(loc);
+    var mmr = el('div', 'tr-mmr'); F.mm = [];
+    var ML = ['L', 'AP', 'T'];
+    for (j = 0; j < 3; j++) { var mi = el('input', 'uc-num tr-mm'); mi.type = 'text'; mi.setAttribute('inputmode', 'decimal'); mi.placeholder = ML[j]; mi.setAttribute('aria-label', ML[j] + ' em mm'); F.mm.push(mi); mmr.appendChild(mi); if (j < 2) { mmr.appendChild(el('span', 'uc-u', '×')); } }
+    mmr.appendChild(el('span', 'uc-u', 'mm')); g.appendChild(mmr);
+    var foot = el('div', 'tr-foot'); F.res = el('span', 'tr-res'); F.ins = el('button', 'btn btn-sm btn-primary tr-ins', 'Inserir nódulo'); F.ins.type = 'button'; F.ins.id = 'trIns';
+    foot.appendChild(F.res); foot.appendChild(F.ins); g.appendChild(foot);
+    on(F.ins, 'click', insertForm);
+    b.appendChild(g); updForm();
   }
   function initTxt() {
     ed = document.getElementById('editor'); if (!ed) { return; }
@@ -209,10 +283,10 @@
     if (ed.addEventListener) { ed.addEventListener('input', function () { setTimeout(runTxt, 0); }, false); }
     runTxt();
   }
-  if (window.UFCalcVol) {
-    UFCalcVol.addToggle('ucTrTxt', 'TI-RADS pelas opções do nódulo no texto', true, function (v) { txtOn = !!v; runTxt(); },
-      'ACR TI-RADS 2017 (Tessler et al.). Lê as 5 opções da frase "Observa-se nódulo ..." e preenche o número em "TI-RADS ___" (1 a 5). "Tipo cauda de cometa" conta 0 ponto (artefato grande em cauda de cometa); "irregulares" e "lobuladas" contam 2.', txtStatus);
-  }
-  window.UFTirads = { score: score, level: level, lines: lines, header: header, sizeNote: sizeNote, CAT: CAT, LV: LV, add: function () { return addNodule(); }, count: function () { return nods.length; }, initTxt: initTxt, runTxt: runTxt, textNodules: textNodules, mapTxt: mapTxt };
+  window.UFTirads = { score: score, level: level, lines: lines, recLines: recLines, header: header, sizeNote: sizeNote, CAT: CAT, LV: LV, initTxt: initTxt, runTxt: runTxt, textNodules: textNodules, mapTxt: mapTxt, bankSentence: bankSentence };
   if (window.UFCalc) { UFCalc.register({ id: 'tirads', title: 'TI-RADS (ACR 2017)', build: build }); }
+  if (window.UFCalcVol) {
+    UFCalcVol.addToggle('ucTrTxt', 'Calcular pelo texto do laudo', true, function (v) { txtOn = !!v; runTxt(); },
+      'Lê as 5 características da frase "Observa-se nódulo ..." e escreve o número em "TI-RADS ___" e as 6 linhas de recomendação logo abaixo. "Tipo cauda de cometa" = 0 ponto; "irregulares" = 2, como "lobuladas".', txtStatus, null, 'tirads');
+  }
 })();

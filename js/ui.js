@@ -2345,7 +2345,29 @@ var UFMain = function () {
     S.lastChoice = null; S.lastRemoval = null; S.userCaret = true;
     return how;
   };
-  window.UFTest = { S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel,
+  /* C6e: insert ready-made inline HTML (fields included). If the report still has an unchosen choice chip that offers
+     exactly this option text (optText), the chip is replaced (as if the option had been chosen); otherwise the HTML goes
+     on its own line at the caret / end (UFInsertLines rules). One Ctrl+Z undoes it. Returns 'chip'/'caret'/'end'. */
+  window.UFInsertHtml = function (html, optText, post) {
+    var undoBefore = edHtml(), undoBeforeText = edText(), how, cs = qsa(editor, '.fld[data-t="s"]'), i, o, chip = null, r = S.savedRange;
+    for (i = 0; i < cs.length && !chip && optText; i++) {
+      if (cs[i].getAttribute('data-v') !== null) { continue; }
+      try { o = JSON.parse(cs[i].getAttribute('data-o')) || []; } catch (e) { o = []; }
+      if (o.indexOf(optText) >= 0) { chip = cs[i]; }
+    }
+    if (chip) { how = 'chip'; replaceNodeWithHtml(chip, html); afterChange(true); }
+    else {
+      if (r && editor.contains(r.commonAncestorContainer)) { how = 'caret'; }
+      else { how = 'end'; ensureNotEmpty(); focusEditor(); var e2 = document.createRange(); e2.selectNodeContents(editor); e2.collapse(false); setRange(e2); saveRange(); }
+      insertBlock('<div>' + html + '</div>');
+    }
+    if (post) { post(); }   /* lines the calculators write must be part of the same undo step */
+    S.insStack.push({ before: undoBefore, beforeText: undoBeforeText, after: edHtml(), afterText: edText() }); S.insRedo = [];
+    if (S.insStack.length > 30) { S.insStack.shift(); }
+    S.lastChoice = null; S.lastRemoval = null; S.userCaret = true;
+    return how;
+  };
+  window.UFTest = { recognizeText: recognizeText, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel,
                     insertCard: insertCard, editorLines: editorLines, lineText: lineText, openSelect: openSelect, chooseOption: chooseOption, reportText: reportText, directiveRule: directiveRule, anchorHits: anchorHits };
   on(navList, 'dblclick', function (e) {
     if (now() - examDblAt < DBL_MS || inExamDbl()) { return; }   /* handled by the click pair */
@@ -2403,7 +2425,7 @@ var UFMain = function () {
       if (S.level === 3 && trim(this.value)) { for (i = 0; i < l.length; i++) { if (l[i].getAttribute('data-ph') !== null) { f = l[i]; break; } } }
       if (f) { f.focus(); if (f.getAttribute('data-ph') !== null) { selectCard(f.getAttribute('data-ph')); } } return; }
     if (k === 27) { e.preventDefault(); e.stopPropagation(); if (this.value) { clearNavSearch(); } else { navBack(); } return; }
-    if (k === 8 && !this.value) { e.preventDefault(); navBack(); }
+    /* C6e: Backspace in the search box only edits the text (it used to go back to the templates when empty) */
   });
   on($('navSearch'), 'input', function () { S.navSearch[S.level - 1] = this.value; saveSearch(); renderNav(); });
   function clearNavSearch() { var si = $('navSearch'); si.value = ''; S.navSearch[S.level - 1] = ''; saveSearch(); renderNav(); si.focus(); }
@@ -2600,6 +2622,104 @@ var UFMain = function () {
     afterChange(false);
   });
   on(editor, 'mousedown', function () { chipExit = null; });
+
+  /* ================= C6e: recognizing a pasted / imported finished report =================
+     Each bank line (models and phrases) that has fields becomes a pattern; a pasted line that matches it is rebuilt
+     with the same field chips, already filled with the pasted values (so the calculators read them). Lines that
+     match nothing stay plain text. Nothing is guessed: a value is only taken where the bank has a field. */
+  var RG = { bank: null, pats: [] };
+  function rgLit(t) {
+    var out = '', i, c;
+    for (i = 0; i < t.length; i++) {
+      c = t.charAt(i);
+      if (/\s/.test(c)) { if (!/\\s\*$/.test(out)) { out += '\\s*'; } }
+      else if (c === 'x' || c === 'X' || c === '\u00d7') { out += '[xX\u00d7]'; }
+      else if (c === '\u00b3' || c === '3') { out += '[3\u00b3]'; }
+      else if (c === '\u00b2' || c === '2') { out += '[2\u00b2]'; }
+      else { out += c.replace(/[\\^$.*+?()[\]{}|\/]/g, '\\$&'); }
+    }
+    return out;
+  }
+  /* compile(text): segments [{lit} | {f: field}], src = regex source; capture=true wraps every segment in a group */
+  function rgCompile(text, capture, depth) {
+    var fs = UltraParser.fieldsOf(text), seg = [], pos = 0, i, src = '', k, f, alts;
+    function add(s2) { src += capture ? '(' + s2 + ')' : '(?:' + s2 + ')'; }
+    for (i = 0; i < fs.length; i++) {
+      f = fs[i]; if (f.offset < pos) { continue; }
+      if (f.offset > pos) { seg.push({ lit: text.substring(pos, f.offset) }); add(rgLit(text.substring(pos, f.offset))); }
+      if (f.type === 'select') {
+        alts = [];
+        for (k = 0; k < f.options.length; k++) { alts.push(depth < 3 ? rgCompile(f.options[k], false, depth + 1).src : rgLit(f.options[k])); }
+        alts.sort(function (a, b) { return b.length - a.length; });
+        alts.push('escolher'); alts.push('_+');   /* an unchosen choice is printed as ___ */
+        add(alts.join('|'));
+      } else if (f.type === 'text') { add('.+?'); }
+      else { add('\\d+(?:[.,]\\d+)?|_+(?:,_+)?'); }
+      seg.push({ f: f }); pos = f.offset + f.raw.length;
+    }
+    if (pos < text.length) { seg.push({ lit: text.substring(pos) }); add(rgLit(text.substring(pos))); }
+    return { seg: seg, src: src };
+  }
+  function rgPats() {
+    if (!S.bank) { return []; }
+    if (RG.bank === S.bank) { return RG.pats; }
+    var bodies = [], i, j, k, ex, ls, l, c, lit;
+    for (i = 0; i < S.bank.exams.length; i++) {
+      ex = S.bank.exams[i];
+      for (j = 0; j < ex.templates.length; j++) { bodies.push(ex.templates[j].body); }
+      for (j = 0; j < (ex.sections || []).length; j++) { for (k = 0; k < ex.sections[j].phrases.length; k++) { bodies.push(ex.sections[j].phrases[k].body); } }
+    }
+    RG.pats = []; RG.bank = S.bank; var seen = {};
+    for (i = 0; i < bodies.length; i++) {
+      ls = String(bodies[i] || '').split('\n');
+      for (j = 0; j < ls.length; j++) {
+        l = ls[j].replace(/\r$/, '').replace(/^\s*[\u2022\-\u2013]\s*/, '').replace(/^\s+|\s+$/g, '');
+        if (!l || seen[l] || l.indexOf('?[') < 0 && l.indexOf('*') < 0) { continue; }
+        lit = l.replace(/\?\[[^\]]*\]|\*/g, '').replace(/[^A-Za-z\u00c0-\u00ff]/g, '');
+        if (lit.length < 4) { continue; }   /* too little fixed text to be sure */
+        try { c = rgCompile(l, true, 0); if (!c.seg.length) { continue; } c.re = new RegExp('^' + c.src + '$', 'i'); c.lit = lit.length; } catch (e) { continue; }
+        seen[l] = 1; RG.pats.push(c);
+      }
+    }
+    RG.pats.sort(function (a, b) { return b.lit - a.lit; });
+    return RG.pats;
+  }
+  function rgFieldHtml(f, v) {
+    var k, c, m;
+    if (f.type === 'select') {
+      if (/^(escolher|_+)$/i.test(v)) { return chipHtml(f); }
+      for (k = 0; k < f.options.length; k++) {
+        if (UltraParser.fieldsOf(f.options[k]).length) {
+          c = rgCompile(f.options[k], true, 1); m = new RegExp('^' + c.src + '$', 'i').exec(v);
+          if (m) { return rgHtml(c, m); }
+        } else if (new RegExp('^' + rgLit(f.options[k]) + '$', 'i').test(v)) {
+          return '<span class="fld f-sel f-ok" contenteditable="false" data-t="s" data-v="' + k + '" data-o="' + esc(JSON.stringify(f.options)) + '" title="Clique para trocar">' + esc(f.options[k]) + '</span>';
+        }
+      }
+      return esc(v);
+    }
+    var t = f.type === 'text' ? 't' : (f.decimal ? 'd' : 'n');
+    if (/^_+(,_+)?$/.test(v) || v === PH.t) { return chipHtml(f); }
+    return '<span class="fld f-ok" data-t="' + t + '" data-ph="' + PH[t] + '">' + esc(v) + '</span>';
+  }
+  function rgHtml(c, m) {
+    var out = '', i;
+    for (i = 0; i < c.seg.length; i++) { out += c.seg[i].lit !== undefined ? esc(m[i + 1]) : rgFieldHtml(c.seg[i].f, m[i + 1]); }
+    return out;
+  }
+  /* text -> html of line divs, or null when no line was recognized */
+  function recognizeText(text) {
+    var pats = rgPats(), ls = String(text).replace(/\r\n?/g, '\n').split('\n'), out = [], hit = 0, i, j, l, b, m, core;
+    if (!pats.length || ls.length < 1) { return null; }
+    for (i = 0; i < ls.length; i++) {
+      l = ls[i]; b = /^\s*[\u2022\-\u2013]\s*/.exec(l); core = l.replace(/^\s*[\u2022\-\u2013]\s*/, '').replace(/\s+$/, '');
+      m = null;
+      if (core.length > 3) { for (j = 0; j < pats.length; j++) { m = pats[j].re.exec(core); if (m) { break; } } }
+      if (m) { hit++; out.push('<div>' + (b ? esc(b[0]) : '') + rgHtml(pats[j], m) + '</div>'); }
+      else { out.push('<div>' + (l ? esc(l) : '<br>') + '</div>'); }
+    }
+    return hit ? { html: out.join(''), hits: hit, lines: ls.length } : null;
+  }
   on(editor, 'paste', function (e) {
     var t = null;
     if (e.clipboardData && e.clipboardData.getData) { t = e.clipboardData.getData('text/plain'); }
@@ -2607,6 +2727,15 @@ var UFMain = function () {
     if (t === null || t === undefined) { return; }
     e.preventDefault();
     var pw = window.getSelection().rangeCount ? wholeField(window.getSelection().getRangeAt(0)) : null; if (pw && !pw.one) { fieldInner(pw.f); }
+    /* C6e: a pasted report (2+ lines, outside a field) whose lines match the bank comes back with its fields */
+    var rg = !pw && /\n/.test(t) ? recognizeText(t) : null;
+    if (rg) {
+      var ub = edHtml(), ubt = edText(); saveRange();
+      insertBlock(rg.html);
+      if (window.UFTirads && UFTirads.runTxt) { UFTirads.runTxt(); }
+      S.insStack.push({ before: ub, beforeText: ubt, after: edHtml(), afterText: edText() }); S.insRedo = [];
+      afterChange(true); return;
+    }
     if (!exec('insertText', t)) {
       var sel = window.getSelection(); if (!sel.rangeCount) { return; }
       var r = sel.getRangeAt(0); r.deleteContents(); var tn = document.createTextNode(t); r.insertNode(tn);
@@ -2694,7 +2823,7 @@ var UFMain = function () {
       e.preventDefault(); toast(COPY_MSG);
     }
   });
-  var tbs = qsa($('editorToolbar'), '.tb'), ti;
+  var tbs = qsa(document, '.tb[data-cmd]'), ti;   /* C6e: formatting buttons live above the report */
   for (ti = 0; ti < tbs.length; ti++) {
     on(tbs[ti], 'mousedown', function (e) { e.preventDefault(); });
     on(tbs[ti], 'click', function () {

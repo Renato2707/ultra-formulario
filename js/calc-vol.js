@@ -144,12 +144,13 @@
       var all = []; for (q = 0; q < lobes.length; q++) { all = all.concat(lobes[q].tr.f); }
       pairs.push({ v: candF[k].v, tr: { f: all, unit: 'mm', lobes: lobes.length }, kind: 'sum' });
     }
-    pairs.cand = cand; pairs.lobes = lobes.length;
+    pairs.cand = cand; pairs.lobes = lobes.length; for (k = 0; k < pairs.length; k++) { if (pairs[k].kind === 'sum') { pairs.sum = true; } }
     return pairs;
   }
 
   function run() {
-    if (busy || !enabled || !editor) { return; }
+    if (busy || !editor) { return; }
+    if (!enabled) { clearAll(); return; }
     busy = true;
     var changed = false, p, i;
     try {
@@ -160,6 +161,15 @@
         try { ev = new Event('input', { bubbles: true }); } catch (e) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); }
         editor.dispatchEvent(ev);
       }
+    } finally { busy = false; }
+  }
+  /* C6e: desligado = os valores que NÓS escrevemos saem do laudo (valor digitado à mão fica) */
+  function clearAll() {
+    busy = true;
+    try {
+      var p = scan(), i, v, ch = false;
+      for (i = 0; i < p.length; i++) { v = p[i].v; if (v.getAttribute('data-auto') !== null) { if (v.textContent === v.getAttribute('data-auto')) { v.textContent = v.getAttribute('data-ph') || '___'; ch = true; } v.removeAttribute('data-auto'); v.removeAttribute('data-src'); } }
+      if (ch) { var ev; try { ev = new Event('input', { bubbles: true }); } catch (e) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); } editor.dispatchEvent(ev); }
     } finally { busy = false; }
   }
   /* digitação manual dentro do campo de resultado: lembrar as medidas atuais */
@@ -188,59 +198,66 @@
   }
 
   var toggles = [];
-  /* outros módulos de "Cálculo no laudo" acrescentam linhas liga/desliga neste cartão.
-     C6c: cada linha tem ⓘ (fonte/fórmula, só no tooltip) e um estado discreto (ex.: "sem linha correspondente no laudo") */
-  function addToggle(id, label, checked, fn, info, status, extra) {
-    var t = { id: id, label: label, checked: checked, fn: fn, info: info || '', status: status || null, extra: extra || null };
-    toggles.push(t); if (secBody) { drawToggle(t); refresh(); }
+  /* C6e: linhas liga/desliga de todos os cálculos no laudo, cada uma no cartão do seu assunto (card).
+     Sem texto de estado: só um ponto (verde = pronto, cinza = falta linha ou medida), explicado no tooltip.
+     status() -> { ready: true|false, tip: '...' } */
+  function addToggle(id, label, checked, fn, info, status, extra, card) {
+    var t = { id: id, label: label, checked: checked, fn: fn, info: info || '', status: status || null, extra: extra || null, card: card || 'auto' };
+    toggles.push(t); refresh();
   }
   var secBody = null;
-  function drawToggle(t) {
-    var row = document.createElement('div'), lab = document.createElement('label'), cb = document.createElement('input'), st = document.createElement('div');
-    row.className = 'uc-row'; cb.type = 'checkbox'; cb.checked = !!t.checked; cb.id = t.id;
+  function drawToggle(t, body) {
+    var row = document.createElement('div'), lab = document.createElement('label'), cb = document.createElement('input'), dot = document.createElement('span');
+    row.className = 'uc-row'; row.setAttribute('data-row', t.id); cb.type = 'checkbox'; cb.checked = !!t.checked; cb.id = t.id;
     cb.onchange = function () { t.checked = cb.checked; t.fn(cb.checked); refresh(); };
-    lab.className = 'uc-chk'; lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + t.label));
-    row.appendChild(lab);
-    if (t.info) { var i = document.createElement('span'); i.className = 'uc-i'; i.title = t.info; i.setAttribute('aria-label', t.info); i.appendChild(document.createTextNode('\u24d8')); row.appendChild(i); }
+    lab.className = 'uc-chk'; if (t.info) { lab.title = t.info; }
+    lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + t.label));
+    dot.className = 'uc-dot'; dot.id = t.id + 'Dot';
+    row.appendChild(lab); row.appendChild(dot);
     if (t.extra) { t.extra(row); }
-    st.className = 'uc-st'; st.id = t.id + 'St'; row.appendChild(st);
-    t.row = row; t.st = st; t.cb = cb;
-    secBody.appendChild(row);
+    t.row = row; t.dot = dot; t.cb = cb;
+    body.appendChild(row);
   }
+  var cardState = {};
   function refresh() {
-    var i, t, r, on = 0, pend = 0;
+    var i, t, r, body, per = {}, k;
     for (i = 0; i < toggles.length; i++) {
-      t = toggles[i]; if (!t.st) { continue; }
-      r = !t.cb.checked ? { txt: 'desligado', cls: 'off' } : (t.status && editor ? t.status() : null);
-      if (t.cb.checked && r && r.cls === 'ok') { on++; } else if (t.cb.checked && r && r.cls === 'wait') { pend++; }
-      t.st.innerHTML = ''; if (r && r.txt) { t.st.appendChild(document.createTextNode(r.txt)); }
-      t.st.className = 'uc-st' + (r && r.cls ? ' uc-st-' + r.cls : '');
+      t = toggles[i];
+      if (!t.dot) { body = window.UFCalc && UFCalc.cardBody ? UFCalc.cardBody(t.card) : null; if (!body) { continue; } drawToggle(t, body); }
+      r = t.cb.checked && t.status && editor ? t.status() : null;
+      var ready = !!(r && r.ready);
+      t.dot.className = 'uc-dot ' + (ready ? 'on' : 'off');
+      t.dot.title = !t.cb.checked ? 'Desligado' : (r && r.tip ? r.tip : '');
+      t.row.setAttribute('data-ready', ready ? '1' : '0');
+      if (!per[t.card]) { per[t.card] = { ready: false, tips: [] }; }
+      if (ready) { per[t.card].ready = true; per[t.card].tips.push(t.label); }
     }
-    if (window.UFCalc && UFCalc.setBadge) { UFCalc.setBadge('auto', on ? on + ' ativo' + (on > 1 ? 's' : '') : (pend ? 'aguardando' : ''), on ? 'ok' : ''); }
+    for (k in per) { if (per.hasOwnProperty(k) && window.UFCalc && UFCalc.setReady) {
+      UFCalc.setReady(k, per[k].ready, per[k].ready ? 'Pronto: ' + per[k].tips.join(', ') : 'Nada a calcular neste laudo (falta a linha ou as medidas)');
+    } }
   }
   function volStatus() {
-    var p = scan(), n = 0, ie = 0, c = p.cand, i, cv = 0, ci = 0;
-    var sum = 0; for (i = 0; i < p.length; i++) { if (p[i].kind === 'vol') { n++; } else if (p[i].kind === 'sum') { sum = p[i].tr.lobes; } else { ie++; } }
-    for (i = 0; i < c.length; i++) { if (c[i] === 'vol') { cv++; } else { ci++; } }
-    if (sum) { return { txt: 'tireoide: soma de ' + sum + (sum > 1 ? ' lobos' : ' lobo') + ' (istmo não entra)' + (n ? ' · ' + n + ' volume' + (n > 1 ? 's' : '') : '') + ' no laudo', cls: 'ok' }; }
-    if (p.lobes && !n) { return { txt: 'tireoide: há medidas dos lobos, mas sem linha de volume total no laudo', cls: 'warn' }; }
-    if (!n && !ie) {
-      if (cv || ci) { return { txt: 'há campo de ' + (cv ? 'volume' : 'índice esplênico') + ', mas sem as 3 medidas (ou com medidas de mais de uma estrutura)', cls: 'warn' }; }
-      return { txt: 'sem linha correspondente no laudo', cls: 'none' };
+    var p = scan(), i, any = false, ready = false, q, full;
+    for (i = 0; i < p.length; i++) {
+      any = true; full = true;
+      for (q = 0; q < p[i].tr.f.length; q++) { if (fldVal(p[i].tr.f[q]) === null) { full = false; } }
+      if (full) { ready = true; }
     }
-    return { txt: (n ? n + ' volume' + (n > 1 ? 's' : '') : '') + (n && ie ? ' · ' : '') + (ie ? 'índice esplênico' : '') + ' no laudo', cls: 'ok' };
+    if (ready) { return { ready: true, tip: p.sum ? 'Pronto (tireoide: soma dos lobos, sem o istmo)' : 'Pronto' }; }
+    if (any) { return { ready: false, tip: 'Faltam medidas' + (p.sum ? ' (tireoide: soma dos lobos, sem o istmo)' : '') }; }
+    if (p.lobes) { return { ready: false, tip: 'Há medidas dos lobos, mas não há linha de volume total no laudo' }; }
+    if (p.cand.length) { return { ready: false, tip: 'Há campo de volume, mas sem as 3 medidas' }; }
+    return { ready: false, tip: 'Sem linha de volume no laudo' };
   }
   var api = { run: run, scan: scan, init: init, addToggle: addToggle, refresh: refresh,
-    _h: { lines: lines, isNumFld: isNumFld, fldVal: fldVal, nextText: nextText, hasCls: hasCls }, setEnabled: function (on) { enabled = !!on; if (enabled) { run(); } }, isEnabled: function () { return enabled; } };
+    _h: { lines: lines, isNumFld: isNumFld, fldVal: fldVal, nextText: nextText, hasCls: hasCls }, setEnabled: function (on) { enabled = !!on; run(); }, isEnabled: function () { return enabled; } };
   window.UFCalcVol = api;
   if (window.UFCalc) {
-    UFCalc.register({ id: 'auto', title: 'Cálculo no laudo', build: function (b) {
+    UFCalc.register({ id: 'auto', title: 'Volume', build: function (b) {
       secBody = b;
-      var mine = { id: 'ucAuto', label: 'Volume e índice esplênico', checked: true, fn: function (v) { api.setEnabled(v); },
-        info: 'Volume = L × AP × T × 0,523 (medidas em mm → cm³). Índice esplênico = C × L × E (cm). Só preenche o campo que já existe no texto.', status: volStatus };
-      toggles.unshift(mine);
-      for (var i = 0; i < toggles.length; i++) { drawToggle(toggles[i]); }
-      refresh();
+      toggles.unshift({ id: 'ucAuto', label: 'Volume e índice esplênico', checked: true, fn: function (v) { api.setEnabled(v); }, card: 'auto',
+        info: 'Volume = L × AP × T × 0,523 (mm → cm³); tireoide = soma dos lobos, sem o istmo. Índice esplênico = C × L × E (cm).', status: volStatus });
+      setTimeout(refresh, 0);
       if (UFCalc.onEditorChange) { UFCalc.onEditorChange(refresh); }
       if (UFCalc.onIgChange) { UFCalc.onIgChange(function () { setTimeout(refresh, 0); }); }
     } });

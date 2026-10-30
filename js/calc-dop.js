@@ -140,21 +140,21 @@
   }
   function status() {
     if (!H) { return null; }
-    var sc = scan(), a = sc.ua ? H.fldVal(sc.ua) : null, m = sc.acm ? H.fldVal(sc.acm) : null, n = sc.outs.length;
-    var os = document.getElementById('ucDopOrd'), q; if (os) { os.value = 'rel'; for (q = 0; q < sc.outs.length; q++) { if (sc.outs[q].k === 'inv') { os.value = 'inv'; } } }
-    var vals = a && m ? 'AU/ACM = ' + f2(a / m) + ' · ACM/AU (RCP) = ' + f2(m / a) : '';
-    if (!n) { return { txt: vals ? vals + ' (sem linha de relação no laudo)' : 'sem linha correspondente no laudo', cls: vals ? 'warn' : 'none' }; }
-    return vals ? { txt: vals, cls: 'ok' } : { txt: 'preencha o IP umbilical e o IP cerebral média', cls: 'wait' };
+    var sc = scan(), a = sc.ua ? H.fldVal(sc.ua) : null, m = sc.acm ? H.fldVal(sc.acm) : null, n = sc.outs.length, q, btn = document.getElementById('ucDopOrd');
+    if (btn) { var inv = false; for (q = 0; q < sc.outs.length; q++) { if (sc.outs[q].k === 'inv') { inv = true; } } btn.setAttribute('data-ord', inv ? 'inv' : 'rel'); btn.disabled = !n; }
+    if (!n) { return { ready: false, tip: 'Sem a linha "Relação" ou da RCP no laudo' }; }
+    return a && m ? { ready: true, tip: 'Pronto: AU/ACM ' + f2(a / m) + ', ACM/AU ' + f2(m / a) } : { ready: false, tip: 'Faltam o IP umbilical e o IP da cerebral média' };
   }
+  /* botão discreto: inverte a linha "Relação" do laudo (AU/ACM <-> ACM/AU) */
   function extra(row) {
-    var lab = document.createElement('label'), sel = document.createElement('select'), k, O = [['rel', 'AU/ACM (umbilical / cerebral média)'], ['inv', 'ACM/AU (cerebral média / umbilical)']];
-    lab.className = 'uc-sub'; lab.appendChild(document.createTextNode('Ordem na linha "Relação": '));
-    for (k = 0; k < O.length; k++) { var op = document.createElement('option'); op.value = O[k][0]; op.appendChild(document.createTextNode(O[k][1])); sel.appendChild(op); }
-    sel.id = 'ucDopOrd'; sel.className = 'uc-selsm';
-    sel.onchange = function () { orient(sel.value); };
-    lab.appendChild(sel); row.appendChild(lab);
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.id = 'ucDopOrd'; btn.className = 'uc-mini'; btn.title = 'Inverter a relação no laudo (AU/ACM ↔ ACM/AU)'; btn.setAttribute('aria-label', btn.title);
+    btn.appendChild(document.createTextNode('\u21c5'));
+    btn.onmousedown = function (e) { if (e && e.preventDefault) { e.preventDefault(); } };
+    btn.onclick = function () { orient(btn.getAttribute('data-ord') === 'inv' ? 'rel' : 'inv'); if (window.UFCalcVol) { UFCalcVol.refresh(); } };
+    row.appendChild(btn);
   }
   window.UFCalcDop = { init: init, run: run, scan: scan, p5: p5, f2: f2, P5: P5, orient: orient, set: function (v) { on.dop = !!v; run(); } };
-  if (window.UFCalcVol) { UFCalcVol.addToggle('ucDop', 'Doppler: relação umbilical/cerebral média e RCP', true, function (v) { on.dop = !!v; run(); },
-    'Relação = IP da artéria umbilical ÷ IP da cerebral média (ou o inverso, se a linha estiver invertida). RCP = IP cerebral média ÷ IP umbilical, com p5 de Ebbing 2007 (interpolado por dia) quando houver IG relatada. Até 2 casas decimais, sem zeros finais.', status, extra); }
+  if (window.UFCalcVol) { UFCalcVol.addToggle('ucDop', 'Doppler: relação AU/ACM e RCP', true, function (v) { on.dop = !!v; run(); },
+    'Relação = IP da artéria umbilical ÷ IP da cerebral média (ou o inverso, se a linha estiver invertida). RCP = IP cerebral média ÷ IP umbilical, com p5 de Ebbing 2007 (interpolado por dia) quando houver IG relatada. Até 2 casas decimais, sem zeros finais.', status, extra, 'obst'); }
 })();

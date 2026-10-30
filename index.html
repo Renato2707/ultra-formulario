@@ -11,18 +11,6 @@
   <header id="topbar">
     <h1 class="sr-only">Editor de Laudos — Ultrassonografia</h1>
     <div id="editorToolbar" class="toolbar">
-      <button type="button" class="tb" data-cmd="bold" title="Negrito (Ctrl+B)"><b>N</b></button>
-      <button type="button" class="tb" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
-      <button type="button" class="tb" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>S</u></button>
-      <span class="sep"></span>
-      <button type="button" class="tb" data-cmd="justifyLeft" title="Alinhar à esquerda">&#8676;</button>
-      <button type="button" class="tb" data-cmd="justifyCenter" title="Centralizar">&#8596;</button>
-      <button type="button" class="tb" data-cmd="justifyRight" title="Alinhar à direita">&#8677;</button>
-      <button type="button" class="tb" data-cmd="justifyFull" title="Justificar">&#8801;</button>
-      <span class="sep"></span>
-      <button type="button" class="tb" data-cmd="undo" title="Desfazer (Ctrl+Z)">&#8630;</button>
-      <button type="button" class="tb" data-cmd="redo" title="Refazer (Ctrl+Y)">&#8631;</button>
-      <span class="sep"></span>
       <span class="search">
         <span class="sbox"><input type="text" id="repSearch" placeholder="Pesquisar no laudo..." autocomplete="off"><button type="button" class="sx" id="repSearchX" title="Limpar pesquisa (Esc)" aria-label="Limpar pesquisa" tabindex="-1" hidden>&#215;</button></span>
         <span id="repSearchCount" class="count"></span>
@@ -45,13 +33,13 @@
     <aside id="left" aria-label="Navegador">
       <div id="navHead">
         <div class="navrow">
-          <button type="button" class="ib" id="navBack" title="Voltar (Backspace / Esc)" aria-label="Voltar">&#8249;</button>
+          <button type="button" class="ib" id="navBack" title="Voltar (Esc)" aria-label="Voltar">&#8249;</button>
           <div id="crumb" class="crumb"></div>
         </div>
+        <div class="navrow navtools"><div id="navTools" class="tools"></div></div>
         <div class="navrow">
           <span class="sbox sbox-nav"><input type="text" id="navSearch" autocomplete="off"><button type="button" class="sx" id="navSearchX" title="Limpar pesquisa (Esc)" aria-label="Limpar pesquisa" tabindex="-1" hidden>&#215;</button></span>
           <span id="navCount" class="count"></span>
-          <div id="navTools" class="tools"></div>
         </div>
       </div>
       <div id="navList" class="scroll"></div>
@@ -64,6 +52,19 @@
 
     <!-- CENTER: report editor only -->
     <section id="center">
+      <div id="fmtBar" class="toolbar fmtbar" aria-label="Formatação">
+      <button type="button" class="tb" data-cmd="bold" title="Negrito (Ctrl+B)"><b>N</b></button>
+      <button type="button" class="tb" data-cmd="italic" title="Itálico (Ctrl+I)"><i>I</i></button>
+      <button type="button" class="tb" data-cmd="underline" title="Sublinhado (Ctrl+U)"><u>S</u></button>
+      <span class="sep"></span>
+      <button type="button" class="tb" data-cmd="justifyLeft" title="Alinhar à esquerda">&#8676;</button>
+      <button type="button" class="tb" data-cmd="justifyCenter" title="Centralizar">&#8596;</button>
+      <button type="button" class="tb" data-cmd="justifyRight" title="Alinhar à direita">&#8677;</button>
+      <button type="button" class="tb" data-cmd="justifyFull" title="Justificar">&#8801;</button>
+      <span class="sep"></span>
+      <button type="button" class="tb" data-cmd="undo" title="Desfazer (Ctrl+Z)">&#8630;</button>
+      <button type="button" class="tb" data-cmd="redo" title="Refazer (Ctrl+Y)">&#8631;</button>
+      </div>
       <div id="editorWrap">
         <div id="editor" contenteditable="true" spellcheck="false" aria-label="Laudo" data-ph="Selecione um modelo ou comece a digitar..."></div>
       </div>

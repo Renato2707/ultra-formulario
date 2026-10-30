@@ -206,21 +206,24 @@
   window.UFCalcBio = { init: init, run: run, scan: scan, pfe: pfe, igComp: igComp, igPeso: igPeso, semDias: semDias, phi: phi, pctMeasure: pctMeasure, pctPfe: pctPfe, MEAN: MEAN,
     set: function (k, v) { setter(k)(v); }, get: function (k) { return on[k]; } };
   if (window.UFCalcVol) {
-    var NONE = { txt: 'sem linha correspondente no laudo', cls: 'none' };
+    /* C6e: pronto = há a linha no laudo e as medidas necessárias; o motivo fica só no tooltip do ponto */
     function st(kind) {
       return function () {
         if (!H) { return null; }
-        var sc = scan(), n = 0, i;
-        if (kind === 'pfe') { for (i = 0; i < sc.blocks.length; i++) { if (sc.blocks[i].pfe) { n++; } } }
-        else if (kind === 'pct') { n = sc.blocks.length; if (n && (!window.UFCalc || UFCalc.getIgRelatada() === null)) { return { txt: 'preencha a IG relatada', cls: 'wait' }; } }
-        else { for (i = 0; i < sc.outs.length; i++) { if (sc.outs[i].kind === kind) { n++; } } }
-        if (!n) { return kind === 'igp' ? { txt: 'sem linha correspondente no laudo (o modelo não tem a frase "Idade gestacional estimada pelo peso fetal: ___ semanas")', cls: 'none' } : NONE; }
-        return { txt: n > 1 ? n + ' linhas no laudo' : 'linha encontrada no laudo', cls: 'ok' };
+        var sc = scan(), i, line = false, ok = false, ig = window.UFCalc ? UFCalc.getIgRelatada() : null, fv, kk;
+        if (kind === 'pfe') { for (i = 0; i < sc.blocks.length; i++) { if (sc.blocks[i].pfe) { line = true; if (vals(sc.blocks[i])) { ok = true; } } } }
+        else if (kind === 'pct') {
+          for (i = 0; i < sc.blocks.length; i++) { line = true; for (kk in sc.blocks[i].m) { if (sc.blocks[i].m.hasOwnProperty(kk)) { fv = H.fldVal(sc.blocks[i].m[kk]); if (fv !== null) { ok = true; } } } }
+          if (line && ig === null) { return { ready: false, tip: 'Preencha a IG relatada' }; }
+        }
+        else { for (i = 0; i < sc.outs.length; i++) { if (sc.outs[i].kind === kind) { line = true; if (sc.outs[i].block && vals(sc.outs[i].block)) { ok = true; } } } }
+        if (!line) { return { ready: false, tip: kind === 'igp' ? 'O laudo não tem a linha "Idade gestacional estimada pelo peso fetal: ___ semanas"' : 'Sem a linha correspondente no laudo' }; }
+        return ok ? { ready: true, tip: 'Pronto' } : { ready: false, tip: 'Faltam medidas da biometria' };
       };
     }
-    UFCalcVol.addToggle('ucPfe', 'Peso fetal estimado (PFE)', true, setter('pfe'), 'Hadlock 1985, 4 parâmetros (DBP, CC, CA, CF).', st('pfe'));
-    UFCalcVol.addToggle('ucIgc', 'IG pela biometria composta', true, setter('ig'), 'Hadlock 1984.', st('ig'));
-    UFCalcVol.addToggle('ucIgp', 'IG pelo PFE', false, setter('igp'), 'Inverso de Hadlock 1991 (peso × IG).', st('igp'));
-    UFCalcVol.addToggle('ucPct', 'Percentis Hadlock (pela IG relatada)', true, setter('pct'), 'Hadlock 1984 (DBP, CC, CA, CF) e Hadlock 1991 (peso).', st('pct'));
+    UFCalcVol.addToggle('ucPfe', 'Peso fetal estimado (PFE)', true, setter('pfe'), 'Hadlock 1985, 4 parâmetros (DBP, CC, CA, CF).', st('pfe'), null, 'obst');
+    UFCalcVol.addToggle('ucIgc', 'IG pela biometria composta', true, setter('ig'), 'Hadlock 1984.', st('ig'), null, 'obst');
+    UFCalcVol.addToggle('ucIgp', 'IG pelo PFE', false, setter('igp'), 'Inverso de Hadlock 1991 (peso × IG).', st('igp'), null, 'obst');
+    UFCalcVol.addToggle('ucPct', 'Percentis Hadlock', true, setter('pct'), 'Pela IG relatada. Hadlock 1984 (DBP, CC, CA, CF) e Hadlock 1991 (peso).', st('pct'), null, 'obst');
   }
 })();

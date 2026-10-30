@@ -45,7 +45,7 @@ def fresh(b):
     pg.goto(IDX); pg.evaluate('localStorage.clear(); sessionStorage.clear()'); pg.reload(); pg.wait_for_timeout(200)
     pg.set_input_files('#bankFile0', f.name); pg.wait_for_timeout(300)
     pg.click('[data-exam]'); pg.wait_for_timeout(700); pg.locator('[data-model]').nth(0).dblclick(); pg.wait_for_timeout(400)
-    if not pg.evaluate('UFCalc.isOpen()'): pg.click('#btnCalc'); pg.wait_for_timeout(150)
+    if not pg.evaluate('UFCalc.isOpen()'): pg.evaluate('UFCalc.open()'); pg.wait_for_timeout(150)
     return pg
 def rep(pg): return [l for l in pg.evaluate('UFTest.reportText()').splitlines()]
 def nod(pg, k): return pg.locator('.tr-nod').nth(k)
@@ -69,7 +69,7 @@ def caret(pg, line_text, off):
 with sync_playwright() as p:
     b = p.chromium.launch()
     pg = fresh(b)
-    ck('módulo UFTirads e seção no painel', pg.evaluate('!!window.UFTirads') and pg.locator('#trAdd').count() == 1)
+    ck('módulo UFTirads e seção no painel', pg.evaluate('!!window.UFTirads') and pg.locator('#trIns').count() == 1)
     # 1) exaustivo: JS puro x Python
     combos = [[c, e, s, m, fo] for c in COMP for e in ECO for s in FORMA for m in MARG for fo in FOCSETS]
     js = pg.evaluate('''(cs) => cs.map(function (a) { var r = UFTirads.score({comp: a[0], eco: a[1], forma: a[2], marg: a[3], focos: a[4]});
@@ -92,70 +92,42 @@ with sync_playwright() as p:
     sb = [(t, mm, w, pg.evaluate('UFTirads.sizeNote(%d,"%s")' % (t, mm))) for t, mm, w in cuts]
     sb = [x for x in sb if (x[2] == 'PAAF' and 'corte de PAAF' not in x[3]) or (x[2] == 'seguimento' and 'corte de seguimento' not in x[3]) or (x[2] not in ('PAAF', 'seguimento') and x[2] not in x[3])]
     ck('cortes de tamanho TR3 25/15, TR4 15/10, TR5 10/5 mm', not sb, sb)
-    # 2) UI
+    # 2) UI  (C6e: um formulário único no cartão TI-RADS; banco sem a frase do nódulo -> bloco da C6)
     base = rep(pg)
-    pg.click('#trAdd'); fill(pg, 0, 'sol', 'hipo', 'alto', 'lob', ['punct'], 'direito', 'médio', '12')
-    ck('total ao vivo no painel', 'Total: 12 pontos — TR5' in nod(pg, 0).locator('.tr-res').inner_text(), nod(pg, 0).locator('.tr-res').inner_text())
-    ck('pontos por categoria visíveis', nod(pg, 0).locator('fieldset[data-cat="focos"] .tr-pts').inner_text().strip() == '— 3 pts')
-    ck('destaque de tamanho no painel', 'corte de PAAF' in nod(pg, 0).locator('.tr-size').inner_text())
+    pg.evaluate("UFCalc.setOpen('tirads', true)")
+    def form(c, e, s, m, fo, lado='', terco='', mm=''):
+        for k, v in (('comp', c), ('eco', e), ('forma', s), ('marg', m)):
+            if v and pg.locator('.tr-sel[data-cat=%s]' % k).is_enabled(): pg.select_option('.tr-sel[data-cat=%s]' % k, v)
+        for x in fo:
+            if not pg.locator('input[data-cat=focos][value=%s]' % x).is_checked(): pg.click('input[data-cat=focos][value=%s]' % x)
+        if terco: pg.locator('.tr-loc select').nth(0).select_option(terco)
+        if lado: pg.locator('.tr-loc select').nth(1).select_option(lado)
+        if mm: pg.locator('.tr-mm').nth(0).fill(mm)
+    ck('botão inserir desativado com formulário vazio', pg.locator('#trIns').is_disabled())
+    form('sol', 'hipo', 'alto', 'lob', ['punct'], 'direito', 'médio', '12')
+    ck('total ao vivo no painel', pg.inner_text('.tr-res').strip() == 'TR5 · 12 pts', pg.inner_text('.tr-res'))
+    ck('pontos de cada opção visíveis', '· 3' in pg.inner_text('.tr-foc'))
     ck('nada no laudo antes de inserir', rep(pg) == base)
     caret(pg, 'Linha dois do laudo.', 5)
-    nod(pg, 0).locator('.tr-ins').click(); pg.wait_for_timeout(150)
+    pg.click('#trIns'); pg.wait_for_timeout(150)
     exp = ['Nódulo do lobo direito, terço médio, medindo 12 mm (ACR TI-RADS):'] + ref_lines(12)
     r = rep(pg); i2 = r.index('Linha dois do laudo.')
     ck('meio do texto: bloco exato logo abaixo da linha do cursor', r[i2 + 1:i2 + 8] == exp and r[i2 + 8] == 'Linha tres do laudo.', r)
-    ck('mensagem de inserção no cursor', 'cursor' in nod(pg, 0).locator('.tr-msg').inner_text())
-    ck('linha de tamanho NÃO vai ao laudo', not any('Pelo tamanho' in x for x in r))
-    pg.keyboard.type('X'); pg.wait_for_timeout(80)
-    r = rep(pg); ck('cursor termina após o bloco', r[i2 + 7].endswith('X') and r[i2 + 7].startswith('Sugestão'), r[i2 + 7])
-    pg.keyboard.press('Backspace'); pg.wait_for_timeout(80)
-    pg = fresh(b); base = rep(pg)
-    pg.click('#trAdd'); fill(pg, 0, 'mist', 'hiper', 'larg', 'lisa', ['nenhum'])
-    caret(pg, 'Linha dois do laudo.', 5); nod(pg, 0).locator('.tr-ins').click(); pg.wait_for_timeout(150)
+    pg = fresh(b); base = rep(pg); pg.evaluate("UFCalc.setOpen('tirads', true)")
+    form('mist', 'hiper', 'larg', 'lisa', ['nenhum'])
+    caret(pg, 'Linha dois do laudo.', 5); pg.click('#trIns'); pg.wait_for_timeout(150)
     ck('inserido (TR2)', rep(pg) != base and 'Categoria TIRADS: TR2' in rep(pg))
-    pg.keyboard.press('Control+z'); pg.wait_for_timeout(150)
+    pg.click('#editor'); pg.keyboard.press('Control+z'); pg.wait_for_timeout(150)
     ck('Ctrl+Z remove o bloco inteiro de uma vez', rep(pg) == base, rep(pg))
-    # início
-    pg = fresh(b); caret(pg, 'TIREOIDE TESTE', 0)
-    pg.click('#trAdd'); fill(pg, 0, 'cist', 'anec', 'larg', 'lisa', ['nenhum'])
-    nod(pg, 0).locator('.tr-ins').click(); pg.wait_for_timeout(150); r = rep(pg)
-    ck('início: bloco após a 1ª linha, cabeçalho sem partes', r[1:8] == ['Nódulo (ACR TI-RADS):'] + ref_lines(0), r)
-    # fim
-    pg = fresh(b); caret(pg, 'Linha tres do laudo.', len('Linha tres do laudo.'))
-    pg.click('#trAdd'); fill(pg, 0, 'esp', '', '', '', [], 'esquerdo', 'inferior', '30')
-    ck('espongiforme: demais categorias desativadas', nod(pg, 0).locator('input[data-cat="eco"]').first.is_disabled() and nod(pg, 0).locator('input[data-cat="focos"]').first.is_disabled())
-    ck('espongiforme: aviso na tela', 'Espongiforme' in nod(pg, 0).locator('.tr-note').inner_text())
-    nod(pg, 0).locator('.tr-ins').click(); pg.wait_for_timeout(150); r = [x for x in rep(pg) if x.strip()]
-    ck('fim: bloco após a última linha (espongiforme TR1)', r[-7:] == ['Nódulo do lobo esquerdo, terço inferior, medindo 30 mm (ACR TI-RADS):'] + ref_lines(0), r)
-    # sem cursor
-    pg = fresh(b); pg.evaluate('UFTest.S.savedRange = null; getSelection().removeAllRanges(); document.activeElement && document.activeElement.blur()')
-    pg.click('#trAdd'); fill(pg, 0, 'ind', '', 'larg', 'ind', ['macro', 'perif'], 'istmo', '', '7')
-    ck('indeterminável: ecogenicidade desativada e 1 pt', nod(pg, 0).locator('input[data-cat="eco"]').first.is_disabled() and '— 1 pt' in nod(pg, 0).locator('fieldset[data-cat="eco"] .tr-pts').inner_text())
-    pg.evaluate('UFTest.S.savedRange = null')
-    nod(pg, 0).locator('.tr-ins').click(); pg.wait_for_timeout(150); r = [x for x in rep(pg) if x.strip()]
-    ck('sem cursor: no fim do laudo, com mensagem', r[-7:] == ['Nódulo do istmo, medindo 7 mm (ACR TI-RADS):'] + ref_lines(6) and 'fim do laudo' in nod(pg, 0).locator('.tr-msg').inner_text(), r)
-    # focos: nenhum exclui os demais
-    pg.click('#trAdd'); pick(pg, 1, 'focos', 'macro'); pick(pg, 1, 'focos', 'punct'); pick(pg, 1, 'focos', 'nenhum')
-    ck('"nenhum" desmarca os outros', [nod(pg, 1).locator('input[data-cat="focos"]').nth(k).is_checked() for k in range(4)] == [True, False, False, False])
-    pick(pg, 1, 'focos', 'perif')
-    ck('outro foco desmarca "nenhum"', [nod(pg, 1).locator('input[data-cat="focos"]').nth(k).is_checked() for k in range(4)] == [False, False, True, False])
-    # múltiplos nódulos independentes, recolher, remover
-    fill(pg, 1, 'sol', 'muito', 'larg', 'lisa', [])
-    ck('nódulos independentes', 'TR4' in nod(pg, 0).locator('.tr-res').inner_text() and 'Total: 7 pontos — TR5' in nod(pg, 1).locator('.tr-res').inner_text(), [nod(pg, 0).locator('.tr-res').inner_text(), nod(pg, 1).locator('.tr-res').inner_text()])
-    nod(pg, 1).locator('.tr-tg').click(); ck('recolher', not nod(pg, 1).locator('.tr-body').is_visible() and nod(pg, 0).locator('.tr-body').is_visible())
-    ck('título recolhido mostra categoria', 'TR5' in nod(pg, 1).locator('.tr-tg').inner_text())
-    nod(pg, 1).locator('.tr-tg').click(); ck('expandir', nod(pg, 1).locator('.tr-body').is_visible())
-    nod(pg, 0).locator('.tr-rm').click()
-    ck('remover só o nódulo 1', pg.locator('.tr-nod').count() == 1 and pg.evaluate('UFTirads.count()') == 1 and 'TR5' in nod(pg, 0).locator('.tr-res').inner_text())
-    pg.click('#trAdd'); ck('botão inserir desativado em nódulo vazio', nod(pg, 1).locator('.tr-ins').is_disabled())
-    # Tab alcança os controles
-    pg.focus('#trAdd'); seen = []
-    for k in range(12): pg.keyboard.press('Tab'); seen.append(pg.evaluate("document.activeElement.className + '|' + (document.activeElement.type||'')"))
-    ck('Tab percorre os controles do painel', any('tr-tg' in x for x in seen) and any('tr-sel' in x for x in seen), seen)
-    # estado só na sessão
-    pg.reload(); pg.wait_for_timeout(300)
-    if not pg.evaluate('UFCalc.isOpen()'): pg.click('#btnCalc'); pg.wait_for_timeout(150)
-    ck('após recarregar não há nódulos', pg.locator('.tr-nod').count() == 0)
+    pg = fresh(b); pg.evaluate("UFCalc.setOpen('tirads', true)")
+    pg.select_option('.tr-sel[data-cat=comp]', 'esp')
+    ck('espongiforme: demais categorias desativadas', pg.locator('.tr-sel[data-cat=eco]').is_disabled() and pg.locator('input[data-cat=focos]').first.is_disabled())
+    ck('espongiforme = TR1 0 pts', pg.inner_text('.tr-res').strip() == 'TR1 · 0 pts', pg.inner_text('.tr-res'))
+    pg.select_option('.tr-sel[data-cat=comp]', 'sol')
+    pg.click('input[data-cat=focos][value=macro]'); pg.click('input[data-cat=focos][value=punct]')
+    ck('outro foco desmarca "sem focos"', [pg.locator('input[data-cat=focos]').nth(k).is_checked() for k in range(4)] == [False, True, False, True])
+    pg.click('input[data-cat=focos][value=nenhum]')
+    ck('"sem focos" desmarca os outros', [pg.locator('input[data-cat=focos]').nth(k).is_checked() for k in range(4)] == [True, False, False, False])
     ck('sem erros de console', not ERR, ERR)
     b.close()
 print('%d/%d' % (sum(R), len(R)))

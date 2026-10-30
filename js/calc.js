@@ -132,7 +132,7 @@ var UFCalc = (function () {
     w.setAttribute('inputmode', 'numeric'); d.setAttribute('inputmode', 'numeric'); w.setAttribute('autocomplete', 'off'); d.setAttribute('autocomplete', 'off');
     w.setAttribute('aria-label', 'IG relatada: semanas (0 a 45)'); d.setAttribute('aria-label', 'IG relatada: dias (0 a 6)');
     msg.id = 'ucIgMsg';
-    row.appendChild(w); row.appendChild(el('span', 'uc-u', 'sem')); row.appendChild(d); row.appendChild(el('span', 'uc-u', 'dias'));
+    row.appendChild(el('span', 'uc-lab', 'IG relatada')); row.appendChild(w); row.appendChild(el('span', 'uc-u', 'sem')); row.appendChild(d); row.appendChild(el('span', 'uc-u', 'dias'));
     function upd() {
       var r = readIg(w.value, d.value), old = igDays;
       igDays = r.days;
@@ -150,31 +150,33 @@ var UFCalc = (function () {
   }
 
   /* ---------- painel ---------- */
-  /* C6c: cada calculadora é um cartão recolhível (acordeão); o estado aberto/fechado fica neste navegador */
-  var FOLD_KEY = 'ufCalcFold', fold = {}, cards = {};
-  try { fold = JSON.parse(window.localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { fold = {}; }
-  function saveFold() { try { window.localStorage.setItem(FOLD_KEY, JSON.stringify(fold)); } catch (e) { /* sem armazenamento */ } }
+  /* C6e: cartões recolhíveis (acordeão). Todos começam fechados; um cartão abre sozinho quando fica PRONTO
+     (ponto verde = há no laudo tudo o que o cálculo precisa). Depois disso, abrir/fechar é do usuário. */
+  var cards = {}, autoOpened = {};
   function setOpen(id, open) {
     var c = cards[id]; if (!c) { return; }
     c.sec.className = 'uc-sec uc-card' + (open ? ' open' : '');
     c.b.style.display = open ? '' : 'none'; c.h.setAttribute('aria-expanded', open ? 'true' : 'false');
     c.chev.innerHTML = open ? '\u25be' : '\u25b8';
   }
+  function isCardOpen(id) { var c = cards[id]; return !!c && /(^|\s)open(\s|$)/.test(c.sec.className); }
   function addSection(m) {
-    var sec = el('section', 'uc-sec uc-card'), h = el('button', 'uc-h'), chev = el('span', 'uc-chev'), t = el('span', 'uc-t', m.title), badge = el('span', 'uc-badge'), b = el('div', 'uc-b');
+    var sec = el('section', 'uc-sec uc-card'), h = el('button', 'uc-h'), chev = el('span', 'uc-chev'), t = el('span', 'uc-t', m.title), dot = el('span', 'uc-dot'), b = el('div', 'uc-b');
     h.type = 'button'; b.id = 'ucB-' + m.id; h.setAttribute('aria-controls', b.id);
-    h.appendChild(chev); h.appendChild(t); h.appendChild(badge);
+    h.appendChild(chev); h.appendChild(t); h.appendChild(dot);
     sec.setAttribute('data-calc', m.id); sec.appendChild(h); sec.appendChild(b); root.appendChild(sec);
-    cards[m.id] = { sec: sec, h: h, b: b, chev: chev, badge: badge };
+    cards[m.id] = { sec: sec, h: h, b: b, chev: chev, dot: dot };
     on(h, 'mousedown', noFocusSteal);
-    on(h, 'click', function () { var o = !/(^|\s)open(\s|$)/.test(sec.className); fold[m.id] = o ? 1 : 0; saveFold(); setOpen(m.id, o); });
-    setOpen(m.id, fold[m.id] == null ? m.open !== false : !!fold[m.id]);
+    on(h, 'click', function () { autoOpened[m.id] = true; setOpen(m.id, !isCardOpen(m.id)); });
+    setOpen(m.id, false);
     m.build(b, api);
   }
-  function setBadge(id, txt, cls) {
+  /* ponto de estado do cartão: true = pronto (verde, abre o cartão uma vez), false = cinza, null = sem ponto */
+  function setReady(id, ready, tip) {
     var c = cards[id]; if (!c) { return; }
-    c.badge.innerHTML = ''; if (txt) { c.badge.appendChild(document.createTextNode(txt)); }
-    c.badge.className = 'uc-badge' + (cls ? ' ' + cls : '');
+    c.dot.className = 'uc-dot' + (ready === true ? ' on' : (ready === false ? ' off' : ''));
+    c.dot.title = tip || ''; c.dot.setAttribute('aria-label', ready ? 'pronto' : 'incompleto');
+    if (ready === true && !autoOpened[id]) { autoOpened[id] = true; setOpen(id, true); }
   }
   /* mudanças no laudo (digitação, escolha de opção, modelo carregado): avisa os módulos, agrupado */
   var edSubs = [], edTimer = null;
@@ -192,41 +194,29 @@ var UFCalc = (function () {
     return true;
   }
   function isOpen() { var r = $('right'); return !!r && !/(^|\s)collapsed(\s|$)/.test(r.className); }
-  function toggle(want) { var t = $('rightToggle'); if (t && (want == null || want !== isOpen())) { t.click(); } syncBtn(); }
-  function syncBtn() { var b = $('btnCalc'); if (b) { b.className = 'tb' + (isOpen() ? ' on' : ''); b.setAttribute('aria-pressed', isOpen() ? 'true' : 'false'); } }
+  function toggle(want) { var t = $('rightToggle'); if (t && (want == null || want !== isOpen())) { t.click(); } }
   function init() {
     if (built) { return; }
-    var right = $('right'), body = right && right.querySelector('.rbody'), i, btn, ref;
+    var right = $('right'), body = right && right.querySelector('.rbody'), i;
     if (!body) { return; }
     body.innerHTML = ''; root = el('div', 'uc-root'); body.appendChild(root); built = true;
     for (i = 0; i < mods.length; i++) { addSection(mods[i]); }
     watchEditor();
-    /* botão discreto na barra: abre/fecha o mesmo painel lateral (mesma lógica e preferência do botão do painel) */
-    ref = $('btnClear');
-    if (ref && !$('btnCalc')) {
-      btn = el('button', 'tb', '\u00b1'); btn.type = 'button'; btn.id = 'btnCalc';
-      btn.title = 'Calculadoras (abrir/fechar painel)'; btn.setAttribute('aria-label', 'Calculadoras');
-      on(btn, 'mousedown', noFocusSteal);
-      on(btn, 'click', function () { toggle(); });
-      ref.parentNode.insertBefore(btn, ref);
-    }
-    on($('rightToggle'), 'click', function () { setTimeout(syncBtn, 0); });
     on($('rightToggle'), 'mousedown', noFocusSteal);
-    syncBtn();
   }
-
   var api = {
     register: register, init: init, open: function () { toggle(true); }, close: function () { toggle(false); }, toggle: function () { toggle(); }, isOpen: isOpen,
     /* IG relatada: total em dias, ou null se vazio/inválido */
     getIgRelatada: function () { return igDays; },
     onIgChange: function (fn) { if (typeof fn === 'function') { igSubs.push(fn); } return function () { for (var i = 0; i < igSubs.length; i++) { if (igSubs[i] === fn) { igSubs.splice(i, 1); return; } } }; },
     setIgRelatada: function (w, d) { if (api._igSet) { api._igSet(w, d); } },
-    setBadge: setBadge, setOpen: setOpen,
+    setReady: setReady, setOpen: setOpen, isCardOpen: isCardOpen, cardBody: function (id) { return cards[id] ? cards[id].b : null; },
     onEditorChange: function (fn) { if (typeof fn === 'function') { edSubs.push(fn); } },
     format: fmt, parseNum: parseNum, _calc: null
   };
   register({ id: 'livre', title: 'Calculadora', build: function (b) { api._calc = buildCalc(b); } });
-  register({ id: 'ig', title: 'IG relatada', build: buildIg });
+  /* C6e: tudo da obstetrícia num cartão só: IG relatada + linhas de PFE, IG, percentis e Doppler (módulos C3-C5) */
+  register({ id: 'obst', title: 'Obstetrícia', build: function (b) { var ig = el('div', 'uc-ig'); ig.setAttribute('data-calc-part', 'ig'); b.appendChild(ig); buildIg(ig); } });
   return api;
 })();
 window.UFCalc = UFCalc;
