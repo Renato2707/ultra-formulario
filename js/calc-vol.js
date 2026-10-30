@@ -73,8 +73,9 @@
   }
   function apply(v, tr, kind) {
     var vals = [], i, key, res, cur = String(v.textContent || ''), auto = v.getAttribute('data-auto');
-    for (i = 0; i < 3; i++) { vals.push(fldVal(tr.f[i])); }
-    if (vals[0] === null || vals[1] === null || vals[2] === null) {
+    for (i = 0; i < tr.f.length; i++) { vals.push(fldVal(tr.f[i])); }
+    var miss = false; for (i = 0; i < vals.length; i++) { if (vals[i] === null) { miss = true; } }
+    if (miss) {
       /* faltou medida: volta ao campo vazio só se o valor atual foi calculado por nós */
       if (auto !== null && cur === auto) { v.textContent = v.getAttribute('data-ph') || '___'; }
       v.removeAttribute('data-auto'); v.removeAttribute('data-src');
@@ -84,7 +85,10 @@
     /* edição manual: respeitar até as medidas mudarem */
     if (auto !== null && cur !== auto && v.getAttribute('data-src') === key) { return false; }
     if (auto === null && fldVal(v) !== null && v.getAttribute('data-man') === key) { return false; }
-    if (kind === 'vol') {
+    if (kind === 'sum') {   /* C6d: tireoide = soma dos volumes dos lobos (cada um L x AP x T x 0,523); istmo não entra */
+      var tot = 0; for (i = 0; i + 2 < vals.length; i += 3) { tot += vals[i] * vals[i + 1] * vals[i + 2] * 0.523 / 1000; }
+      res = Math.round(tot);
+    } else if (kind === 'vol') {
       var mm = tr.unit === 'cm' ? 10 : 1;
       res = Math.round(vals[0] * mm * vals[1] * mm * vals[2] * mm * 0.523 / 1000);
     } else {
@@ -97,11 +101,15 @@
 
   /* encontra os pares (campo de resultado, 3 medidas) no laudo atual */
   function scan() {
-    var L = lines(), pairs = [], li, si, ss, prevLast, toks, i, v, after, before, tr, kind, cand = [];
+    var L = lines(), pairs = [], li, si, ss, prevLast, toks, i, v, after, before, tr, kind, cand = [], lobes = [], candF = [];
     for (li = 0; li < L.length; li++) {
       ss = sentences(L[li]);
       for (si = 0; si < ss.length; si++) {
         toks = ss[si];
+        /* C6d: frase de medida de lobo da tireoide ("O lobo direito mede cerca de # x # x # mm") */
+        var lt = textOf(toks, 0, toks.length), lm = /^\s*(o\s+)?lobo\s+(direito|esquerdo)\s+(mede|medindo)\b/i.exec(lt), ltr = null;
+        if (lm) { var nf = 0, cut = toks.length, z; for (z = 0; z < toks.length; z++) { if (toks[z].f) { nf++; if (nf === 4) { cut = z; break; } } } ltr = triple(toks, 0, cut); }
+        if (ltr && ltr.unit === 'mm') { lobes.push({ side: lm[2].toLowerCase(), tr: ltr }); }
         for (i = 0; i < toks.length; i++) {
           if (!toks[i].f || !isNumFld(toks[i].f)) { continue; }
           after = nextText(toks, i);
@@ -109,7 +117,7 @@
           v = toks[i].f; before = textOf(toks, 0, i);
           kind = /índice\s+esplênico|indice\s+esplenico/i.test(before) ? 'ie' : 'vol';
           if (kind === 'vol' && !/volume|~/i.test(before)) { continue; }
-          cand.push(kind);
+          cand.push(kind); if (kind === 'vol') { candF.push({ v: toks[i].f, line: textOf(L[li], 0, L[li].length) }); }
           tr = triple(toks, 0, i);
           if (!tr && kind === 'vol' && si === 0 && textOf(toks, 0, i).replace(/#/g, '').length === textOf(toks, 0, i).length &&
               /^\s*volume/i.test(before) && li > 0) {
@@ -127,7 +135,16 @@
         }
       }
     }
-    pairs.cand = cand;
+    /* C6d: campo de volume total da tireoide (sem par próprio) = soma dos lobos; dois "lobo direito" (ou esquerdo) = ambíguo */
+    var sides = {}, okL = lobes.length > 0, k, q, used;
+    for (k = 0; k < lobes.length; k++) { if (sides[lobes[k].side]) { okL = false; } sides[lobes[k].side] = 1; }
+    for (k = 0; okL && k < candF.length; k++) {
+      used = false; for (q = 0; q < pairs.length; q++) { if (pairs[q].v === candF[k].v) { used = true; } }
+      if (used || !/volume\s+glandular|gl[âa]ndula\s+tireoide/i.test(candF[k].line)) { continue; }
+      var all = []; for (q = 0; q < lobes.length; q++) { all = all.concat(lobes[q].tr.f); }
+      pairs.push({ v: candF[k].v, tr: { f: all, unit: 'mm', lobes: lobes.length }, kind: 'sum' });
+    }
+    pairs.cand = cand; pairs.lobes = lobes.length;
     return pairs;
   }
 
@@ -154,7 +171,7 @@
       var p = scan(), i;
       for (i = 0; i < p.length; i++) {
         if (p[i].v === f) {
-          var vs = [fldVal(p[i].tr.f[0]), fldVal(p[i].tr.f[1]), fldVal(p[i].tr.f[2])];
+          var vs = [], z; for (z = 0; z < p[i].tr.f.length; z++) { vs.push(fldVal(p[i].tr.f[z])); }
           f.setAttribute('data-man', p[i].tr.unit + ':' + vs.join('|'));
           if (f.getAttribute('data-auto') !== null && f.textContent !== f.getAttribute('data-auto')) { f.setAttribute('data-src', p[i].tr.unit + ':' + vs.join('|')); }
         }
@@ -203,8 +220,10 @@
   }
   function volStatus() {
     var p = scan(), n = 0, ie = 0, c = p.cand, i, cv = 0, ci = 0;
-    for (i = 0; i < p.length; i++) { if (p[i].kind === 'vol') { n++; } else { ie++; } }
+    var sum = 0; for (i = 0; i < p.length; i++) { if (p[i].kind === 'vol') { n++; } else if (p[i].kind === 'sum') { sum = p[i].tr.lobes; } else { ie++; } }
     for (i = 0; i < c.length; i++) { if (c[i] === 'vol') { cv++; } else { ci++; } }
+    if (sum) { return { txt: 'tireoide: soma de ' + sum + (sum > 1 ? ' lobos' : ' lobo') + ' (istmo não entra)' + (n ? ' · ' + n + ' volume' + (n > 1 ? 's' : '') : '') + ' no laudo', cls: 'ok' }; }
+    if (p.lobes && !n) { return { txt: 'tireoide: há medidas dos lobos, mas sem linha de volume total no laudo', cls: 'warn' }; }
     if (!n && !ie) {
       if (cv || ci) { return { txt: 'há campo de ' + (cv ? 'volume' : 'índice esplênico') + ', mas sem as 3 medidas (ou com medidas de mais de uma estrutura)', cls: 'warn' }; }
       return { txt: 'sem linha correspondente no laudo', cls: 'none' };

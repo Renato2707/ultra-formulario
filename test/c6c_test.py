@@ -100,7 +100,7 @@ with sync_playwright() as p:
     ck('volume: estado "no laudo"', 'no laudo' in (st(pg, 'ucAuto') or '') and 'sem linha' not in st(pg, 'ucAuto'), st(pg, 'ucAuto'))
     ck('badge do cartão mostra ativo', 'ativo' in (T(lambda: pg.inner_text('[data-calc="auto"] .uc-badge', timeout=500)) or ''))
     pg = fresh(b, 0)
-    ck('tireoide 2 lobos: aviso de medidas de mais de uma estrutura', 'mais de uma estrutura' in (st(pg, 'ucAuto') or ''), st(pg, 'ucAuto'))
+    ck('tireoide 2 lobos: soma dos lobos (C6d)', 'soma de 2 lobos' in (st(pg, 'ucAuto') or ''), st(pg, 'ucAuto'))
     # ---------- 3: Doppler ----------
     pg = fresh(b, 2)
     lab = pg.inner_text('[data-calc="auto"]')

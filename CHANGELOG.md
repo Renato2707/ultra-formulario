@@ -11,6 +11,19 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6d] Volume da tireoide = soma dos lobos — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Aprovado pelo Dr. Renato.
+- Cada lobo usa a regra da C2: L × AP × T × 0,523 (mm → cm³). Conta como lobo a frase "O lobo direito/esquerdo mede cerca de # x # x # mm".
+- O campo de volume total recebe a soma dos lobos, arredondada no fim:
+  - "Volume glandular estimado em ___ cm³";
+  - ou "Glândula tireoide ... de volume ___ cm³".
+- Se a frase do lobo tiver o próprio campo de volume, ele também é preenchido.
+- O istmo não entra na soma: a fórmula aprovada é a soma dos lobos, e o banco só tem a espessura AP do istmo, sem 3 medidas.
+- Só um lobo no laudo (ex.: lobectomia): o total é esse lobo. Dois lobos do mesmo lado: ambíguo, não calcula. Medidas de nódulo não contam.
+- Valor digitado à mão é respeitado até alguma medida de lobo mudar, como na C2.
+- Painel: "tireoide: soma de 2 lobos (istmo não entra)", ou aviso quando há lobos sem linha de volume total.
+- Teste automático: test/c6d_test.py, 13/13 (6/13 na C6c).
+
 ## [etapa-C6c] Painel em cartões, avisos de "sem linha", Doppler, opção dentro de opção, listas, TI-RADS pelo texto — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Painel de calculadoras em cartões recolhíveis. O cabeçalho é um botão com seta e um selo de estado ("2 ativos"). O aberto/fechado de cada cartão fica guardado neste navegador.
 - "Cálculo no laudo": cada cálculo é uma linha com liga/desliga, um ⓘ (fórmula e fonte só no tooltip) e um estado curto:
