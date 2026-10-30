@@ -133,6 +133,86 @@
     b.appendChild(el('div', 'uc-note', 'ACR TI-RADS (Tessler et al., JACR 2017). Os nódulos ficam só nesta janela.'));
     on(add, 'click', function () { var n = addNodule(); var f = n.box.querySelector('select'); if (f) { f.focus(); } });
   }
-  window.UFTirads = { score: score, level: level, lines: lines, header: header, sizeNote: sizeNote, CAT: CAT, LV: LV, add: function () { return addNodule(); }, count: function () { return nods.length; } };
+  /* ---------- C6c: TI-RADS a partir das opções escolhidas no próprio texto do laudo ----------
+     Frase do banco: "Observa-se nódulo ?[composição], ?[ecogenicidade], ?[forma], margens ?[margem], ?[focos]. ... TI-RADS *."
+     Cada opção do texto é ligada a uma opção ACR já implementada acima (mesmos pontos); nada novo. */
+  var TXT = {
+    comp: [[/^c[íi]stic/i, 'cist'], [/^espongiform/i, 'esp'], [/^mist/i, 'mist'], [/^s[óo]lid/i, 'sol'], [/^indetermin/i, 'ind']],
+    eco: [[/^anecoic/i, 'anec'], [/^hiperecog/i, 'hiper'], [/^isoecog/i, 'hiper'], [/^hipoecog/i, 'hipo'], [/^muito hipoecog/i, 'muito'], [/^indetermin/i, 'ind']],
+    forma: [[/^mais largo/i, 'larg'], [/^mais alto/i, 'alto']],
+    marg: [[/^lisa/i, 'lisa'], [/^mal definid/i, 'mal'], [/^lobulad/i, 'lob'], [/^irregular/i, 'lob'], [/extratireoid/i, 'ete'], [/^indetermin/i, 'ind']],
+    focos: [[/^sem focos/i, 'nenhum'], [/cauda de cometa/i, 'nenhum'], [/macrocalcifica/i, 'macro'], [/perif[ée]ric/i, 'perif'], [/puntiform/i, 'punct']]
+  };
+  var ORDER = ['comp', 'eco', 'forma', 'marg', 'focos'], txtOn = true, ed = null, busyT = false;
+  function mapTxt(cat, t) { var l = TXT[cat], i; t = String(t || '').replace(/^\s+|\s+$/g, ''); for (i = 0; i < l.length; i++) { if (l[i][0].test(t)) { return l[i][1]; } } return null; }
+  function blockOf(n) { while (n && n !== ed && !(n.nodeType === 1 && /^(DIV|P|LI)$/.test(n.nodeName))) { n = n.parentNode; } return n; }
+  /* frases de nódulo no laudo: {chips:[5 escolhas], out: campo "TI-RADS ___"} */
+  function textNodules() {
+    var out = [], fs, i, f, j, ln, seen = [];
+    if (!ed) { return out; }
+    fs = ed.querySelectorAll('.fld');
+    for (i = 0; i < fs.length; i++) {
+      f = fs[i]; if (f.getAttribute('data-t') === 's') { continue; }
+      var prev = f.previousSibling, pt = prev && prev.nodeType === 3 ? prev.nodeValue : '';
+      if (!/TI-RADS\s*$/i.test(pt)) { continue; }
+      ln = blockOf(f); if (!ln || seen.indexOf(ln) >= 0) { continue; }
+      var all = ln.querySelectorAll('.fld'), k = -1, chips = [], txt;
+      for (j = 0; j < all.length; j++) { if (all[j] === f) { k = j; break; } }
+      /* a frase do nódulo: do "nódulo" até o campo do TI-RADS */
+      txt = ln.textContent || '';
+      if (!/n[óo]dulo/i.test(txt)) { continue; }
+      for (j = 0; j < k; j++) { if (all[j].getAttribute('data-t') === 's') { chips.push(all[j]); } }
+      if (chips.length < 5) { continue; }
+      seen.push(ln); out.push({ chips: chips.slice(0, 5), out: f });
+    }
+    return out;
+  }
+  function readTxt(n) {
+    var st = { focos: [] }, i, c, v, miss = 0;
+    for (i = 0; i < 5; i++) {
+      c = n.chips[i]; v = c.getAttribute('data-v') !== null ? mapTxt(ORDER[i], c.textContent) : null;
+      if (v === null) { miss++; continue; }
+      if (ORDER[i] === 'focos') { st.focos = [v]; } else { st[ORDER[i]] = v; }
+    }
+    return { st: st, miss: miss };
+  }
+  function putT(f, val) {   /* mesmo comportamento dos outros campos calculados: valor manual respeitado */
+    var cur = String(f.textContent || ''), auto = f.getAttribute('data-auto');
+    if (val === null) { if (auto !== null) { if (cur === auto) { f.textContent = f.getAttribute('data-ph') || '___'; } f.removeAttribute('data-auto'); return cur === auto; } return false; }
+    if (auto === null && cur !== '' && cur !== f.getAttribute('data-ph')) { return false; }   /* digitado à mão */
+    if (auto !== null && cur !== auto) { return false; }
+    if (cur === val) { return false; }
+    f.textContent = val; f.setAttribute('data-auto', val); return true;
+  }
+  function runTxt() {
+    if (busyT || !ed) { return; }
+    busyT = true;
+    try {
+      var L = textNodules(), i, r, sc, ch = false;
+      for (i = 0; i < L.length; i++) {
+        r = readTxt(L[i]); sc = r.miss ? null : score(r.st);
+        if (putT(L[i].out, txtOn && sc && sc.complete ? level(sc.total).substring(2) : null)) { ch = true; }
+        L[i].out.title = sc && sc.complete ? 'ACR TI-RADS: ' + sc.total + (sc.total === 1 ? ' ponto' : ' pontos') + ' (' + level(sc.total) + ')' : '';
+      }
+      if (ch) { var ev; try { ev = new Event('input', { bubbles: true }); } catch (x) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); } ed.dispatchEvent(ev); }
+    } finally { busyT = false; }
+  }
+  function txtStatus() {
+    var L = textNodules(), i, r, sc, parts = [];
+    if (!L.length) { return { txt: 'sem frase de nódulo com "TI-RADS ___" no laudo', cls: 'none' }; }
+    for (i = 0; i < L.length; i++) { r = readTxt(L[i]); sc = r.miss ? null : score(r.st); parts.push(sc ? level(sc.total) + ' (' + sc.total + ' pts)' : 'faltam ' + r.miss + ' opç' + (r.miss > 1 ? 'ões' : 'ão')); }
+    return { txt: 'nódulo no texto: ' + parts.join(' · '), cls: /TR/.test(parts.join('')) ? 'ok' : 'wait' };
+  }
+  function initTxt() {
+    ed = document.getElementById('editor'); if (!ed) { return; }
+    if (window.UFCalc && UFCalc.onEditorChange) { UFCalc.onEditorChange(runTxt); }
+    if (ed.addEventListener) { ed.addEventListener('input', function () { setTimeout(runTxt, 0); }, false); }
+    runTxt();
+  }
+  if (window.UFCalcVol) {
+    UFCalcVol.addToggle('ucTrTxt', 'TI-RADS pelas opções do nódulo no texto', true, function (v) { txtOn = !!v; runTxt(); },
+      'ACR TI-RADS 2017 (Tessler et al.). Lê as 5 opções da frase "Observa-se nódulo ..." e preenche o número em "TI-RADS ___" (1 a 5). "Tipo cauda de cometa" conta 0 ponto (artefato grande em cauda de cometa); "irregulares" e "lobuladas" contam 2.', txtStatus);
+  }
+  window.UFTirads = { score: score, level: level, lines: lines, header: header, sizeNote: sizeNote, CAT: CAT, LV: LV, add: function () { return addNodule(); }, count: function () { return nods.length; }, initTxt: initTxt, runTxt: runTxt, textNodules: textNodules, mapTxt: mapTxt };
   if (window.UFCalc) { UFCalc.register({ id: 'tirads', title: 'TI-RADS (ACR 2017)', build: build }); }
 })();

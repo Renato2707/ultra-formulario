@@ -97,7 +97,7 @@
 
   /* encontra os pares (campo de resultado, 3 medidas) no laudo atual */
   function scan() {
-    var L = lines(), pairs = [], li, si, ss, prevLast, toks, i, v, after, before, tr, kind;
+    var L = lines(), pairs = [], li, si, ss, prevLast, toks, i, v, after, before, tr, kind, cand = [];
     for (li = 0; li < L.length; li++) {
       ss = sentences(L[li]);
       for (si = 0; si < ss.length; si++) {
@@ -109,6 +109,7 @@
           v = toks[i].f; before = textOf(toks, 0, i);
           kind = /índice\s+esplênico|indice\s+esplenico/i.test(before) ? 'ie' : 'vol';
           if (kind === 'vol' && !/volume|~/i.test(before)) { continue; }
+          cand.push(kind);
           tr = triple(toks, 0, i);
           if (!tr && kind === 'vol' && si === 0 && textOf(toks, 0, i).replace(/#/g, '').length === textOf(toks, 0, i).length &&
               /^\s*volume/i.test(before) && li > 0) {
@@ -126,6 +127,7 @@
         }
       }
     }
+    pairs.cand = cand;
     return pairs;
   }
 
@@ -169,28 +171,59 @@
   }
 
   var toggles = [];
-  /* outros módulos de "Cálculo no laudo" acrescentam caixas liga/desliga nesta seção */
-  function addToggle(id, label, checked, fn) { toggles.push({ id: id, label: label, checked: checked, fn: fn }); if (secBody) { drawToggle(toggles[toggles.length - 1]); } }
+  /* outros módulos de "Cálculo no laudo" acrescentam linhas liga/desliga neste cartão.
+     C6c: cada linha tem ⓘ (fonte/fórmula, só no tooltip) e um estado discreto (ex.: "sem linha correspondente no laudo") */
+  function addToggle(id, label, checked, fn, info, status, extra) {
+    var t = { id: id, label: label, checked: checked, fn: fn, info: info || '', status: status || null, extra: extra || null };
+    toggles.push(t); if (secBody) { drawToggle(t); refresh(); }
+  }
   var secBody = null;
   function drawToggle(t) {
-    var lab = document.createElement('label'), cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = !!t.checked; cb.id = t.id;
-    cb.onchange = function () { t.fn(cb.checked); };
+    var row = document.createElement('div'), lab = document.createElement('label'), cb = document.createElement('input'), st = document.createElement('div');
+    row.className = 'uc-row'; cb.type = 'checkbox'; cb.checked = !!t.checked; cb.id = t.id;
+    cb.onchange = function () { t.checked = cb.checked; t.fn(cb.checked); refresh(); };
     lab.className = 'uc-chk'; lab.appendChild(cb); lab.appendChild(document.createTextNode(' ' + t.label));
-    secBody.insertBefore(lab, secBody.lastChild);
+    row.appendChild(lab);
+    if (t.info) { var i = document.createElement('span'); i.className = 'uc-i'; i.title = t.info; i.setAttribute('aria-label', t.info); i.appendChild(document.createTextNode('\u24d8')); row.appendChild(i); }
+    if (t.extra) { t.extra(row); }
+    st.className = 'uc-st'; st.id = t.id + 'St'; row.appendChild(st);
+    t.row = row; t.st = st; t.cb = cb;
+    secBody.appendChild(row);
   }
-  var api = { run: run, scan: scan, init: init, addToggle: addToggle,
+  function refresh() {
+    var i, t, r, on = 0, pend = 0;
+    for (i = 0; i < toggles.length; i++) {
+      t = toggles[i]; if (!t.st) { continue; }
+      r = !t.cb.checked ? { txt: 'desligado', cls: 'off' } : (t.status && editor ? t.status() : null);
+      if (t.cb.checked && r && r.cls === 'ok') { on++; } else if (t.cb.checked && r && r.cls === 'wait') { pend++; }
+      t.st.innerHTML = ''; if (r && r.txt) { t.st.appendChild(document.createTextNode(r.txt)); }
+      t.st.className = 'uc-st' + (r && r.cls ? ' uc-st-' + r.cls : '');
+    }
+    if (window.UFCalc && UFCalc.setBadge) { UFCalc.setBadge('auto', on ? on + ' ativo' + (on > 1 ? 's' : '') : (pend ? 'aguardando' : ''), on ? 'ok' : ''); }
+  }
+  function volStatus() {
+    var p = scan(), n = 0, ie = 0, c = p.cand, i, cv = 0, ci = 0;
+    for (i = 0; i < p.length; i++) { if (p[i].kind === 'vol') { n++; } else { ie++; } }
+    for (i = 0; i < c.length; i++) { if (c[i] === 'vol') { cv++; } else { ci++; } }
+    if (!n && !ie) {
+      if (cv || ci) { return { txt: 'há campo de ' + (cv ? 'volume' : 'índice esplênico') + ', mas sem as 3 medidas (ou com medidas de mais de uma estrutura)', cls: 'warn' }; }
+      return { txt: 'sem linha correspondente no laudo', cls: 'none' };
+    }
+    return { txt: (n ? n + ' volume' + (n > 1 ? 's' : '') : '') + (n && ie ? ' · ' : '') + (ie ? 'índice esplênico' : '') + ' no laudo', cls: 'ok' };
+  }
+  var api = { run: run, scan: scan, init: init, addToggle: addToggle, refresh: refresh,
     _h: { lines: lines, isNumFld: isNumFld, fldVal: fldVal, nextText: nextText, hasCls: hasCls }, setEnabled: function (on) { enabled = !!on; if (enabled) { run(); } }, isEnabled: function () { return enabled; } };
   window.UFCalcVol = api;
   if (window.UFCalc) {
     UFCalc.register({ id: 'auto', title: 'Cálculo no laudo', build: function (b) {
-      var lab = document.createElement('label'), cb = document.createElement('input'), p = document.createElement('div');
-      cb.type = 'checkbox'; cb.checked = true; cb.id = 'ucAuto';
-      cb.onchange = function () { api.setEnabled(cb.checked); };
-      lab.className = 'uc-chk'; lab.appendChild(cb); lab.appendChild(document.createTextNode(' Volume e índice esplênico'));
-      p.className = 'uc-note'; p.appendChild(document.createTextNode('Volume = L × AP × T × 0,523 (mm → cm³). Índice esplênico = C × L × E (cm). PFE: Hadlock 1985 (4 parâmetros). IG composta: Hadlock 1984. IG pelo PFE: inverso de Hadlock 1991. RCP: p5 de Ebbing 2007. Só onde o texto já tem o campo.'));
-      b.appendChild(lab); b.appendChild(p); secBody = b;
+      secBody = b;
+      var mine = { id: 'ucAuto', label: 'Volume e índice esplênico', checked: true, fn: function (v) { api.setEnabled(v); },
+        info: 'Volume = L × AP × T × 0,523 (medidas em mm → cm³). Índice esplênico = C × L × E (cm). Só preenche o campo que já existe no texto.', status: volStatus };
+      toggles.unshift(mine);
       for (var i = 0; i < toggles.length; i++) { drawToggle(toggles[i]); }
+      refresh();
+      if (UFCalc.onEditorChange) { UFCalc.onEditorChange(refresh); }
+      if (UFCalc.onIgChange) { UFCalc.onIgChange(function () { setTimeout(refresh, 0); }); }
     } });
   }
 })();

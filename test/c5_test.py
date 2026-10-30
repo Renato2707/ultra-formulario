@@ -35,8 +35,8 @@ PERFIL HEMODINÂMICO FETAL:
 - Relação: IP umbilical / IP cerebral média = * (V.R.: < 1).
 '''
 EBB = {21: 0.90, 22: 0.98, 23: 1.07, 24: 1.16, 25: 1.24, 26: 1.32, 27: 1.40, 28: 1.47, 29: 1.53, 30: 1.58, 31: 1.62, 32: 1.64, 33: 1.65, 34: 1.63, 35: 1.60, 36: 1.55, 37: 1.48, 38: 1.40, 39: 1.29}
-def f2(x):
-    c = int(math.floor(x * 100 + 0.5)); return '%d,%02d' % (c // 100, c % 100)
+def f2(x):   # C6c: até 2 casas, sem zeros finais
+    c = int(math.floor(x * 100 + 0.5)); s = '%d,%02d' % (c // 100, c % 100); s = s.rstrip('0'); return s[:-1] if s.endswith(',') else s
 def p5(d):
     if d is None or d < 147 or d > 273: return None
     w, r = d // 7, d % 7
@@ -106,7 +106,7 @@ with sync_playwright() as p:
     ck('volta acima do p5: trecho some', '(abaixo' not in L(pg, RCP) and '= %s (p5' % f2(r) in L(pg, RCP), L(pg, RCP))
     # faixa de IG
     setig(pg, 20, 6); ck('20s6d: p5 e semanas em branco, sem classificação', '(p5 para ___ semanas: ___)' in L(pg, RCP) and '(abaixo' not in L(pg, RCP), L(pg, RCP))
-    setig(pg, 21, 0); ck('21s0d: p5 0,90', '(p5 para 21 semanas: 0,90)' in L(pg, RCP), L(pg, RCP))
+    setig(pg, 21, 0); ck('21s0d: p5 0,9 (C6c: sem zero final)', '(p5 para 21 semanas: 0,9)' in L(pg, RCP), L(pg, RCP))
     setig(pg, 39, 0); ck('39s0d: p5 1,29', '(p5 para 39 semanas: 1,29)' in L(pg, RCP), L(pg, RCP))
     setig(pg, 39, 1); ck('39s1d: nada', '(p5 para ___ semanas: ___)' in L(pg, RCP), L(pg, RCP))
     setig(pg, 32, 4); ck('32s4d: p5 interpolado %s' % f2(p5(228)), '(p5 para 32 semanas: %s)' % f2(p5(228)) in L(pg, RCP), L(pg, RCP))
@@ -144,7 +144,7 @@ with sync_playwright() as p:
     pg.close()
     # modelo sem linha de RCP (como o banco real)
     pg = fresh(b, 1); typ(pg, ipix(pg, 0), '0,9'); typ(pg, ipix(pg, 1), '1,8')
-    ck('sem linha de RCP: só a relação (0,50)', L(pg, REL) == '- Relação: IP umbilical / IP cerebral média = 0,50 (V.R.: < 1).' and pg.locator('#editor .uc-dop').count() == 0, L(pg, REL))
+    ck('sem linha de RCP: só a relação (0,5; C6c sem zero final)', L(pg, REL) == '- Relação: IP umbilical / IP cerebral média = 0,5 (V.R.: < 1).' and pg.locator('#editor .uc-dop').count() == 0, L(pg, REL))
     ck('sem erros no console', not ERR, ERR)
     b.close()
 print('%d/%d passed' % (sum(R), len(R))); sys.exit(0 if all(R) else 1)

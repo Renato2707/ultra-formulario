@@ -30,7 +30,8 @@ def pfe(b, h, a, f):   # Hadlock 1985 (BPD, HC, AC, FL), mm -> g (independente d
     b, h, a, f = b / 10.0, h / 10.0, a / 10.0, f / 10.0
     return int(math.floor(10 ** (1.3596 - 0.00386 * a * f + 0.0064 * h + 0.00061 * b * a + 0.0424 * a + 0.174 * f) + 0.5))
 def vol(l, ap, t): return int(math.floor(l * ap * t * 0.523 / 1000 + 0.5))
-def f2(x): c = int(math.floor(x * 100 + 0.5)); return '%d,%02d' % (c // 100, c % 100)
+def f2(x):   # C6c: até 2 casas, sem zeros finais
+    c = int(math.floor(x * 100 + 0.5)); s = '%d,%02d' % (c // 100, c % 100); s = s.rstrip('0'); return s[:-1] if s.endswith(',') else s
 R = []
 def ck(n, c, i=''):
     R.append(bool(c)); print(('PASS ' if c else 'FAIL ') + n + ('' if c else '  -> ' + str(i)[:300])); sys.stdout.flush()

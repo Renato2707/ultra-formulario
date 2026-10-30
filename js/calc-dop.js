@@ -15,7 +15,8 @@
     if (r === 0) { return P5[w]; }
     return P5[w] + (P5[w + 1] - P5[w]) * r / 7;
   }
-  function f2(x) { var c = Math.round(x * 100), s = String(Math.floor(c / 100)) + ',' + (c % 100 < 10 ? '0' : '') + (c % 100); return s; }
+  /* C6c: até 2 casas, sem zeros inúteis à direita (0,50 -> 0,5; 1,00 -> 1) */
+  function f2(x) { var c = Math.round(x * 100), d = c % 100, s = String(Math.floor(c / 100)); if (d) { s += ',' + (d < 10 ? '0' : '') + d; s = s.replace(/0$/, ''); } return s; }
 
   function lineText(t) { var s = '', i; for (i = 0; i < t.length; i++) { s += t[i].s != null ? t[i].s : '#'; } return s; }
   function flds(t) { var o = [], i; for (i = 0; i < t.length; i++) { if (t[i].f && H.isNumFld(t[i].f)) { o.push(t[i].f); } } return o; }
@@ -26,6 +27,7 @@
       if (/^\s*$/.test(s)) { v = null; continue; }
       if (/cerebroplacent|\bRCP\b/i.test(c) && fs.length) { outs.push({ k: 'rcp', f: fs[0], w: /p5 para\s*#\s*semanas\s*:\s*#/i.test(s) && fs.length >= 3 ? fs[1] : null, p: fs.length >= 3 ? fs[2] : null }); continue; }
       if (/IP\s+umbilical\s*\/\s*IP\s+cerebral\s+m[ée]dia/i.test(c) && fs.length) { outs.push({ k: 'rel', f: fs[0] }); continue; }
+      if (/IP\s+cerebral\s+m[ée]dia\s*\/\s*IP\s+umbilical/i.test(c) && /^rela[çc][ãa]o\s*:/i.test(c) && fs.length) { outs.push({ k: 'inv', f: fs[0] }); continue; }   /* C6c: linha invertida */
       if (!fs.length && /^art[ée]ria\s+umbilical\b/i.test(c)) { v = 'ua'; continue; }
       if (!fs.length && /^art[ée]ria\s+cerebral\s+m[ée]dia\b/i.test(c)) { v = 'acm'; continue; }
       if (!fs.length) { if (/^(art[ée]ria|ducto|veia|fluxo|perfil)/i.test(c)) { v = null; } continue; }
@@ -73,6 +75,7 @@
       for (i = 0; i < sc.outs.length; i++) {
         o = sc.outs[i];
         if (o.k === 'rel') { if (put(o.f, ok ? f2(a / m) : null, 'rel:' + key)) { changed = true; } continue; }
+        if (o.k === 'inv') { if (put(o.f, ok ? f2(m / a) : null, 'inv:' + key)) { changed = true; } continue; }
         rcp = ok ? f2(m / a) : null;
         if (put(o.f, rcp, 'rcp:' + key)) { changed = true; }
         lim = ok ? p5(d) : null; txt = null;
@@ -114,6 +117,44 @@
     if (window.UFCalc && UFCalc.onIgChange) { UFCalc.onIgChange(function () { run(); }); }
     run();
   }
-  window.UFCalcDop = { init: init, run: run, scan: scan, p5: p5, f2: f2, P5: P5, set: function (v) { on.dop = !!v; run(); } };
-  if (window.UFCalcVol) { UFCalcVol.addToggle('ucDop', 'Doppler: IP umbilical/cerebral média e RCP', true, function (v) { on.dop = !!v; run(); }); }
+  /* C6c: trocar a ordem da linha "Relação" no próprio texto (AU/ACM <-> ACM/AU); o V.R. inverte junto (< 1 <-> > 1) */
+  var SW = [[/IP umbilical \/ IP cerebral m[ée]dia/, 'IP cerebral média / IP umbilical'], [/IP cerebral m[ée]dia \/ IP umbilical/, 'IP umbilical / IP cerebral média']];
+  function lineOf(f) { var n = f; while (n && n !== editor && !(n.nodeType === 1 && /^(DIV|P|LI)$/.test(n.nodeName))) { n = n.parentNode; } return n; }
+  function orient(want) {   /* want: 'rel' (AU/ACM) ou 'inv' (ACM/AU) */
+    if (!editor) { return 0; }
+    var sc = scan(), i, o, ln, w, tn, done = 0;
+    for (i = 0; i < sc.outs.length; i++) {
+      o = sc.outs[i]; if ((o.k !== 'rel' && o.k !== 'inv') || o.k === want) { continue; }
+      ln = lineOf(o.f); if (!ln) { continue; }
+      w = document.createTreeWalker ? document.createTreeWalker(ln, 4, null, false) : null; if (!w) { continue; }
+      while ((tn = w.nextNode())) {
+        if (tn.parentNode && H.hasCls(tn.parentNode, 'fld')) { continue; }
+        var v = tn.nodeValue, nv = v.replace(SW[o.k === 'rel' ? 0 : 1][0], SW[o.k === 'rel' ? 0 : 1][1]);
+        nv = o.k === 'rel' ? nv.replace(/\(V\.R\.:\s*<\s*1\)/, '(V.R.: > 1)') : nv.replace(/\(V\.R\.:\s*>\s*1\)/, '(V.R.: < 1)');
+        if (nv !== v) { tn.nodeValue = nv; }
+      }
+      o.f.removeAttribute('data-man'); done++;
+    }
+    run();
+    return done;
+  }
+  function status() {
+    if (!H) { return null; }
+    var sc = scan(), a = sc.ua ? H.fldVal(sc.ua) : null, m = sc.acm ? H.fldVal(sc.acm) : null, n = sc.outs.length;
+    var os = document.getElementById('ucDopOrd'), q; if (os) { os.value = 'rel'; for (q = 0; q < sc.outs.length; q++) { if (sc.outs[q].k === 'inv') { os.value = 'inv'; } } }
+    var vals = a && m ? 'AU/ACM = ' + f2(a / m) + ' · ACM/AU (RCP) = ' + f2(m / a) : '';
+    if (!n) { return { txt: vals ? vals + ' (sem linha de relação no laudo)' : 'sem linha correspondente no laudo', cls: vals ? 'warn' : 'none' }; }
+    return vals ? { txt: vals, cls: 'ok' } : { txt: 'preencha o IP umbilical e o IP cerebral média', cls: 'wait' };
+  }
+  function extra(row) {
+    var lab = document.createElement('label'), sel = document.createElement('select'), k, O = [['rel', 'AU/ACM (umbilical / cerebral média)'], ['inv', 'ACM/AU (cerebral média / umbilical)']];
+    lab.className = 'uc-sub'; lab.appendChild(document.createTextNode('Ordem na linha "Relação": '));
+    for (k = 0; k < O.length; k++) { var op = document.createElement('option'); op.value = O[k][0]; op.appendChild(document.createTextNode(O[k][1])); sel.appendChild(op); }
+    sel.id = 'ucDopOrd'; sel.className = 'uc-selsm';
+    sel.onchange = function () { orient(sel.value); };
+    lab.appendChild(sel); row.appendChild(lab);
+  }
+  window.UFCalcDop = { init: init, run: run, scan: scan, p5: p5, f2: f2, P5: P5, orient: orient, set: function (v) { on.dop = !!v; run(); } };
+  if (window.UFCalcVol) { UFCalcVol.addToggle('ucDop', 'Doppler: relação umbilical/cerebral média e RCP', true, function (v) { on.dop = !!v; run(); },
+    'Relação = IP da artéria umbilical ÷ IP da cerebral média (ou o inverso, se a linha estiver invertida). RCP = IP cerebral média ÷ IP umbilical, com p5 de Ebbing 2007 (interpolado por dia) quando houver IG relatada. Até 2 casas decimais, sem zeros finais.', status, extra); }
 })();

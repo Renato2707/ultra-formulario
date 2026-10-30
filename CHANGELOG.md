@@ -11,6 +11,29 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6c] Painel em cartões, avisos de "sem linha", Doppler, opção dentro de opção, listas, TI-RADS pelo texto — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Painel de calculadoras em cartões recolhíveis. O cabeçalho é um botão com seta e um selo de estado ("2 ativos"). O aberto/fechado de cada cartão fica guardado neste navegador.
+- "Cálculo no laudo": cada cálculo é uma linha com liga/desliga, um ⓘ (fórmula e fonte só no tooltip) e um estado curto:
+  - "linha encontrada no laudo";
+  - "sem linha correspondente no laudo";
+  - "preencha a IG relatada";
+  - "desligado".
+  O texto longo de fórmulas saiu do painel.
+- Volume: a fórmula não mudou. Com o banco real, funciona onde há uma linha de 3 medidas e a linha de volume (ex.: útero). Na tireoide (dois lobos + istmo) não calcula, de propósito: a soma dos lobos não foi aprovada e o caso é ambíguo; o painel agora avisa. Índice esplênico: a frase do banco não tem as medidas, e o painel avisa.
+- IG pelo PFE: vem desligada e o banco não tem a frase. O painel diz isso.
+- Doppler:
+  - rótulo "Doppler: relação umbilical/cerebral média e RCP";
+  - o painel mostra AU/ACM e ACM/AU ao vivo;
+  - um seletor inverte a ordem na própria linha "Relação" ("IP cerebral média / IP umbilical", V.R. "> 1") e o valor acompanha;
+  - números com até 2 casas, sem zeros finais (0,5; 1; 1,05).
+- Editor (`js/ui.js`):
+  - opção com campos dentro: o foco vai ao primeiro campo interno (lista aberta), e Enter/Tab seguem em ordem;
+  - escolher com o mouse deixa aberta a lista do próximo campo (antes o mesmo clique a fechava);
+  - com um campo de opção destacado, Seta para baixo ou Enter abrem a lista;
+  - a opção sob o mouse ou o teclado tem destaque forte (azul com texto branco).
+- TI-RADS pelo texto: as 5 opções da frase "Observa-se nódulo ..." viram os mesmos pontos ACR da C6, e o número entra em "TI-RADS ___" (1 a 5). "Tipo cauda de cometa" conta 0 ponto e "irregulares" conta 2, como "lobuladas". Valor digitado à mão é respeitado.
+- Testes: test/c6c_test.py, 34/34 (2/34 na C6b). As expectativas da c5/c6b passaram ao novo formato sem zeros finais.
+
 ## [etapa-C6b] Correção: editar um campo já preenchido — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Bug relatado: ao editar um valor já preenchido (ex.: DBP), o campo virava texto comum e o cálculo (PFE etc.) sumia. O bug já existia antes da etapa C (D3c cb2856d): vem do editor (Chromium/Edge), não dos módulos de cálculo. Os cálculos só deixavam o efeito visível.
 - Causas:

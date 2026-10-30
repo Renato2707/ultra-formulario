@@ -206,9 +206,21 @@
   window.UFCalcBio = { init: init, run: run, scan: scan, pfe: pfe, igComp: igComp, igPeso: igPeso, semDias: semDias, phi: phi, pctMeasure: pctMeasure, pctPfe: pctPfe, MEAN: MEAN,
     set: function (k, v) { setter(k)(v); }, get: function (k) { return on[k]; } };
   if (window.UFCalcVol) {
-    UFCalcVol.addToggle('ucPfe', 'Peso fetal estimado (PFE)', true, setter('pfe'));
-    UFCalcVol.addToggle('ucIgc', 'IG pela biometria composta', true, setter('ig'));
-    UFCalcVol.addToggle('ucIgp', 'IG pelo PFE', false, setter('igp'));
-    UFCalcVol.addToggle('ucPct', 'Percentis Hadlock (pela IG relatada)', true, setter('pct'));
+    var NONE = { txt: 'sem linha correspondente no laudo', cls: 'none' };
+    function st(kind) {
+      return function () {
+        if (!H) { return null; }
+        var sc = scan(), n = 0, i;
+        if (kind === 'pfe') { for (i = 0; i < sc.blocks.length; i++) { if (sc.blocks[i].pfe) { n++; } } }
+        else if (kind === 'pct') { n = sc.blocks.length; if (n && (!window.UFCalc || UFCalc.getIgRelatada() === null)) { return { txt: 'preencha a IG relatada', cls: 'wait' }; } }
+        else { for (i = 0; i < sc.outs.length; i++) { if (sc.outs[i].kind === kind) { n++; } } }
+        if (!n) { return kind === 'igp' ? { txt: 'sem linha correspondente no laudo (o modelo não tem a frase "Idade gestacional estimada pelo peso fetal: ___ semanas")', cls: 'none' } : NONE; }
+        return { txt: n > 1 ? n + ' linhas no laudo' : 'linha encontrada no laudo', cls: 'ok' };
+      };
+    }
+    UFCalcVol.addToggle('ucPfe', 'Peso fetal estimado (PFE)', true, setter('pfe'), 'Hadlock 1985, 4 parâmetros (DBP, CC, CA, CF).', st('pfe'));
+    UFCalcVol.addToggle('ucIgc', 'IG pela biometria composta', true, setter('ig'), 'Hadlock 1984.', st('ig'));
+    UFCalcVol.addToggle('ucIgp', 'IG pelo PFE', false, setter('igp'), 'Inverso de Hadlock 1991 (peso × IG).', st('igp'));
+    UFCalcVol.addToggle('ucPct', 'Percentis Hadlock (pela IG relatada)', true, setter('pct'), 'Hadlock 1984 (DBP, CC, CA, CF) e Hadlock 1991 (peso).', st('pct'));
   }
 })();

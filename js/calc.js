@@ -150,10 +150,40 @@ var UFCalc = (function () {
   }
 
   /* ---------- painel ---------- */
+  /* C6c: cada calculadora é um cartão recolhível (acordeão); o estado aberto/fechado fica neste navegador */
+  var FOLD_KEY = 'ufCalcFold', fold = {}, cards = {};
+  try { fold = JSON.parse(window.localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { fold = {}; }
+  function saveFold() { try { window.localStorage.setItem(FOLD_KEY, JSON.stringify(fold)); } catch (e) { /* sem armazenamento */ } }
+  function setOpen(id, open) {
+    var c = cards[id]; if (!c) { return; }
+    c.sec.className = 'uc-sec uc-card' + (open ? ' open' : '');
+    c.b.style.display = open ? '' : 'none'; c.h.setAttribute('aria-expanded', open ? 'true' : 'false');
+    c.chev.innerHTML = open ? '\u25be' : '\u25b8';
+  }
   function addSection(m) {
-    var sec = el('section', 'uc-sec'), h = el('div', 'uc-h', m.title), b = el('div', 'uc-b');
+    var sec = el('section', 'uc-sec uc-card'), h = el('button', 'uc-h'), chev = el('span', 'uc-chev'), t = el('span', 'uc-t', m.title), badge = el('span', 'uc-badge'), b = el('div', 'uc-b');
+    h.type = 'button'; b.id = 'ucB-' + m.id; h.setAttribute('aria-controls', b.id);
+    h.appendChild(chev); h.appendChild(t); h.appendChild(badge);
     sec.setAttribute('data-calc', m.id); sec.appendChild(h); sec.appendChild(b); root.appendChild(sec);
+    cards[m.id] = { sec: sec, h: h, b: b, chev: chev, badge: badge };
+    on(h, 'mousedown', noFocusSteal);
+    on(h, 'click', function () { var o = !/(^|\s)open(\s|$)/.test(sec.className); fold[m.id] = o ? 1 : 0; saveFold(); setOpen(m.id, o); });
+    setOpen(m.id, fold[m.id] == null ? m.open !== false : !!fold[m.id]);
     m.build(b, api);
+  }
+  function setBadge(id, txt, cls) {
+    var c = cards[id]; if (!c) { return; }
+    c.badge.innerHTML = ''; if (txt) { c.badge.appendChild(document.createTextNode(txt)); }
+    c.badge.className = 'uc-badge' + (cls ? ' ' + cls : '');
+  }
+  /* mudanças no laudo (digitação, escolha de opção, modelo carregado): avisa os módulos, agrupado */
+  var edSubs = [], edTimer = null;
+  function fireEd() { edTimer = null; for (var i = 0; i < edSubs.length; i++) { try { edSubs[i](); } catch (e) { if (window.console) { window.console.error(e); } } } }
+  function edChanged() { if (!edTimer) { edTimer = setTimeout(fireEd, 60); } }
+  function watchEditor() {
+    var ed = $('editor'); if (!ed) { return; }
+    on(ed, 'input', edChanged);
+    if (window.MutationObserver) { new window.MutationObserver(edChanged).observe(ed, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-v'] }); }
   }
   function register(m) {
     if (!m || !m.id || typeof m.build !== 'function') { return false; }
@@ -170,6 +200,7 @@ var UFCalc = (function () {
     if (!body) { return; }
     body.innerHTML = ''; root = el('div', 'uc-root'); body.appendChild(root); built = true;
     for (i = 0; i < mods.length; i++) { addSection(mods[i]); }
+    watchEditor();
     /* botão discreto na barra: abre/fecha o mesmo painel lateral (mesma lógica e preferência do botão do painel) */
     ref = $('btnClear');
     if (ref && !$('btnCalc')) {
@@ -190,6 +221,8 @@ var UFCalc = (function () {
     getIgRelatada: function () { return igDays; },
     onIgChange: function (fn) { if (typeof fn === 'function') { igSubs.push(fn); } return function () { for (var i = 0; i < igSubs.length; i++) { if (igSubs[i] === fn) { igSubs.splice(i, 1); return; } } }; },
     setIgRelatada: function (w, d) { if (api._igSet) { api._igSet(w, d); } },
+    setBadge: setBadge, setOpen: setOpen,
+    onEditorChange: function (fn) { if (typeof fn === 'function') { edSubs.push(fn); } },
     format: fmt, parseNum: parseNum, _calc: null
   };
   register({ id: 'livre', title: 'Calculadora', build: function (b) { api._calc = buildCalc(b); } });

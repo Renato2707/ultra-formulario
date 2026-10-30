@@ -141,7 +141,8 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .preview .t{font-weight:bold}
 .popup{position:absolute;z-index:120;background:#fff;color:#111;border:1px solid #bdbdbd;border-radius:5px;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:520px;max-height:50vh;overflow-y:auto}
 .popup .opt{padding:7px 12px;cursor:pointer;font-size:14px;border-bottom:1px solid #eee;white-space:pre-wrap}
-.popup .opt:hover,.popup .opt.kbd{background:#eef2f7}
+.popup .opt:hover,.popup .opt.kbd{background:#1f5fbf;color:#fff}
+.popup .opt:hover b,.popup .opt.kbd b{color:#fff}
 #toast{position:fixed;right:12px;bottom:8px;z-index:200;font-size:12px;color:#6b6b6b;color:var(--muted);background:transparent;pointer-events:none;opacity:0;transition:opacity .2s}
 #toast.show{opacity:1}
 
@@ -278,7 +279,7 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .theme-dark .chk-item.done{opacity:.6}
 .theme-dark .popup{background:#2b2b2b;color:#e8e8e8;border-color:#5a5a5a;box-shadow:0 4px 16px rgba(0,0,0,.6)}
 .theme-dark .popup .opt{border-bottom-color:#383838}
-.theme-dark .popup .opt:hover,.theme-dark .popup .opt.kbd{background:#3a3f47}
+.theme-dark .popup .opt:hover,.theme-dark .popup .opt.kbd{background:#3b7ddd;color:#fff}
 .theme-dark .phtip{background:#2b2b2b;color:#e8e8e8;border-color:#5a5a5a;box-shadow:0 2px 8px rgba(0,0,0,.5)}
 .theme-dark .phtip .dirl,.theme-dark .pcard .raw .dirl{color:#8f8f8f}
 .theme-dark .pcard .pins{color:#b5b5b5}
@@ -354,9 +355,31 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .theme-dark #modalFoot{border-top-color:#3c3c3c}
 /* ===== C1 painel de calculadoras (js/calc.js) ===== */
 #right .rbody{overflow-y:auto;padding:6px 8px}
-.uc-sec{border-bottom:1px solid #d9d9d9;border-bottom:1px solid var(--line);padding:6px 0 10px}
-.uc-sec:last-child{border-bottom:0}
-.uc-h{font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;color:#6b6b6b;color:var(--muted);margin:0 0 6px}
+/* C6c: cartões recolhíveis */
+.uc-root{padding:2px 0}
+.uc-sec{border:1px solid #d9d9d9;border:1px solid var(--line);border-radius:8px;margin:0 0 8px;background:#fff;background:var(--panel);overflow:hidden}
+.uc-h{display:flex;align-items:center;width:100%;box-sizing:border-box;padding:8px 10px;margin:0;border:0;background:none;color:inherit;font:inherit;font-size:13px;font-weight:bold;text-align:left;cursor:pointer}
+.uc-h:hover{background:#f0f0f0;background:var(--hover)}
+.uc-h:focus{outline:2px solid #5a6f8f;outline:2px solid var(--accent);outline-offset:-2px}
+.uc-chev{width:14px;flex:0 0 auto;color:#6b6b6b;color:var(--muted)}
+.uc-t{flex:1 1 auto}
+.uc-badge{flex:0 0 auto;font-size:11px;font-weight:normal;color:#6b6b6b;color:var(--muted)}
+.uc-badge.ok{color:#2e7d32}
+.uc-b{padding:2px 10px 10px}
+.uc-row{padding:5px 0;border-top:1px solid #eee;border-top:1px solid var(--line)}
+.uc-row:first-child{border-top:0}
+.uc-row .uc-chk{display:inline}
+.uc-i{display:inline-block;margin-left:6px;font-size:13px;color:#6b6b6b;color:var(--muted);cursor:help}
+.uc-st{font-size:11px;margin:2px 0 0 20px;color:#6b6b6b;color:var(--muted)}
+.uc-st:empty{display:none}
+.uc-st-ok{color:#2e7d32}
+.uc-st-warn,.uc-st-wait{color:#a15c00}
+.uc-st-none,.uc-st-off{color:#8a8a8a;font-style:italic}
+.uc-sub{display:block;font-size:12px;margin:3px 0 0 20px;color:#6b6b6b;color:var(--muted)}
+.uc-selsm{font:inherit;font-size:12px;max-width:100%;background:#fff;background:var(--panel);color:inherit;border:1px solid #c8c8c8;border:1px solid var(--line2);border-radius:4px}
+.theme-dark .uc-st-ok,.theme-dark .uc-badge.ok{color:#7bc47f}
+.theme-dark .uc-st-warn,.theme-dark .uc-st-wait{color:#e0a85a}
+.theme-dark .uc-row{border-top-color:#383838}
 .uc-calc{outline:0;border:1px solid #d9d9d9;border:1px solid var(--line);border-radius:6px;padding:6px}
 .uc-calc:focus{border-color:#5a6f8f;border-color:var(--accent)}
 .uc-expr{font-size:12px;min-height:15px;text-align:right;color:#6b6b6b;color:var(--muted);white-space:nowrap;overflow:hidden}

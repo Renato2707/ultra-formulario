@@ -745,7 +745,16 @@ var UFMain = function () {
     closePopup();
     if (opt === undefined) { return; }
     var nested = UltraParser.fieldsOf(opt).length > 0;
-    if (nested || opt.indexOf('\n') >= 0) { replaceNodeWithHtml(chip, inlineHtml(opt)); }
+    if (nested || opt.indexOf('\n') >= 0) {
+      /* C6c: option with fields inside: the next field must be the FIRST inner one, so restart the search
+         from where the chosen chip was (replaceNodeWithHtml leaves the caret after the inserted text) */
+      var npar = chip.parentNode, nprev = chip.previousSibling;
+      replaceNodeWithHtml(chip, inlineHtml(opt));
+      var nr = document.createRange();
+      if (nprev && nprev.parentNode === npar) { nr.setStartAfter(nprev); } else { nr.setStart(npar, 0); }
+      nr.collapse(true); setRange(nr); saveRange();
+      if (nprev && nprev.nodeType === 3 && nprev.parentNode === npar) { nr = document.createRange(); nr.setStart(nprev, 0); nr.collapse(true); setRange(nr); saveRange(); }
+    }
     else {
       var oldHtml = chip.outerHTML, prevSib = chip.previousSibling, par = chip.parentNode;
       replaceNodeWithHtml(chip, '<span class="fld f-sel f-ok" contenteditable="false" data-t="s" data-v="' + i + '" data-o="' +
@@ -760,7 +769,8 @@ var UFMain = function () {
   }
   on($('popup'), 'mousedown', function (e) {
     var o = closest(e.target, function (n) { return hasCls(n, 'opt'); });
-    if (o) { e.preventDefault(); chooseOption(parseInt(o.getAttribute('data-i'), 10)); }
+    /* C6c: stop here, or the document mousedown sees the (now detached) option and closes the NEXT field's list */
+    if (o) { e.preventDefault(); if (e.stopPropagation) { e.stopPropagation(); } chooseOption(parseInt(o.getAttribute('data-i'), 10)); }
   });
 
   /* ================= output (copy / generate) ================= */
@@ -2555,6 +2565,16 @@ var UFMain = function () {
       var ev; try { ev = new Event('input', { bubbles: true }); } catch (x) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); }
       editor.dispatchEvent(ev);
     }
+  });
+  /* C6c: a highlighted (selected) choice chip opens with ArrowDown, Alt+ArrowDown or Enter instead of moving the caret */
+  on(editor, 'keydown', function (e) {
+    var k = e.keyCode; if (!$('popup').hidden || e.ctrlKey || e.metaKey || e.shiftKey || (k !== 40 && k !== 13)) { return; }
+    var sel = window.getSelection(), r = sel.rangeCount ? sel.getRangeAt(0) : null, c;
+    if (!r || r.collapsed) { return; }
+    c = r.startContainer.nodeType === 1 ? r.startContainer.childNodes[r.startOffset] : null;
+    if (!c || c.nodeType !== 1 || !hasCls(c, 'fld') || c.getAttribute('data-t') !== 's' || r.endContainer !== r.startContainer || r.endOffset !== r.startOffset + 1) { return; }
+    e.preventDefault(); if (e.stopPropagation) { e.stopPropagation(); }
+    openSelect(c);
   });
   /* caret as plain text right after a chip: typing must not merge into the field value */
   var chipExit = null;
