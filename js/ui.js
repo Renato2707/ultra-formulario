@@ -2455,6 +2455,12 @@ var UFMain = function () {
       }
     }, 0);
   });
+  /* C6b: double click on a filled field selects its whole value (the browser's word selection stops at "," / ".") */
+  on(editor, 'dblclick', function (e) {
+    var f = closest(e.target, function (n) { return hasCls(n, 'fld'); }, editor);
+    if (!isTxtFld(f) || !fieldFilled(f)) { return; }
+    var r = document.createRange(); r.selectNodeContents(f); setRange(r); saveRange();
+  });
   on(editor, 'input', function () { afterChange(false); });
   on(editor, 'blur', saveRange);
   on(document, 'selectionchange', function () { if (document.activeElement === editor) { saveRange(); } });
@@ -2484,6 +2490,71 @@ var UFMain = function () {
       }
     }
     if (S.repMarks.length) { clearRepMarks(); }
+  });
+  /* C6b: Chromium/Edge delete the field <span> when its whole text is replaced or erased (the value then turns into
+     plain text and is no longer a field). Before the browser edits: a selection that is exactly a field's whole text is
+     moved INSIDE the span (typing then replaces the value and keeps the field); erasing the last character(s) writes the
+     placeholder back with insertText instead (native undo keeps working). */
+  function isTxtFld(n) { return n && n.nodeType === 1 && hasCls(n, 'fld') && n.getAttribute('data-t') !== 's' && editor.contains(n); }
+  /* field touched by range r: {f, pos} with pos 'in' (inside), 'before' or 'after' (caret right next to it) */
+  function fieldAt(r) {
+    var c = r.startContainer, o = r.startOffset, f = closest(c, function (n) { return hasCls(n, 'fld'); }, editor);
+    if (f) { return isTxtFld(f) ? { f: f, pos: 'in' } : null; }
+    var nx = c.nodeType === 3 ? (o === c.nodeValue.length ? c.nextSibling : null) : c.childNodes[o];
+    var pv = c.nodeType === 3 ? (o === 0 ? c.previousSibling : null) : c.childNodes[o - 1];
+    if (isTxtFld(nx)) { return { f: nx, pos: 'before' }; }
+    if (isTxtFld(pv)) { return { f: pv, pos: 'after' }; }
+    return null;
+  }
+  function wholeField(r) {
+    if (!r) { return null; }
+    var a = fieldAt(r), l, i, hit = null;
+    if (!a && !r.collapsed) {   /* selection dragged from outside: the one field it touches */
+      l = qsa(editor, '.fld');
+      for (i = 0; i < l.length; i++) { if (r.intersectsNode(l[i])) { if (hit) { return null; } hit = l[i]; } }
+      if (isTxtFld(hit)) { a = { f: hit, pos: 'in' }; }
+    }
+    if (!a) { return null; }
+    var t = a.f.textContent || '';
+    if (t === '') { return null; }
+    if (r.collapsed) { return t.length === 1 ? { f: a.f, one: true, pos: a.pos } : null; }
+    return r.toString().replace(/^\s+|\s+$/g, '') === t && r.intersectsNode(a.f) ? { f: a.f, one: false } : null;   /* blanks dragged in at the edges are kept */
+  }
+  function fieldInner(f) { var r = document.createRange(); r.selectNodeContents(f); setRange(r); return r; }
+  on(editor, 'keydown', function (e) {
+    var k = e.keyCode; if ((k !== 8 && k !== 46) || e.ctrlKey || e.metaKey || e.altKey) { return; }
+    var sel = window.getSelection(), r = sel.rangeCount ? sel.getRangeAt(0) : null, w = wholeField(r);
+    if (!w) { return; }
+    if (w.one) {   /* collapsed caret: only when this key would erase the single remaining character */
+      var c = r.startContainer, o = r.startOffset;
+      var atEnd = w.pos === 'after' || (w.pos === 'in' && (c.nodeType === 3 ? o === c.nodeValue.length : o >= c.childNodes.length));
+      var atStart = w.pos === 'before' || (w.pos === 'in' && o === 0);
+      if (!((k === 8 && atEnd) || (k === 46 && atStart))) { return; }
+    }
+    e.preventDefault();
+    var ph = w.f.getAttribute('data-ph') || '___';
+    fieldInner(w.f);
+    if (!exec('insertText', ph)) { w.f.textContent = ph; }
+    if (editor.contains(w.f)) { fieldInner(w.f); }
+    saveRange(); afterChange(false);
+  });
+  on(editor, 'keypress', function (e) {
+    var ch = e.charCode || e.which; if (!ch || ch < 32 || e.ctrlKey || e.metaKey) { return; }
+    var sel = window.getSelection(), r = sel.rangeCount ? sel.getRangeAt(0) : null, w = r && !r.collapsed ? wholeField(r) : null;
+    if (w) { fieldInner(w.f); }   /* the browser then replaces the value inside the span */
+    /* caret on the outer edge of a filled numeric field (a click at its first/last digit puts it outside the span):
+       a digit or decimal sign goes into the field, never as loose text next to it */
+    var a = r && r.collapsed ? fieldAt(r) : null, t = a ? a.f.getAttribute('data-t') : '';
+    if (a && a.pos !== 'in' && (t === 'n' || t === 'd') && fieldFilled(a.f) && /[0-9.,]/.test(String.fromCharCode(ch))) {
+      /* direct text edit: the browser would move a caret at the span's edge back outside it */
+      e.preventDefault();
+      var tn = a.f.firstChild; if (!tn || tn.nodeType !== 3) { tn = document.createTextNode(''); a.f.insertBefore(tn, a.f.firstChild); }
+      if (a.pos === 'before') { tn = a.f.firstChild; tn.insertData(0, String.fromCharCode(ch)); }
+      else { tn = a.f.lastChild.nodeType === 3 ? a.f.lastChild : a.f.appendChild(document.createTextNode('')); tn.appendData(String.fromCharCode(ch)); }
+      var ir = document.createRange(); ir.setStart(tn, a.pos === 'before' ? 1 : tn.nodeValue.length); ir.collapse(true); setRange(ir); saveRange();
+      var ev; try { ev = new Event('input', { bubbles: true }); } catch (x) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); }
+      editor.dispatchEvent(ev);
+    }
   });
   /* caret as plain text right after a chip: typing must not merge into the field value */
   var chipExit = null;
@@ -2515,6 +2586,7 @@ var UFMain = function () {
     else if (window.clipboardData) { t = window.clipboardData.getData('Text'); }
     if (t === null || t === undefined) { return; }
     e.preventDefault();
+    var pw = window.getSelection().rangeCount ? wholeField(window.getSelection().getRangeAt(0)) : null; if (pw && !pw.one) { fieldInner(pw.f); }
     if (!exec('insertText', t)) {
       var sel = window.getSelection(); if (!sel.rangeCount) { return; }
       var r = sel.getRangeAt(0); r.deleteContents(); var tn = document.createTextNode(t); r.insertNode(tn);

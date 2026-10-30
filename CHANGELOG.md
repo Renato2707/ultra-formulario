@@ -11,6 +11,19 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6b] Correção: editar um campo já preenchido — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Bug relatado: ao editar um valor já preenchido (ex.: DBP), o campo virava texto comum e o cálculo (PFE etc.) sumia. O bug já existia antes da etapa C (D3c cb2856d): vem do editor (Chromium/Edge), não dos módulos de cálculo. Os cálculos só deixavam o efeito visível.
+- Causas:
+  - ao trocar ou apagar todo o texto do campo, o navegador remove o `<span class="fld">`;
+  - o duplo clique só seleciona até a vírgula ou o ponto;
+  - com o cursor na borda do campo (clique no primeiro ou no último dígito), o que se digita fica fora do campo.
+- Correção, só em `js/ui.js` (editor):
+  - duplo clique num campo preenchido seleciona o valor inteiro;
+  - uma seleção que cobre o valor inteiro (também arrastando a partir de fora do campo) passa a ficar dentro do campo antes de digitar ou colar;
+  - apagar o último caractere com Backspace ou Delete devolve o placeholder ao campo, e ele fica selecionado;
+  - um dígito ou "," "." digitado na borda de um campo numérico preenchido entra no campo.
+- Teste automático: test/c6b_test.py, 61 verificações. Na C6 (38e7ed4) passam 30/61, na D3c 24/61, e com a correção 61/61.
+
 ## [etapa-C6] Calculadora ACR TI-RADS (tireoide) — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Novo `js/calc-tirads.js` (`UFTirads`), com a seção "TI-RADS (ACR 2017)" no painel e o botão "Adicionar nódulo". Cada nódulo tem seu próprio painel, que pode ser recolhido ou removido. Os nódulos ficam só na sessão.
 - Fonte dos pontos, níveis e cortes: Tessler et al., ACR TI-RADS White Paper, JACR 2017;14:587-595. O texto de saída copia o protótipo do Dr. Renato (xlsx): 6 linhas "Rótulo: valor".
