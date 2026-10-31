@@ -11,6 +11,15 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6f] Gravação na pasta de dados mais robusta — entregue, testado só em Chromium automatizado (pasta simulada), NÃO testado pelo usuário
+- Corrige o aviso recorrente "Não foi possível gravar na pasta de dados (pendrive removido?)". Causa: uma única falha passageira na gravação (arquivo preso por antivírus/OneDrive, outra aba gravando, oscilação do pendrive) já desligava o espelhamento.
+- Gravação que falha é repetida sozinha 3 vezes (espera de 0,5 s, 1,5 s e 4 s) antes de virar erro. Pendrive removido (NotFoundError) não é repetido e vai direto para erro; permissão retirada (NotAllowedError) vai para "desconectada".
+- Em erro, o app tenta religar sozinho a cada 15 s (sem clique, se a permissão continuar concedida). Ao voltar grava o que ficou pendente; se dados.json/configuracoes.json da pasta forem mais novos que a última gravação deste computador, os da pasta valem (lidos, não sobrescritos).
+- Rascunhos: no pendrive no máximo 1 gravação a cada 5 s por rascunho, e sempre uma ao fechar/sair da aba. No navegador continua como antes.
+- Aviso e Configurações mostram o nome técnico do erro em letra pequena, ex.: "(NotFoundError)".
+- Duas abas não gravam a pasta ao mesmo tempo (navigator.locks quando existe; sem ele, as repetições cobrem a colisão). IE11/navegador sem pasta: nada muda.
+- Testes: `test/c6f_test.py` (27 verificações; na versão 790078c a primeira falha passageira já leva a erro e o teste para no item 4). `test/fakefs.js` ganhou falhas simuladas (fakefs.flaky) e contagem de gravações.
+
 ## [etapa-C6e] Painel limpo, laudo colado com campos, TI-RADS unificado — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Layout:
   - botões de formatação (N I S, alinhamento, desfazer/refazer) numa barra própria logo acima do laudo;

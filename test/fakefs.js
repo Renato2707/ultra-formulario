@@ -24,8 +24,10 @@
     return Promise.resolve(new File([f.t],this.name,{lastModified:f.m})); };
   FH.prototype.createWritable=function(){ var self=this, buf=null;
     if(off()) return Promise.reject(err('NotFoundError'));
+    /* C6f: fakefs.flaky = N next writes fail with fakefs.flakyname (default NoModificationAllowedError) */
+    var fl=+(LS.getItem('fakefs.flaky')||0); if(fl>0){ LS.setItem('fakefs.flaky',String(fl-1)); window.__flakyHits=(window.__flakyHits||0)+1; return Promise.reject(err(LS.getItem('fakefs.flakyname')||'NoModificationAllowedError')); }
     return Promise.resolve({ write:function(d){ return (typeof d==='string'?Promise.resolve(d):d.text()).then(function(t){buf=t;}); },
-      close:function(){ var dl=+(LS.getItem("fakefs.delay")||0); if(dl){ return new Promise(function(ok){setTimeout(ok,dl);}).then(function(){ var f=files(); f[self.path]={t:buf,m:Date.now()}; save(f); }); } if(off()) return Promise.reject(err('NotFoundError')); var f=files(); f[self.path]={t:buf,m:Date.now()}; save(f); return Promise.resolve(); } }); };
+      close:function(){ var dl=+(LS.getItem("fakefs.delay")||0); if(dl){ return new Promise(function(ok){setTimeout(ok,dl);}).then(function(){ var f=files(); f[self.path]={t:buf,m:Date.now()}; save(f); }); } if(off()) return Promise.reject(err('NotFoundError')); var f=files(); f[self.path]={t:buf,m:Date.now()}; save(f); var wc=JSON.parse(LS.getItem('fakefs.wc')||'{}'); wc[self.path]=(wc[self.path]||0)+1; LS.setItem('fakefs.wc',JSON.stringify(wc)); return Promise.resolve(); } }); };
   window.__fakeRoot=function(){ return new Dir('/','PENDRIVE-TESTE'); };
   /* fake IndexedDB just for the handle */
   Object.defineProperty(window,'indexedDB',{configurable:true,value:{ open:function(){ var req={}; setTimeout(function(){

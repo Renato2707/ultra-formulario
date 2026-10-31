@@ -18,7 +18,9 @@ var UFolder = (function () {
   var available = false;
   try { available = typeof window.showDirectoryPicker === 'function' && !!window.indexedDB && typeof window.Promise === 'function'; } catch (e0) { available = false; }
   var dir = null, state = available ? 'browser' : 'unavailable', listeners = [], pending = {}, timer = null, chain = null, decoder = null, lastErr = '';
-  var touched = {}, lateFns = [];   /* D3: keys written by the app while the folder was still being read (slow pendrive) */
+  var touched = {}, lateFns = [];
+  /* C6f: retries, automatic reconnection, fewer draft writes, one writer between tabs */
+  var RETRY = [500, 1500, 4000], RECON_MS = 15000, DRAFT_MS = 5000, recTimer = null, fails = 0, draftLast = {}, draftTimer = {}, leaving = false, LOCK = 'ultra-formulario-pasta';   /* D3: keys written by the app while the folder was still being read (slow pendrive) */
 
   function setState(s, msg) { state = s; if (msg) { lastErr = msg; } for (var i = 0; i < listeners.length; i++) { try { listeners[i](s); } catch (e) {} } }
   function mode() { return UStore.get('storeMode', null) || 'auto'; }   /* 'folder' | 'browser' | 'auto' (unknown: look for a saved folder) */
@@ -28,7 +30,15 @@ var UFolder = (function () {
     function read(enc, next) { var fr = new FileReader(); fr.onload = function () { next(fr.result); }; fr.readAsText(file, enc); }
     read('UTF-8', function (t) { if (t.indexOf('\ufffd') >= 0) { read('windows-1252', cb); } else { cb(t); } });
   }
-  function q(fn) { chain = (chain || Promise.resolve()).then(fn, fn); return chain; }  /* serialize folder writes */
+  function locked(fn) {   /* C6f: other tabs wait (navigator.locks); without it the retries below cover the collision */
+    try { if (navigator.locks && navigator.locks.request) { return navigator.locks.request(LOCK, function () { return fn(); }); } } catch (e) {}
+    return fn();
+  }
+  function q(fn) { var g = function () { return locked(fn); }; chain = (chain || Promise.resolve()).then(g, g); return chain; }  /* serialize folder writes */
+  function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+  function ename(e) { return String(e && (e.name || e.message) || e); }
+  /* pendrive removed / permission gone: retrying does not help */
+  function persistent(e) { var n = e && e.name; return n === 'NotFoundError' || n === 'NotAllowedError' || n === 'SecurityError' || n === 'TypeMismatchError'; }
 
   /* ---------- IndexedDB: remember the folder handle ---------- */
   function idb(fn) {
@@ -66,12 +76,23 @@ var UFolder = (function () {
   function writeFile(path, data) {
     return q(function () {
       if (!dir) { return null; }
-      var p = split(path), d = p[0] ? sub(p[0], true) : Promise.resolve(dir), fh;
-      return d.then(function (h) { return h.getFileHandle(p[1], { create: true }); })
-        .then(function (h) { fh = h; return h.createWritable(); })
-        .then(function (w) { return w.write(data).then(function () { return w.close(); }); })
-        .then(function () { return fh.getFile(); })
-        ['catch'](function (e) { fail(e); return null; });
+      var p = split(path);
+      function once() {
+        var d = p[0] ? sub(p[0], true) : Promise.resolve(dir), fh, wr = null;
+        return d.then(function (h) { return h.getFileHandle(p[1], { create: true }); })
+          .then(function (h) { fh = h; return h.createWritable(); })
+          .then(function (w) { wr = w; return w.write(data).then(function () { wr = null; return w.close(); }); })
+          .then(function () { return fh.getFile(); })
+          .then(function (f) { noteMod(path, f); return f; }, function (e) { if (wr && wr.abort) { try { wr.abort()['catch'](function () {}); } catch (x) {} } throw e; });
+      }
+      function attempt(n) {
+        return once()['catch'](function (e) {
+          /* C6f: antivirus / OneDrive lock, file busy, IO hiccup: try again a few times before giving up */
+          if (persistent(e) || n >= RETRY.length || !dir) { throw e; }
+          return wait(RETRY[n]).then(function () { return attempt(n + 1); });
+        });
+      }
+      return attempt(0)['catch'](function (e) { fail(e, path); return null; });
     });
   }
   function removeFile(path) {
@@ -100,9 +121,45 @@ var UFolder = (function () {
       return f.text().then(function (t) { try { return JSON.parse(t); } catch (e) { return null; } });
     });
   }
-  function fail(e) {
-    var m = String(e && (e.name || e.message) || e);
-    if (state === 'folder') { setState('error', m); }
+  function noteMod(path, f) { if (f && (path === CONF || path === DATA)) { var m = UStore.get('folderMods', {}) || {}; m[path] = f.lastModified; UStore.set('folderMods', m, true); } }
+  function fail(e, path) {
+    var m = ename(e); fails++;
+    if (path) { UStore.set('folderDirty', 1, true); }   /* what did not reach the folder is sent when it comes back */
+    if (state === 'folder' || (state === 'error' && m !== lastErr)) { setState(e && e.name === 'NotAllowedError' ? 'needperm' : 'error', m); }
+    if (state === 'error') { autoRecon(); }
+  }
+  /* C6f: while in 'error', every RECON_MS try again by itself (no click) if the permission is still granted */
+  function autoRecon() {
+    if (recTimer || !dir) { return; }
+    recTimer = setTimeout(function () { recTimer = null; if (state === 'error') { recover().then(null, function () { if (state === 'error') { autoRecon(); } }); } }, RECON_MS);
+  }
+  function newerInFolder() {   /* another computer wrote configuracoes.json / dados.json after our last write? */
+    var m = UStore.get('folderMods', {}) || {}, ps = [CONF, DATA];
+    return Promise.all(ps.map(function (p2) { return getFile(p2); })).then(function (fs) {
+      for (var i = 0; i < fs.length; i++) { if (fs[i] && m[ps[i]] && fs[i].lastModified > m[ps[i]]) { return true; } }
+      return false;
+    });
+  }
+  function recover() {
+    if (!dir) { return Promise.reject(new Error('nenhuma pasta')); }
+    var qp = dir.queryPermission ? dir.queryPermission({ mode: 'readwrite' }) : Promise.resolve('granted');
+    return qp.then(function (p) {
+      if (p !== 'granted') { setState('needperm'); return null; }
+      var f0 = fails;
+      return sub(DRAFTS, true).then(function () { return newerInFolder(); }).then(function (newer) {
+        var how;
+        /* folder newer: its data wins (read it; only this tab's drafts are written); otherwise send what was pending */
+        if (newer) { how = importAll().then(function (h) { return Promise.all([getFile(CONF), getFile(DATA)]).then(function (fs) { noteMod(CONF, fs[0]); noteMod(DATA, fs[1]); return exportDrafts(); }).then(function () { return h === 'same' ? 'same' : 'imported'; }); }); }
+        else { for (var df in draftTimer) { if (draftTimer.hasOwnProperty(df)) { clearTimeout(draftTimer[df].id); } } draftTimer = {}; how = exportAll(true).then(function () { return 'exported'; }); }
+        return how;
+      }).then(function (how) {
+        if (fails !== f0) { throw new Error('ainda falha'); }
+        if (state !== 'error') { return how; }
+        UStore.remove('folderDirty', true); pending = {}; setState('folder');
+        if (how === 'imported') { for (var i = 0; i < lateFns.length; i++) { try { lateFns[i](how); } catch (e) {} } }
+        return how;
+      });
+    });
   }
   function json(v) { return JSON.stringify(v, null, 2); }
   function dataObj() { var o = {}, i; for (i = 0; i < DATA_KEYS.length; i++) { o[DATA_KEYS[i]] = UStore.get(DATA_KEYS[i], null); } return o; }
@@ -118,8 +175,38 @@ var UFolder = (function () {
     var f = mirrorKey(key); if (!f) { return; }
     if (state === 'loading') { touched[key] = 1; pending[f] = key; if (key.indexOf('draft.') !== 0) { UStore.set('folderDirty', 1, true); } return; }   /* written after the late read finishes */
     if (state !== 'folder') { if (dir && key.indexOf('draft.') !== 0) { UStore.set('folderDirty', 1, true); } return; }
+    if (key.indexOf('draft.') === 0) { draftWrite(f, key); return; }
     pending[f] = key; if (!timer) { timer = setTimeout(flush, 400); }
   });
+  /* C6f: a draft goes to the folder at most once every DRAFT_MS (the browser copy is still immediate) */
+  function draftWrite(f, key) {
+    var t = new Date().getTime(), last = draftLast[f] || 0;
+    if (leaving) { if (draftTimer[f]) { clearTimeout(draftTimer[f].id); delete draftTimer[f]; } draftLast[f] = t; pending[f] = key; if (timer) { clearTimeout(timer); timer = null; } flush(); return; }   /* the tab is closing: write now */
+    if (t - last >= DRAFT_MS && !draftTimer[f]) { draftLast[f] = t; pending[f] = key; if (!timer) { timer = setTimeout(flush, 400); } return; }
+    if (!draftTimer[f]) {
+      draftTimer[f] = { key: key, id: setTimeout(function () { var k2 = draftTimer[f].key; delete draftTimer[f]; if (state === 'folder') { draftLast[f] = new Date().getTime(); pending[f] = k2; flush(); } }, Math.max(0, last + DRAFT_MS - t)) };
+    } else { draftTimer[f].key = key; }
+  }
+  function flushAllDrafts() {   /* closing / leaving the tab: the waiting drafts are written now */
+    var f;
+    for (f in draftTimer) { if (draftTimer.hasOwnProperty(f)) { clearTimeout(draftTimer[f].id); pending[f] = draftTimer[f].key; draftLast[f] = new Date().getTime(); } }
+    draftTimer = {};
+    if (state !== 'folder' && state !== 'error') { return Promise.resolve(); }
+    if (timer) { clearTimeout(timer); timer = null; }
+    return flush();
+  }
+  function exportDrafts() {
+    var ks = UStore.keys(), ws = [], i;
+    for (i = 0; i < ks.length; i++) { if (ks[i].indexOf('draft.') === 0) { ws.push(writeFile(DRAFTS + '/' + ks[i].slice(6) + '.json', json(UStore.get(ks[i], null)))); } }
+    return Promise.all(ws);
+  }
+  function onLeave() { leaving = true; if (state === 'folder') { flushAllDrafts(); } }
+  if (window.addEventListener) {
+    window.addEventListener('pagehide', onLeave, false);
+    window.addEventListener('beforeunload', onLeave, false);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { onLeave(); } else { leaving = false; } }, false);
+    window.addEventListener('pageshow', function () { leaving = false; }, false);
+  }
   function flush() {
     timer = null;
     var f, all = [], k;
@@ -283,7 +370,8 @@ var UFolder = (function () {
     available: available, boot: boot, choose: choose, reconnect: reconnect, useBrowser: useBrowser, useHandle: useHandle,
     saveBank: saveBank, writeBankText: function (t) { return state === 'folder' ? writeBankText(t) : Promise.resolve(null); },
     checkBank: checkBank, acceptBank: acceptBank, clearDrafts: clearDrafts, flush: flush, exportAll: exportAll,
-    status: function () { return state; }, folderName: function () { return dir && dir.name || ''; }, lastError: function () { return lastErr; },
+    status: function () { return state; }, recover: recover, flushDrafts: flushAllDrafts,
+    _timing: function (retry, recon, draft) { if (retry) { RETRY = retry; } if (recon) { RECON_MS = recon; } if (draft !== undefined && draft !== null) { DRAFT_MS = draft; } },   /* tests only */ folderName: function () { return dir && dir.name || ''; }, lastError: function () { return lastErr; },
     onStatus: function (fn) { listeners.push(fn); }, onLate: function (fn) { lateFns.push(fn); }, setDecoder: function (fn) { decoder = fn; }
   };
 })();

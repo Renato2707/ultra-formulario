@@ -1844,7 +1844,7 @@ var UFMain = function () {
     if (st === 'folder') { return 'Pasta de dados: <b>' + nm + '</b> (conectada). Banco, configurações e rascunhos são gravados nela.'; }
     if (st === 'loading') { return 'Pasta de dados: <b>' + nm + '</b> — lendo a pasta (pendrive lento?). O app usa a cópia do navegador e atualiza a tela quando terminar.'; }
     if (st === 'needperm') { return 'Pasta de dados: <b>' + nm + '</b> — desconectada (o navegador pede permissão de novo). Clique em Reconectar.'; }
-    if (st === 'error') { return 'Pasta de dados: <b>' + nm + '</b> — não foi possível gravar (pendrive removido?). Clique em Reconectar.'; }
+    if (st === 'error') { return 'Pasta de dados: <b>' + nm + '</b> — não foi possível gravar (pendrive removido?). O app tenta de novo sozinho; ou clique em Reconectar.' + (UFolder.lastError() ? ' <small class="fbar-err">(' + esc(UFolder.lastError()) + ')</small>' : ''); }
     if (st === 'unavailable') { return 'Só o navegador deste computador. Este navegador não grava em pasta (use Chrome ou Edge); para levar os dados use Exportar / Importar.'; }
     return 'Só o navegador deste computador. Para guardar no pendrive: Escolher pasta (ou Exportar / Importar).';
   }
@@ -1914,8 +1914,8 @@ var UFMain = function () {
   }
   /* small bar: folder disconnected / bank edited outside the app (no dialogs) */
   var barAction = null;
-  function showBar(msg, label, fn) {
-    var b = $('fbar'); $('fbarMsg').innerHTML = esc(msg); $('fbarBtn').innerHTML = esc(label); barAction = fn; b.hidden = false;
+  function showBar(msg, label, fn, detail) {
+    var b = $('fbar'); $('fbarMsg').innerHTML = esc(msg) + (detail ? ' <small class="fbar-err">(' + esc(detail) + ')</small>' : ''); $('fbarBtn').innerHTML = esc(label); barAction = fn; b.hidden = false;
   }
   function hideBar() { $('fbar').hidden = true; barAction = null; }
   on($('fbarBtn'), 'click', function () { if (barAction) { barAction(); } });
@@ -1931,8 +1931,8 @@ var UFMain = function () {
   }
   UFolder.onLate(refreshFromStore);
   function folderStatus(st) {
-    if (st === 'needperm') { showBar('Pasta de dados desconectada.', 'Reconectar', reconnectFolder); }
-    else if (st === 'error') { showBar('Não foi possível gravar na pasta de dados (pendrive removido?).', 'Reconectar', reconnectFolder); }
+    if (st === 'needperm') { showBar('Pasta de dados desconectada.', 'Reconectar', reconnectFolder, UFolder.lastError()); }
+    else if (st === 'error') { showBar('Não foi possível gravar na pasta de dados (pendrive removido?). Tentando de novo sozinho.', 'Reconectar', reconnectFolder, UFolder.lastError()); }
     else if (st === 'folder' && barAction === reconnectFolder) { hideBar(); }
     if (!$('modalBack').hidden && $('stMode')) { $('stMode').innerHTML = storageText(); }
   }

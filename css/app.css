@@ -440,3 +440,4 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .tr-ins[disabled]{opacity:.5;cursor:default}
 .uc-trl{color:inherit}
 #navCount:empty{display:none}
+.fbar-err{font-size:11px;opacity:.75;font-family:monospace}
