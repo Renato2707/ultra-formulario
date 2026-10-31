@@ -181,6 +181,13 @@ Na escolha múltipla a lista abre com caixinhas: clique (ou Espaço, ou o
 número) para marcar/desmarcar; Enter ou "Pronto" confirma e vai ao próximo
 campo; Tab confirma e segue; Esc cancela; clicar fora também confirma.
 O laudo recebe "a", "a e b" ou "a, b e c" (na ordem do banco).
+O começo igual das opções marcadas (palavras inteiras) é escrito uma vez só,
+e uma palavra repetida logo depois (ex.: "tipo") fica só no primeiro item:
+  "com focos tipo cauda de cometa" + "com focos tipo macrocalcificações"
+  + "com focos puntiformes"
+  -> "com focos tipo cauda de cometa, macrocalcificações e puntiformes"
+  "dor leve" + "dor forte" -> "dor leve e forte"
+Uma opção marcada sozinha sai inteira.
 Sem nada marcado, o campo volta a "escolher".
 Uma opção que começa com "sem" (ex.: "sem focos") desmarca as outras,
 e marcar outra desmarca o "sem".

@@ -118,7 +118,7 @@ with sync_playwright() as p:
     ck('formulário: TR5 · 8 pts', pg.inner_text('.tr-res').strip() == 'TR5 · 8 pts', pg.inner_text('.tr-res'))
     pg.click('#trIns'); pg.wait_for_timeout(300)
     l = L(pg, 'Observa-se')
-    ck('formulário escreve os 2 focos na lista múltipla', 'com focos hiperecogênicos tipo macrocalcificações e com focos hiperecogênicos puntiformes.' in l and 'Pontuação: 8' in rep(pg), l)
+    ck('formulário escreve os 2 focos na lista múltipla', 'com focos hiperecogênicos tipo macrocalcificações e puntiformes.' in l and 'Pontuação: 8' in rep(pg), l)
     ck('sem erros de console', not ERR, ERR[:3])
     b.close()
 print('%d/%d' % (sum(R), len(R)))

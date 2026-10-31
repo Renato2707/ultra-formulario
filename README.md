@@ -40,4 +40,4 @@ do `LEIA-ME-frases.txt` são genéricos.
 - `docs/ESTADO-DO-PROJETO.md`: etapas e pendências.
 
 ## Escolha múltipla
-No banco, `?+[a|b|c]` permite marcar várias opções (o laudo recebe "a, b e c"); `?[a|b|c]` continua escolha única. Detalhes em `LEIA-ME-frases.txt`.
+No banco, `?+[a|b|c]` permite marcar várias opções (o laudo recebe "a, b e c", com o começo comum das opções escrito uma vez só: "dor leve e forte"); `?[a|b|c]` continua escolha única. Detalhes em `LEIA-ME-frases.txt`.

@@ -716,9 +716,33 @@ var UltraParser = (function () {
   }
 
   /* fields of an arbitrary text (used for nested dropdown options) */
+  /* C6i: text of the ticked options of ?+[ ] (in bank order): the common beginning (whole words) is written once,
+     then only what differs; a word shared by consecutive remainders ("tipo") stays only in the first of them.
+     ["com focos tipo a", "com focos tipo b", "com focos c"] -> "com focos tipo a, b e c" */
+  function joinMulti(list) {
+    var W = [], i, j, p, items = [], it, out;
+    if (!list || !list.length) { return ''; }
+    if (list.length === 1) { return list[0]; }
+    for (i = 0; i < list.length; i++) { W.push(String(list[i]).replace(/^\s+|\s+$/g, '').split(/\s+/)); }
+    for (p = 0; ; p++) {
+      var w = W[0][p], same = w !== undefined;
+      for (i = 1; i < W.length && same; i++) { if (W[i][p] !== w) { same = false; } }
+      if (!same) { break; }
+    }
+    for (i = 0; i < W.length; i++) { if (W[i].length <= p) { p = Math.min(p, W[i].length - 1); } }   /* never an empty remainder */
+    if (p < 0) { p = 0; }
+    var prev = null;
+    for (i = 0; i < W.length; i++) {
+      it = W[i].slice(p);
+      if (p > 0 && prev !== null && it.length > 1 && it[0] === prev) { j = it.slice(1); } else { j = it; }
+      prev = it[0]; items.push(j.join(' '));
+    }
+    out = items.length < 2 ? items[0] : items.slice(0, -1).join(', ') + ' e ' + items[items.length - 1];
+    return (p ? W[0].slice(0, p).join(' ') + ' ' : '') + out;
+  }
   function fieldsOf(text) { return scanFields(String(text || ''), 1, [], null); }
 
-  return { parse: parse, parsePlacement: parsePlacement, parseTitle: parseTitle, fold: fold, words: words, stripSides: stripSides, wordsEqualPlural: wordsEqualPlural, fieldsOf: fieldsOf, getSectionPhrases: getSectionPhrases,
+  return { parse: parse, parsePlacement: parsePlacement, parseTitle: parseTitle, fold: fold, words: words, stripSides: stripSides, wordsEqualPlural: wordsEqualPlural, fieldsOf: fieldsOf, joinMulti: joinMulti, getSectionPhrases: getSectionPhrases,
            ISSUE_TYPES: ISSUE_TYPES, GLOBAL_EXAM: GLOBAL_EXAM };
 })();
 

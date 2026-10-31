@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6i] Escolha múltipla: começo comum escrito uma vez — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Antes: "com focos hiperecogênicos tipo cauda de cometa, com focos hiperecogênicos tipo macrocalcificações, ...". Agora: "com focos hiperecogênicos tipo cauda de cometa, macrocalcificações, calcificações periféricas e puntiformes".
+- Regra: o maior começo comum (palavras inteiras) de todas as marcadas sai uma vez; nos restos, uma palavra igual no início de itens seguidos ("tipo") fica só no primeiro; nenhum item fica vazio (opção igual ao começo sai inteira: "dor e dor forte"); uma só marcada sai inteira. Ordem do banco.
+- Vale para o campo no laudo, o cartão TI-RADS e o laudo colado. Laudo colado reconhece o texto novo e o antigo da C6h (o antigo é reescrito no formato novo); o TI-RADS soma os focos reconhecidos.
+- Testes: `test/c6i_test.py` (34 verificações); `test/c6h_test.py` atualizado para o texto novo.
+
 ## [etapa-C6h] Escolha múltipla ?+[ ] — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Nova sintaxe no banco: `?+[a|b|c]`. A lista abre com caixinhas (clique, Espaço ou número marcam; Enter/"Pronto" confirma e vai ao próximo campo; Tab confirma e segue; Esc cancela; clicar fora confirma).
 - Texto no laudo: "a", "a e b", "a, b e c" (ordem do banco); nada marcado = volta a "escolher". Reabrir mostra as marcadas.

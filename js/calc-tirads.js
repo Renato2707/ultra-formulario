@@ -219,7 +219,7 @@
     var o = JSON.stringify(opts).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'), t = [], i;
     if (!mv.length) { return '<span class="fld f-sel f-multi" contenteditable="false" data-t="s" data-m="1" data-o="' + o + '">escolher</span>'; }
     for (i = 0; i < mv.length; i++) { t.push(opts[mv[i]]); }
-    t = t.length < 2 ? t[0] : t.slice(0, -1).join(', ') + ' e ' + t[t.length - 1];
+    t = UltraParser.joinMulti(t);   /* C6i: começo comum uma vez só */
     return '<span class="fld f-sel f-multi f-ok" contenteditable="false" data-t="s" data-m="1" data-v="' + mv.join(',') + '" data-o="' + o + '" title="Clique para trocar (várias opções)">' + esc(t) + '</span>';
   }
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }

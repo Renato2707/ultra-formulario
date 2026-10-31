@@ -730,7 +730,7 @@ var UFMain = function () {
   function multiChipHtml(oj, sel, opts, keep) {   /* keep: the pasted order (otherwise the bank order) */
     var t = [], i; sel = keep ? sel.slice(0) : sel.slice(0).sort(function (a, b) { return a - b; }); for (i = 0; i < sel.length; i++) { t.push(opts[sel[i]]); }
     if (!sel.length) { return '<span class="fld f-sel f-multi" contenteditable="false" data-t="s" data-m="1" data-o="' + esc(oj) + '">' + PH.s + '</span>'; }
-    return '<span class="fld f-sel f-multi f-ok" contenteditable="false" data-t="s" data-m="1" data-v="' + sel.join(',') + '" data-o="' + esc(oj) + '" title="Clique para trocar (várias opções)">' + esc(joinList(t)) + '</span>';
+    return '<span class="fld f-sel f-multi f-ok" contenteditable="false" data-t="s" data-m="1" data-v="' + sel.join(',') + '" data-o="' + esc(oj) + '" title="Clique para trocar (várias opções)">' + esc(UltraParser.joinMulti(t)) + '</span>';   /* C6i: common beginning written once */
   }
   function multiPaint() {
     var l = qsa($('popup'), '.opt[data-i]'), i, k;
@@ -2699,8 +2699,12 @@ var UFMain = function () {
         for (k = 0; k < f.options.length; k++) { alts.push(depth < 3 ? rgCompile(f.options[k], false, depth + 1).src : rgLit(f.options[k])); }
         alts.sort(function (a, b) { return b.length - a.length; });
         if (f.multi) {   /* C6h: "a", "a e b", "a, b e c" */
-          var one = '(?:' + alts.join('|') + ')';
-          add(one + '(?:(?:,\\s*|\\s+e\\s+)' + one + ')*|escolher|_+');
+          /* C6i: later items may be just the end of an option ("... tipo a, b e c"); the exact split is checked in rgMulti */
+          var one = '(?:' + alts.join('|') + ')', tails = [], tw, ti;
+          for (k = 0; k < f.options.length; k++) { tw = String(f.options[k]).split(/\s+/); for (ti = 1; ti < tw.length; ti++) { tails.push(rgLit(tw.slice(ti).join(' '))); } }
+          tails.sort(function (a, b) { return b.length - a.length; });
+          var any = '(?:' + alts.concat(tails).join('|') + ')';
+          add(one + '(?:(?:,\\s*|\\s+e\\s+)' + any + ')*|escolher|_+');
         } else {
           alts.push('escolher'); alts.push('_+');   /* an unchosen choice is printed as ___ */
           add(alts.join('|'));
@@ -2737,7 +2741,19 @@ var UFMain = function () {
     return RG.pats;
   }
   /* C6h: split "a, b e c" into option indices; longest option first, with backtracking (options may contain commas) */
-  function rgMulti(opts, v) {
+  function rgMulti(opts, v) {   /* C6i: new joined text first ("... tipo a e b", bank order), then the C6h text (every option whole) */
+    var nv = rgNorm(v), n = opts.length, best = null, m, i, sel, t;
+    if (n <= 12) {
+      for (m = 1; m < (1 << n) && !best; m++) {
+        sel = []; t = []; for (i = 0; i < n; i++) { if (m & (1 << i)) { sel.push(i); t.push(opts[i]); } }
+        if (sel.length > 1 && rgNorm(UltraParser.joinMulti(t)) === nv) { best = sel; }
+      }
+      if (best) { return best; }
+    }
+    return rgMultiOld(opts, v);
+  }
+  function rgNorm(t) { return String(t).replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '').replace(/[\u00d7X]/g, 'x').replace(/\u00b3/g, '3').replace(/\u00b2/g, '2').toLowerCase(); }
+  function rgMultiOld(opts, v) {
     var ord = [], i;
     for (i = 0; i < opts.length; i++) { ord.push(i); }
     ord.sort(function (a, b) { return opts[b].length - opts[a].length; });
