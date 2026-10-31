@@ -38,3 +38,6 @@ do `LEIA-ME-frases.txt` são genéricos.
 ## Documentos
 - `CHANGELOG.md`: histórico por rodada.
 - `docs/ESTADO-DO-PROJETO.md`: etapas e pendências.
+
+## Escolha múltipla
+No banco, `?+[a|b|c]` permite marcar várias opções (o laudo recebe "a, b e c"); `?[a|b|c]` continua escolha única. Detalhes em `LEIA-ME-frases.txt`.

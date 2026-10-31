@@ -299,7 +299,7 @@ var UFMain = function () {
   var PH = { n: '___', d: '__,_', t: 'texto', s: 'escolher' };
   function chipHtml(f) {
     if (f.type === 'select') {
-      return '<span class="fld f-sel" contenteditable="false" data-t="s" data-o="' + esc(JSON.stringify(f.options)) + '">' + PH.s + '</span>';
+      return '<span class="fld f-sel' + (f.multi ? ' f-multi' : '') + '" contenteditable="false" data-t="s"' + (f.multi ? ' data-m="1"' : '') + ' data-o="' + esc(JSON.stringify(f.options)) + '">' + PH.s + '</span>';
     }
     var t = f.type === 'text' ? 't' : (f.decimal ? 'd' : 'n');
     return '<span class="fld" data-t="' + t + '" data-ph="' + PH[t] + '">' + PH[t] + '</span>';
@@ -722,12 +722,57 @@ var UFMain = function () {
 
   /* dropdown popup for ?[a|b] */
   var popupFor = null, popupIdx = 0;
+  /* ---- C6h: multiple choice ?+[a|b|c]: ticks in the list, result "a, b e c" ---- */
+  var popupSel = null;   /* ticked indices while a multi list is open (null = single list) */
+  function joinList(a) { return a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1]; }
+  function isSem(t) { return /^\s*sem\b/i.test(t); }
+  function multiVals(chip) { var v = chip.getAttribute('data-v'), o = [], i, a; if (v === null || v === '') { return o; } a = v.split(','); for (i = 0; i < a.length; i++) { o.push(parseInt(a[i], 10)); } return o; }
+  function multiChipHtml(oj, sel, opts, keep) {   /* keep: the pasted order (otherwise the bank order) */
+    var t = [], i; sel = keep ? sel.slice(0) : sel.slice(0).sort(function (a, b) { return a - b; }); for (i = 0; i < sel.length; i++) { t.push(opts[sel[i]]); }
+    if (!sel.length) { return '<span class="fld f-sel f-multi" contenteditable="false" data-t="s" data-m="1" data-o="' + esc(oj) + '">' + PH.s + '</span>'; }
+    return '<span class="fld f-sel f-multi f-ok" contenteditable="false" data-t="s" data-m="1" data-v="' + sel.join(',') + '" data-o="' + esc(oj) + '" title="Clique para trocar (várias opções)">' + esc(joinList(t)) + '</span>';
+  }
+  function multiPaint() {
+    var l = qsa($('popup'), '.opt[data-i]'), i, k;
+    for (i = 0; i < l.length; i++) { k = parseInt(l[i].getAttribute('data-i'), 10); if (popupSel.indexOf(k) >= 0) { addCls(l[i], 'on'); } else { rmCls(l[i], 'on'); } l[i].firstChild.innerHTML = popupSel.indexOf(k) >= 0 ? '&#9745;' : '&#9744;'; }
+  }
+  function multiToggle(k) {
+    var opts = JSON.parse(popupFor.getAttribute('data-o')), at = popupSel.indexOf(k), i;
+    if (at >= 0) { popupSel.splice(at, 1); }
+    else {
+      /* "sem ..." contradicts the others: ticking it clears them, ticking another clears it */
+      if (isSem(opts[k])) { popupSel = []; } else { for (i = popupSel.length - 1; i >= 0; i--) { if (isSem(opts[popupSel[i]])) { popupSel.splice(i, 1); } } }
+      popupSel.push(k);
+    }
+    multiPaint();
+  }
+  function multiApply(move, back) {   /* write the ticked options into the report (one undo step) */
+    var chip = popupFor, sel = popupSel; closePopup();
+    if (!chip || !chip.parentNode || !editor.contains(chip)) { return; }
+    var old = multiVals(chip).sort().join(','), nw = sel.slice(0).sort().join(',');
+    if (old !== nw || chip.getAttribute('data-v') === null && sel.length) {
+      var ub = edHtml(), ubt = edText(), par = chip.parentNode, prev = chip.previousSibling;
+      replaceNodeWithHtml(chip, multiChipHtml(chip.getAttribute('data-o'), sel, JSON.parse(chip.getAttribute('data-o'))));
+      afterChange(true);
+      if (window.UFTirads && UFTirads.runTxt) { UFTirads.runTxt(); }
+      S.lastChoice = null; S.lastRemoval = null;
+      S.insStack.push({ before: ub, beforeText: ubt, after: edHtml(), afterText: edText() }); S.insRedo = [];
+      if (S.insStack.length > 30) { S.insStack.shift(); }
+      var nc = prev && prev.parentNode === par ? prev.nextSibling : par.firstChild;
+      if (nc) { chip = nc; }
+    }
+    editor.focus();
+    var r = document.createRange(); r.selectNode(chip); r.collapse(!!back); setRange(r); saveRange();
+    if (move) { nextField(!!back, true); }
+  }
   function openSelect(chip) {
     var opts = [];
     try { opts = JSON.parse(chip.getAttribute('data-o')) || []; } catch (e) { opts = []; }
     var p = $('popup'), html = '', i;
-    for (i = 0; i < opts.length; i++) { html += '<div class="opt" data-i="' + i + '">' + (i < 9 ? '<b>' + (i + 1) + '.</b> ' : '') + esc(opts[i]) + '</div>'; }
-    p.innerHTML = html;
+    popupSel = chip.getAttribute('data-m') === '1' ? multiVals(chip) : null;
+    for (i = 0; i < opts.length; i++) { html += '<div class="opt' + (popupSel ? ' opt-m' : '') + '" data-i="' + i + '">' + (popupSel ? '<span class="ck"></span> ' : '') + (i < 9 ? '<b>' + (i + 1) + '.</b> ' : '') + esc(opts[i]) + '</div>'; }
+    if (popupSel) { html += '<div class="opt opt-ok" data-ok="1">&#10003; Pronto <small>(Enter)</small></div>'; }
+    p.innerHTML = html; if (popupSel) { multiPaint(); }
     var rc = chip.getBoundingClientRect();
     p.style.left = (rc.left + (window.pageXOffset || document.documentElement.scrollLeft)) + 'px';
     p.style.top = (rc.bottom + 2 + (window.pageYOffset || document.documentElement.scrollTop)) + 'px';
@@ -738,7 +783,7 @@ var UFMain = function () {
     var l = qsa($('popup'), '.opt'), i;
     for (i = 0; i < l.length; i++) { if (i === popupIdx) { addCls(l[i], 'kbd'); } else { rmCls(l[i], 'kbd'); } }
   }
-  function closePopup() { $('popup').hidden = true; if (popupFor) { rmCls(popupFor, 'f-cur'); } popupFor = null; }
+  function closePopup() { popupSel = null; $('popup').hidden = true; if (popupFor) { rmCls(popupFor, 'f-cur'); } popupFor = null; }
   function chooseOption(i) {
     var chip = popupFor; if (!chip || !chip.parentNode || !editor.contains(chip)) { closePopup(); return; }
     var opts = JSON.parse(chip.getAttribute('data-o')), opt = opts[i];
@@ -770,6 +815,7 @@ var UFMain = function () {
   on($('popup'), 'mousedown', function (e) {
     var o = closest(e.target, function (n) { return hasCls(n, 'opt'); });
     /* C6c: stop here, or the document mousedown sees the (now detached) option and closes the NEXT field's list */
+    if (o && popupSel) { e.preventDefault(); if (e.stopPropagation) { e.stopPropagation(); } if (o.getAttribute('data-ok')) { multiApply(true); } else { popupIdx = parseInt(o.getAttribute('data-i'), 10); popupKbd(); multiToggle(popupIdx); } return; }
     if (o) { e.preventDefault(); if (e.stopPropagation) { e.stopPropagation(); } chooseOption(parseInt(o.getAttribute('data-i'), 10)); }
   });
 
@@ -1990,6 +2036,7 @@ var UFMain = function () {
     DROPDOWN_NESTED: ['n', '?[ ] dentro de outro ?[ ]. O app aceita: depois de escolher a opção, o ?[ ] de dentro vira um novo campo.'],
     DROPDOWN_EMPTY_OPTION: ['r', 'Opção vazia em ?[ ] (ex.: "a||b").'],
     DROPDOWN_SINGLE: ['r', '?[ ] com uma única opção.'],
+    MULTI_NESTED: ['r', '?+[ ] (escolha múltipla) com campos ou listas dentro das opções: esse conteúdo entra como texto, não vira campo.'],
     STRAY_BRACKET: ['n', '[ ou ] solto no texto. Aparece como texto.']
   };
   var ISSUE_NOISE = { SECTION_RESERVED: 1, LEGACY_BULLET: 1, CRITICAL_LINE: 1, TEMPLATE_TITLE_DIFFERS: 1, STRAY_BRACKET: 1, LEGACY_SLASH: 1, DIRECTIVE_SEPARATOR: 1, EXAMPLE_BLOCK_SKIPPED: 1 };
@@ -2464,7 +2511,7 @@ var UFMain = function () {
     dragId = null; renderNav();
   });
   on(document, 'mousedown', function (e) {
-    if (!$('popup').hidden && !closest(e.target, function (n) { return n.id === 'popup'; })) { closePopup(); }
+    if (!$('popup').hidden && !closest(e.target, function (n) { return n.id === 'popup'; })) { if (popupSel) { multiApply(false); } else { closePopup(); } }   /* C6h: clicking outside keeps the ticks */
   });
 
   /* editor */
@@ -2651,8 +2698,13 @@ var UFMain = function () {
         alts = [];
         for (k = 0; k < f.options.length; k++) { alts.push(depth < 3 ? rgCompile(f.options[k], false, depth + 1).src : rgLit(f.options[k])); }
         alts.sort(function (a, b) { return b.length - a.length; });
-        alts.push('escolher'); alts.push('_+');   /* an unchosen choice is printed as ___ */
-        add(alts.join('|'));
+        if (f.multi) {   /* C6h: "a", "a e b", "a, b e c" */
+          var one = '(?:' + alts.join('|') + ')';
+          add(one + '(?:(?:,\\s*|\\s+e\\s+)' + one + ')*|escolher|_+');
+        } else {
+          alts.push('escolher'); alts.push('_+');   /* an unchosen choice is printed as ___ */
+          add(alts.join('|'));
+        }
       } else if (f.type === 'text') { add('.+?'); }
       else { add('\\d+(?:[.,]\\d+)?|_+(?:,_+)?'); }
       seg.push({ f: f }); pos = f.offset + f.raw.length;
@@ -2674,8 +2726,8 @@ var UFMain = function () {
       ls = String(bodies[i] || '').split('\n');
       for (j = 0; j < ls.length; j++) {
         l = ls[j].replace(/\r$/, '').replace(/^\s*[\u2022\-\u2013]\s*/, '').replace(/^\s+|\s+$/g, '');
-        if (!l || seen[l] || l.indexOf('?[') < 0 && l.indexOf('*') < 0) { continue; }
-        lit = l.replace(/\?\[[^\]]*\]|\*/g, '').replace(/[^A-Za-z\u00c0-\u00ff]/g, '');
+        if (!l || seen[l] || l.indexOf('?[') < 0 && l.indexOf('?+[') < 0 && l.indexOf('*') < 0) { continue; }
+        lit = l.replace(/\?\+?\[[^\]]*\]|\*/g, '').replace(/[^A-Za-z\u00c0-\u00ff]/g, '');
         if (lit.length < 4) { continue; }   /* too little fixed text to be sure */
         try { c = rgCompile(l, true, 0); if (!c.seg.length) { continue; } c.re = new RegExp('^' + c.src + '$', 'i'); c.lit = lit.length; } catch (e) { continue; }
         seen[l] = 1; RG.pats.push(c);
@@ -2684,10 +2736,31 @@ var UFMain = function () {
     RG.pats.sort(function (a, b) { return b.lit - a.lit; });
     return RG.pats;
   }
+  /* C6h: split "a, b e c" into option indices; longest option first, with backtracking (options may contain commas) */
+  function rgMulti(opts, v) {
+    var ord = [], i;
+    for (i = 0; i < opts.length; i++) { ord.push(i); }
+    ord.sort(function (a, b) { return opts[b].length - opts[a].length; });
+    function go(pos, acc) {
+      var k, o, re, m, rest;
+      for (k = 0; k < ord.length; k++) {
+        o = opts[ord[k]]; if (acc.indexOf(ord[k]) >= 0) { continue; }
+        re = new RegExp('^' + rgLit(o), 'i'); m = re.exec(v.substring(pos));
+        if (!m) { continue; }
+        rest = v.substring(pos + m[0].length);
+        if (!rest) { return acc.concat([ord[k]]); }
+        var sep = /^(,\s*|\s+e\s+)/.exec(rest);
+        if (sep) { var r2 = go(pos + m[0].length + sep[0].length, acc.concat([ord[k]])); if (r2) { return r2; } }
+      }
+      return null;
+    }
+    return go(0, []);
+  }
   function rgFieldHtml(f, v) {
     var k, c, m;
     if (f.type === 'select') {
       if (/^(escolher|_+)$/i.test(v)) { return chipHtml(f); }
+      if (f.multi) { var mi = rgMulti(f.options, v); return mi ? multiChipHtml(JSON.stringify(f.options), mi, f.options, true) : esc(v); }
       for (k = 0; k < f.options.length; k++) {
         if (UltraParser.fieldsOf(f.options[k]).length) {
           c = rgCompile(f.options[k], true, 1); m = new RegExp('^' + c.src + '$', 'i').exec(v);
@@ -2979,7 +3052,12 @@ var UFMain = function () {
       return;
     }
     if (!$('popup').hidden) {
-      var n = qsa($('popup'), '.opt').length;
+      var n = qsa($('popup'), '.opt[data-i]').length;
+      if (popupSel) {   /* multi list: Space / number ticks, Enter = done (next field), Tab = done + move, Esc = keep as it was */
+        if (e.keyCode === 32 || (e.keyCode >= 49 && e.keyCode <= 57 && e.keyCode - 49 < n)) { e.preventDefault(); e.stopPropagation(); if (e.keyCode !== 32) { popupIdx = e.keyCode - 49; popupKbd(); } multiToggle(popupIdx); return; }
+        if (e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); multiApply(true); return; }
+        if (e.keyCode === 9) { e.preventDefault(); e.stopPropagation(); multiApply(true, e.shiftKey); return; }
+      }
       if (e.keyCode === 40) { e.preventDefault(); popupIdx = Math.min(n - 1, popupIdx + 1); popupKbd(); return; }
       if (e.keyCode === 38) { e.preventDefault(); popupIdx = Math.max(0, popupIdx - 1); popupKbd(); return; }
       if (e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); chooseOption(popupIdx); return; }
@@ -2988,7 +3066,7 @@ var UFMain = function () {
       if (e.keyCode >= 49 && e.keyCode <= 57 && e.keyCode - 49 < n) { e.preventDefault(); chooseOption(e.keyCode - 49); return; }
       /* while the option list is open, typing must not overwrite the dropdown */
       if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.keyCode === 8 || e.keyCode === 46 || e.keyCode === 32 || e.keyCode >= 48)) {
-        e.preventDefault(); toast('Escolha uma opção (setas + Enter, ou o número). Esc fecha a lista.'); return;
+        e.preventDefault(); toast(popupSel ? 'Marque com Espaço ou o número; Enter confirma. Esc cancela.' : 'Escolha uma opção (setas + Enter, ou o número). Esc fecha a lista.'); return;
       }
     }
     if (!$('modalBack').hidden && e.keyCode === 27) { e.preventDefault(); e.stopPropagation(); closeModal(); }

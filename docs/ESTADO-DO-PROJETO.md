@@ -9,6 +9,7 @@
 | D3 | Correções da revisão completa (abas, importar, backups, desfazer, revisão de críticas, pasta lenta, navegador sem espaço, final de linha, rascunhos) | Entregue, **não testada pelo usuário** |
 | D3b | Editor do banco mantém final de linha só CR | Entregue, **não testada pelo usuário** |
 | D3c | Clique no meio do campo em branco substitui o campo inteiro | Entregue (só Chromium automatizado), **não testada pelo usuário** |
+| C6h | Escolha múltipla `?+[ ]` no banco (TI-RADS soma todos os focos) | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6g | TI-RADS: 6 linhas editáveis/apagáveis, sem o veredito de tamanho | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6f | Pasta de dados: repete gravações que falham, religa sozinha, rascunhos a cada 5 s, uma aba grava por vez | Entregue (só Chromium com pasta simulada), **não testada pelo usuário** |
 | E, F | — | Não definidas nos registros disponíveis |

@@ -441,3 +441,8 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .uc-trl{color:inherit}
 #navCount:empty{display:none}
 .fbar-err{font-size:11px;opacity:.75;font-family:monospace}
+/* C6h: escolha múltipla ?+[ ] */
+#popup .opt-m .ck{display:inline-block;width:16px;font-size:15px;line-height:1}
+#popup .opt-m.on{font-weight:bold}
+#popup .opt-ok{border-top:1px solid #d9d9d9;border-top:1px solid var(--line);text-align:right;color:#1f5fbf;font-weight:bold}
+.fld.f-multi{border-bottom-style:double}

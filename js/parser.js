@@ -53,6 +53,7 @@ var UltraParser = (function () {
     DIRECTIVE_TARGET_MISSING: ['aviso', 'Alvo da diretiva não encontrado no(s) template(s) - a frase vai para o fim da seção/laudo'],
     DROPDOWN_EMPTY_OPTION:    ['aviso', 'Opção vazia em ?[ ]'],
     DROPDOWN_SINGLE:          ['aviso', '?[ ] com uma única opção'],
+    MULTI_NESTED:             ['aviso', '?+[ ] (escolha múltipla) com campos ou listas dentro das opções - esse conteúdo vai como texto, não vira campo'],
     STRAY_BRACKET:            ['info',  '[ ou ] solto no corpo (não é campo)']
   };
 
@@ -161,31 +162,33 @@ var UltraParser = (function () {
     while (i < n) {
       var c = body.charAt(i);
       if (c === '\n') { line++; lineStart = i + 1; i++; continue; }
-      if (c === '?' && body.charAt(i + 1) === '[') {
-        var close = -1, j, nested = false, startLine = line, depth = 1, cuts = [];
-        for (j = i + 2; j < n; j++) {
+      /* C6h: ?+[a|b|c] = multiple choice (several options can be ticked); same rules as ?[ ] */
+      var multi = c === '?' && body.charAt(i + 1) === '+' && body.charAt(i + 2) === '[';
+      if (c === '?' && (body.charAt(i + 1) === '[' || multi)) {
+        var close = -1, j, nested = false, startLine = line, depth = 1, cuts = [], s0 = i + (multi ? 3 : 2);
+        for (j = s0; j < n; j++) {
           var cj = body.charAt(j);
           if (cj === '[') { depth++; nested = true; }
           else if (cj === ']') { depth--; if (depth === 0) { close = j; break; } }
           else if (cj === '|' && depth === 1) { cuts.push(j); }
         }
-        if (close < 0) { add('DROPDOWN_UNCLOSED', i); i += 2; continue; }
-        var inner = body.substring(i + 2, close);
-        var opts = [], prev = i + 2, k;
+        if (close < 0) { add('DROPDOWN_UNCLOSED', i); i = s0; continue; }
+        var inner = body.substring(s0, close);
+        var opts = [], prev = s0, k;
         for (k = 0; k < cuts.length; k++) { opts.push(body.substring(prev, cuts[k])); prev = cuts[k] + 1; }
         opts.push(body.substring(prev, close));
-        if (nested) { add('DROPDOWN_NESTED', i); }
+        if (nested) { add(multi ? 'MULTI_NESTED' : 'DROPDOWN_NESTED', i); }
         if (inner.indexOf('\n') >= 0) { add('DROPDOWN_MULTILINE', i); }
         var empty = false, children = null;
         for (k = 0; k < opts.length; k++) { if (isBlank(opts[k])) { empty = true; } }
         if (empty) { add('DROPDOWN_EMPTY_OPTION', i); }
-        if (opts.length < 2) { add('DROPDOWN_SINGLE', i); }
+        if (opts.length < 2 && !multi) { add('DROPDOWN_SINGLE', i); }   /* ?+[a] = tick or not: fine */
         if (nested || /\*/.test(inner)) {
           /* fields inside options (tolerated; spec says no nesting) */
           children = [];
           for (k = 0; k < opts.length; k++) { children.push(scanFields(opts[k], line, [], ctx)); }
         }
-        fields.push({ type: 'select', options: opts, children: children, raw: body.substring(i, close + 1), offset: i, line: startLine });
+        fields.push({ type: 'select', multi: multi, options: opts, children: children, raw: body.substring(i, close + 1), offset: i, line: startLine });
         for (k = i; k < close; k++) { if (body.charAt(k) === '\n') { line++; } }
         i = close + 1;
         continue;
@@ -254,6 +257,7 @@ var UltraParser = (function () {
       /* strip ?[..] on this line (multi-line dropdowns handled loosely) */
       for (p = 0; p < L.length; p++) {
         if (L.charAt(p) === '?' && L.charAt(p + 1) === '[') { inDrop = (inDrop || 0) + 1; p++; continue; }
+        if (L.charAt(p) === '?' && L.charAt(p + 1) === '+' && L.charAt(p + 2) === '[') { inDrop = (inDrop || 0) + 1; p += 2; continue; }
         if (inDrop && L.charAt(p) === '[') { inDrop++; continue; }
         if (inDrop && L.charAt(p) === ']') { inDrop--; continue; }
         if (!inDrop) { out += L.charAt(p); }
@@ -311,7 +315,7 @@ var UltraParser = (function () {
     if (!/:$/.test(t) || isBlank(t)) { return false; }
     if (t.length > 200) { return false; }
     if (/^\s*[\u2022\-*]/.test(t)) { return false; }
-    if (t.indexOf('?[') >= 0) { return false; }
+    if (t.indexOf('?[') >= 0 || t.indexOf('?+[') >= 0) { return false; }
     return true;
   }
 

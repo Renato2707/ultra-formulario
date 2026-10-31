@@ -11,6 +11,16 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6h] Escolha múltipla ?+[ ] — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Nova sintaxe no banco: `?+[a|b|c]`. A lista abre com caixinhas (clique, Espaço ou número marcam; Enter/"Pronto" confirma e vai ao próximo campo; Tab confirma e segue; Esc cancela; clicar fora confirma).
+- Texto no laudo: "a", "a e b", "a, b e c" (ordem do banco); nada marcado = volta a "escolher". Reabrir mostra as marcadas.
+- Opção que começa com "sem" desmarca as outras, e marcar outra desmarca o "sem".
+- Funciona com desfazer/refazer, rascunho, cópia, pesquisa no laudo e laudo colado (reconhece "a, b e c", inclusive opções com vírgula; mantém a ordem colada).
+- `?+[ ]` dentro de uma opção de `?[ ]` funciona como o aninhado de sempre. Limitação: dentro das opções do próprio `?+[ ]`, campos e listas viram texto (aviso MULTI_NESTED). `?+[a]` com uma opção só não gera aviso.
+- TI-RADS: se os focos do nódulo estiverem como `?+[ ]`, todos os marcados somam (cauda de cometa 0, macro 1, periféricas 2, puntiformes 3; "sem focos" 0). O formulário do cartão escreve todos os focos marcados nessa lista. Com `?[ ]` continua como antes (um foco, o de maior pontuação).
+- O banco real não foi alterado: para usar, troque no banco o `?[` dos focos por `?+[`.
+- Testes: `test/c6h_test.py` (32 verificações).
+
 ## [etapa-C6g] Linhas do TI-RADS editáveis, sem o "(indicada: N mm)" — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Saiu o acréscimo "(indicada/não indicada: N mm)" das linhas "Recomendação de PAAF" e "Sugestão de Acompanhamento": as 6 linhas seguem exatamente o modelo.
 - As 6 linhas são texto comum do laudo: dá para editar ou apagar. Linha editada não é sobrescrita; linha apagada não volta enquanto o nódulo continuar completo. Se o nódulo ficar incompleto, as linhas não mexidas somem e o controle recomeça.

@@ -95,10 +95,21 @@
     }
     return out;
   }
+  /* C6h: focos escritos como ?+[ ] (escolha múltipla): cada tipo marcado soma os seus pontos (ACR 2017) */
+  function multiFocos(c) {
+    var v = c.getAttribute('data-v'), o, a, i, k, out = [];
+    if (v === null || v === '') { return null; }
+    try { o = JSON.parse(c.getAttribute('data-o')) || []; } catch (e) { return null; }
+    a = v.split(',');
+    for (i = 0; i < a.length; i++) { k = mapTxt('focos', o[parseInt(a[i], 10)]); if (k === null) { return null; } if (out.indexOf(k) < 0) { out.push(k); } }
+    return out.length ? out : null;
+  }
   function readTxt(n) {
     var st = { focos: [] }, i, c, v, miss = 0;
     for (i = 0; i < 5; i++) {
-      c = n.chips[i]; v = c.getAttribute('data-v') !== null ? mapTxt(ORDER[i], c.textContent) : null;
+      c = n.chips[i];
+      if (c.getAttribute('data-m') === '1' && ORDER[i] === 'focos') { v = multiFocos(c); if (v === null) { miss++; } else { st.focos = v; } continue; }
+      v = c.getAttribute('data-v') !== null ? mapTxt(ORDER[i], c.textContent) : null;
       if (v === null) { miss++; continue; }
       if (ORDER[i] === 'focos') { st.focos = [v]; } else { st[ORDER[i]] = v; }
     }
@@ -204,6 +215,13 @@
     if (i < 0) { return '<span class="fld f-sel" contenteditable="false" data-t="s" data-o="' + o + '">escolher</span>'; }
     return '<span class="fld f-sel f-ok" contenteditable="false" data-t="s" data-v="' + i + '" data-o="' + o + '" title="Clique para trocar">' + esc(opts[i]) + '</span>';
   }
+  function multiHtml(opts, mv) {
+    var o = JSON.stringify(opts).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'), t = [], i;
+    if (!mv.length) { return '<span class="fld f-sel f-multi" contenteditable="false" data-t="s" data-m="1" data-o="' + o + '">escolher</span>'; }
+    for (i = 0; i < mv.length; i++) { t.push(opts[mv[i]]); }
+    t = t.length < 2 ? t[0] : t.slice(0, -1).join(', ') + ' e ' + t[t.length - 1];
+    return '<span class="fld f-sel f-multi f-ok" contenteditable="false" data-t="s" data-m="1" data-v="' + mv.join(',') + '" data-o="' + o + '" title="Clique para trocar (várias opções)">' + esc(t) + '</span>';
+  }
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   /* a frase do nódulo vem do banco carregado (nunca uma cópia no código) */
   function bankSentence() {
@@ -231,6 +249,11 @@
       out += esc(opt.substring(pos, fs[i].offset)); pos = fs[i].offset + fs[i].raw.length;
       if (fs[i].type === 'select') {
         idx = -1;
+        if (si === 4 && fs[i].multi) {   /* C6h: lista múltipla de focos: todos os marcados */
+          var mv = [], q, pi; for (q = 0; q < st.focos.length; q++) { pi = pickIdx(fs[i].options, 'focos', st.focos[q]); if (pi >= 0 && mv.indexOf(pi) < 0) { mv.push(pi); } }
+          mv.sort(function (a, b) { return a - b; });
+          out += multiHtml(fs[i].options, mv); si++; continue;
+        }
         if (si < 5) { idx = pickIdx(fs[i].options, ORDER[si], ORDER[si] === 'focos' ? foc : st[ORDER[si]]); }
         else if (si === 5 && f.terco) { idx = fs[i].options.indexOf(f.terco); }
         else if (si === 6 && f.lado && f.lado !== 'istmo') { idx = fs[i].options.indexOf(f.lado); }

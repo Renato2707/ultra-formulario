@@ -169,3 +169,26 @@ Em outros navegadores (Firefox, Internet Explorer) os dados ficam só no
 navegador: use "Exportar" para gerar um arquivo .json e "Importar" para
 carregá-lo em outro computador. O arquivo exportado leva banco e
 configurações, mas não leva rascunhos.
+
+
+CAMPOS DAS FRASES: ?[ ] e ?+[ ]
+===============================
+
+?[a|b|c]   escolha UMA opção (lista normal).
+?+[a|b|c]  escolha VÁRIAS opções (escolha múltipla).
+
+Na escolha múltipla a lista abre com caixinhas: clique (ou Espaço, ou o
+número) para marcar/desmarcar; Enter ou "Pronto" confirma e vai ao próximo
+campo; Tab confirma e segue; Esc cancela; clicar fora também confirma.
+O laudo recebe "a", "a e b" ou "a, b e c" (na ordem do banco).
+Sem nada marcado, o campo volta a "escolher".
+Uma opção que começa com "sem" (ex.: "sem focos") desmarca as outras,
+e marcar outra desmarca o "sem".
+
+Exemplo:
+  Focos: ?+[sem focos|macrocalcificações|calcificações periféricas|puntiformes].
+  -> "Focos: macrocalcificações e puntiformes."
+
+Pode ficar dentro de uma opção de ?[ ] (aparece depois de escolher a opção).
+As opções de ?+[ ] devem ser texto simples: campos (*) ou listas dentro
+delas não viram campo.
