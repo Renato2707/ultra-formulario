@@ -114,31 +114,46 @@
   }
   function num(f) { var t = String(f.textContent || '').replace(/^\s+|\s+$/g, ''); return /^\d+([.,]\d+)?$/.test(t) ? parseFloat(t.replace(',', '.')) : null; }
   function maxMm(n) { var i, v, m = null; for (i = 0; i < n.nums.length; i++) { v = num(n.nums[i]); if (v !== null && (m === null || v > m)) { m = v; } } return m; }
-  /* C6e: as 6 linhas do protótipo; com tamanho informado, o veredito pelos cortes ACR 2017 vai entre parênteses */
+  /* C6e/C6g: as 6 linhas do protótipo, sem veredito entre parênteses (o texto é sempre o mesmo da categoria) */
   function recLines(t, mm) {
-    var L = lines(t), v = LV[level(t)], fm;
-    if (mm !== null && v[4] !== null) {
-      fm = fmtMm(mm) + ' mm';
-      L[4] += mm >= v[4] ? ' (indicada: ' + fm + ')' : ' (não indicada: ' + fm + ')';
-      L[5] += mm >= v[5] ? ' (indicado: ' + fm + ')' : ' (não indicado: ' + fm + ')';
-    }
-    return L;
+    return lines(t);
   }
   function isRec(n) { return n && n.nodeType === 1 && (' ' + n.className + ' ').indexOf(' uc-trl ') >= 0; }
-  /* bloco de 6 linhas logo depois da linha do nódulo (não editável; some se o nódulo ficar incompleto) */
+  /* bloco de 6 linhas logo depois da linha do nódulo (texto comum, editável; as linhas não mexidas somem se o nódulo ficar incompleto) */
   function setRec(ln, L) {
-    var cur = [], n = ln.nextSibling, i, d, ch = false, LB = /^(Pontua\u00e7\u00e3o|Categoria TIRADS|N\u00edvel de Risco|Risco de Malignidade|Recomenda\u00e7\u00e3o de PAAF|Sugest\u00e3o de Acompanhamento):/, nx;
+    var cur = [], n = ln.nextSibling, i, j, d, ch = false, made, last = null, LB = /^(Pontua\u00e7\u00e3o|Categoria TIRADS|N\u00edvel de Risco|Risco de Malignidade|Recomenda\u00e7\u00e3o de PAAF|Sugest\u00e3o de Acompanhamento):/, nx;
     /* um laudo colado/importado já traz as 6 linhas como texto: elas passam a ser as linhas calculadas (sem duplicar) */
     while (L && n && n.nodeType === 1 && !isRec(n) && !n.querySelector('.fld') && LB.test(n.textContent || '')) { nx = n.nextSibling; n.parentNode.removeChild(n); ch = true; n = nx; }
     n = ln.nextSibling;
     while (n && (n.nodeType === 3 && !/\S/.test(n.nodeValue) ? true : isRec(n))) { if (isRec(n)) { cur.push(n); } n = n.nextSibling; }
-    if (!L) { for (i = 0; i < cur.length; i++) { cur[i].parentNode.removeChild(cur[i]); ch = true; } return ch; }
-    for (i = 0; i < L.length; i++) {
-      if (cur[i]) { if (cur[i].textContent !== L[i]) { cur[i].textContent = L[i]; ch = true; } cur[i].ucGen = gen; continue; }
-      d = document.createElement('div'); d.className = 'uc-trl'; d.setAttribute('contenteditable', 'false'); d.textContent = L[i]; d.ucGen = gen;
-      var ref = i ? cur[i - 1] : ln; ref.parentNode.insertBefore(d, ref.nextSibling); cur[i] = d; ch = true;
+    /* C6g: as linhas são texto comum (editável e apagável). Cada uma lembra o texto que o app escreveu (data-auto):
+       se Renato mexer, a linha fica como ele deixou; se apagar, ela não volta enquanto o nódulo continuar completo. */
+    for (i = cur.length - 1; i >= 0; i--) { if (cur[i].getAttribute('data-i') === null) { cur[i].parentNode.removeChild(cur[i]); cur.splice(i, 1); ch = true; } }
+    if (!L) {
+      for (i = 0; i < cur.length; i++) {
+        if (cur[i].getAttribute('data-auto') === null || cur[i].getAttribute('data-auto') === cur[i].textContent) { cur[i].parentNode.removeChild(cur[i]); ch = true; } else { cur[i].ucGen = gen; }
+      }
+      if (ln.getAttribute('data-trl') !== null) { ln.removeAttribute('data-trl'); }
+      return ch;
     }
-    for (i = L.length; i < cur.length; i++) { cur[i].parentNode.removeChild(cur[i]); ch = true; }
+    made = ln.getAttribute('data-trl') === '1';
+    for (i = 0; i < L.length; i++) {
+      d = null;
+      for (j = 0; j < cur.length; j++) { if (cur[j].getAttribute('data-i') === String(i)) { d = cur[j]; break; } }
+      if (d) {
+        d.ucGen = gen; last = d;
+        if (d.getAttribute('data-auto') === null || d.getAttribute('data-auto') === d.textContent) {
+          if (d.textContent !== L[i]) { d.textContent = L[i]; ch = true; }
+          d.setAttribute('data-auto', L[i]);
+        }
+        continue;
+      }
+      if (made) { continue; }   /* apagada de propósito: não volta */
+      d = document.createElement('div'); d.className = 'uc-trl'; d.setAttribute('data-i', String(i)); d.setAttribute('data-auto', L[i]); d.textContent = L[i]; d.ucGen = gen;
+      var ref = last ? last : ln; ref.parentNode.insertBefore(d, ref.nextSibling); cur.push(d); last = d; ch = true;
+    }
+    for (i = 0; i < cur.length; i++) { cur[i].ucGen = gen; }
+    if (!made) { ln.setAttribute('data-trl', '1'); }
     return ch;
   }
   var gen = 0;

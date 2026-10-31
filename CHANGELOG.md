@@ -11,6 +11,11 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6g] Linhas do TI-RADS editáveis, sem o "(indicada: N mm)" — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Saiu o acréscimo "(indicada/não indicada: N mm)" das linhas "Recomendação de PAAF" e "Sugestão de Acompanhamento": as 6 linhas seguem exatamente o modelo.
+- As 6 linhas são texto comum do laudo: dá para editar ou apagar. Linha editada não é sobrescrita; linha apagada não volta enquanto o nódulo continuar completo. Se o nódulo ficar incompleto, as linhas não mexidas somem e o controle recomeça.
+- Testes: `test/c6g_test.py` (9 verificações); `test/c6e_test.py` atualizado.
+
 ## [etapa-C6f] Gravação na pasta de dados mais robusta — entregue, testado só em Chromium automatizado (pasta simulada), NÃO testado pelo usuário
 - Corrige o aviso recorrente "Não foi possível gravar na pasta de dados (pendrive removido?)". Causa: uma única falha passageira na gravação (arquivo preso por antivírus/OneDrive, outra aba gravando, oscilação do pendrive) já desligava o espelhamento.
 - Gravação que falha é repetida sozinha 3 vezes (espera de 0,5 s, 1,5 s e 4 s) antes de virar erro. Pendrive removido (NotFoundError) não é repetido e vai direto para erro; permissão retirada (NotAllowedError) vai para "desconectada".
