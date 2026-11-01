@@ -616,6 +616,7 @@ var UFMain = function () {
     }
   }
   function afterChange(fast) {
+    updTitle();
     syncHypotheses();
     markHypUnderline();
     markCritOrig();
@@ -635,10 +636,16 @@ var UFMain = function () {
   function markAlive(on) {
     var m = tabsMap(); if (on) { m[TAB] = now(); } else { delete m[TAB]; } UStore.set('tabs', m);
   }
+  /* C6n: aba aberta por "Sessões" (index.html#ufopen=<nome do modelo>) */
+  var OPEN_TPL = null, BASE_TITLE = document.title;
+  var OPEN_ORD = 0, TAB_ORD = 0;
+  try { var hm = /[#&]ufopen=([^&]*)/.exec(String(window.location.hash || '')), ho = /[#&]uford=(\d+)/.exec(String(window.location.hash || ''));
+    if (hm) { OPEN_TPL = decodeURIComponent(hm[1]); OPEN_ORD = ho ? +ho[1] : 0; } } catch (eH) { OPEN_TPL = null; }
   function draftIndex() { var m = UStore.get('drafts', {}); return (m && typeof m === 'object') ? m : {}; }
   function pickTab() {
     var id = ssGet(), m = tabsMap(), idx = draftIndex(), t = now(), k, best = null, legacy;
-    if (!id && /^uf\.tab=/.test(String(window.name || ''))) { id = String(window.name).slice(7); }
+    if (OPEN_TPL !== null) { id = null; m = {}; idx = {}; }   /* C6n: aba aberta por uma sessão: sempre uma aba nova, vazia */
+    else if (!id && /^uf\.tab=/.test(String(window.name || ''))) { id = String(window.name).slice(7); }
     if (id && m[id] && t - m[id] < TAB_ALIVE_MS) {           /* duplicated tab: same id still alive elsewhere */
       var nid = 't' + t.toString(36) + Math.floor(Math.random() * 1e6).toString(36), d0 = UStore.get('draft.' + id, null);
       if (d0) { UStore.set('draft.' + nid, d0); idx[nid] = t; UStore.set('drafts', idx); }
@@ -648,9 +655,11 @@ var UFMain = function () {
       legacy = UStore.get('draft', null);                       /* single draft from versions before B21 */
       if (legacy && legacy.html) { UStore.set('draft.legacy', legacy); idx.legacy = legacy.t || 1; UStore.remove('draft'); UStore.set('drafts', idx); }
       for (k in idx) { if (idx.hasOwnProperty(k) && !(m[k] && t - m[k] < TAB_ALIVE_MS) && (!best || idx[k] > idx[best])) { best = k; } }
-      id = best || ('t' + t.toString(36) + Math.floor(Math.random() * 1e6).toString(36));
+      id = (OPEN_TPL === null && best) || ('t' + t.toString(36) + Math.floor(Math.random() * 1e6).toString(36));
     }
     TAB = id; ssSet(id); markAlive(true);
+    if (OPEN_TPL !== null) { idx = draftIndex(); }
+    var dd = UStore.get('draft.' + TAB, null); TAB_ORD = OPEN_ORD || (dd && dd.ord) || t;   /* C6n: ordem de abertura da aba (sessões) */
     /* prune: keep the newest MAX_DRAFTS drafts, drop drafts older than 30 days */
     var ks = []; for (k in idx) { if (idx.hasOwnProperty(k)) { ks.push(k); } }
     ks.sort(function (a, b) { return idx[b] - idx[a]; });
@@ -661,7 +670,7 @@ var UFMain = function () {
     if (!TAB || S.noDraft) { return; }   /* noDraft: drafts were cleared in another tab; resumes on the next edit here */
     var html = editor.innerHTML.replace(/<mark class="hl( cur)?">|<\/mark>/g, '');
     var idx = draftIndex(); idx[TAB] = now(); UStore.set('drafts', idx);
-    UStore.set('draft.' + TAB, { html: html, model: S.activeModelId, exam: S.activeExam, nav: { level: S.level, exam: S.navExam }, t: now() });
+    UStore.set('draft.' + TAB, { html: html, model: S.activeModelId, exam: S.activeExam, nav: { level: S.level, exam: S.navExam }, t: now(), ord: TAB_ORD });
   }
   function flash(el) { addCls(el, 'crit-flash'); setTimeout(function () { rmCls(el, 'crit-flash'); }, 1200); }
   function gotoLine(el) {
@@ -3126,6 +3135,99 @@ var UFMain = function () {
   if (window.addEventListener) { window.addEventListener('storage', onStorage, false);
     window.addEventListener('pagehide', function () { saveDraft(); markAlive(false); }, false); }
 
+  /* ================= C6n: título da aba = modelo aberto; sessões de abas ================= */
+  function updTitle() {
+    var m = S.activeModelId ? getModel(S.activeModelId) : null, t = m ? m.name : BASE_TITLE;
+    if (document.title !== t) { document.title = t; }
+  }
+  function findModelByName(nm) {
+    var i, n = trim(String(nm || ''));
+    for (i = 0; i < S.models.length; i++) { if (trim(S.models[i].name) === n) { return S.models[i]; } }
+    return null;
+  }
+  function sessList() { var a = UStore.get('tabSessions', []); return (a && a.length !== undefined) ? a : []; }
+  /* abas abertas agora (vivas), na ordem em que foram abertas; cada uma com o nome do seu modelo */
+  function openTabsModels() {
+    saveDraft();
+    var m = tabsMap(), od = {}, t = now(), ids = [], k, out = [], i, d, md, dr = {};
+    for (k in m) { if (m.hasOwnProperty(k) && (k === TAB || t - m[k] < TAB_ALIVE_MS)) { ids.push(k); } }
+    if (ids.indexOf(TAB) < 0) { ids.push(TAB); }
+    for (i = 0; i < ids.length; i++) { dr[ids[i]] = UStore.get('draft.' + ids[i], null); od[ids[i]] = ids[i] === TAB ? TAB_ORD : (dr[ids[i]] && dr[ids[i]].ord) || 0; }
+    ids.sort(function (a, b) { return (od[a] || t) - (od[b] || t) || (a < b ? -1 : 1); });
+    for (i = 0; i < ids.length; i++) {
+      d = ids[i] === TAB ? { model: S.activeModelId } : dr[ids[i]];
+      md = d && d.model ? getModel(d.model) : null;
+      if (md) { out.push(md.name); }
+    }
+    return out;
+  }
+  function tabUrl(nm, ord) { var u = String(window.location.href).replace(/#.*$/, ''); return u + '#ufopen=' + encodeURIComponent(nm) + '&uford=' + ord; }
+  function openSession(se) {
+    var names = se.models || [], list = [], i, w, blocked = 0, here;
+    for (i = 0; i < names.length; i++) { if (findModelByName(names[i])) { list.push(names[i]); } }   /* modelo que não existe mais: pulado */
+    if (!list.length) { toast('Nenhum modelo desta sessão existe no banco atual.'); return; }
+    here = trim(lineText(editor)) === '';   /* aba atual vazia: recebe o 1º modelo; com conteúdo, nada é apagado */
+    var base = now();
+    if (here) { TAB_ORD = base; }
+    for (i = here ? 1 : 0; i < list.length; i++) {
+      w = null; try { w = window.open(tabUrl(list[i], base + i), '_blank'); } catch (eW) { w = null; }
+      if (!w) { blocked++; }
+    }
+    if (here) { useModel(findModelByName(list[0]), true); }
+    if (blocked) { toast('O navegador bloqueou ' + blocked + ' aba(s): permita janelas pop-up para este arquivo.'); }
+  }
+  function saveSessionDialog() {
+    var names = openTabsModels();
+    if (!names.length) { toast('Nenhuma aba com modelo aberto.'); return; }
+    var li = '', i; for (i = 0; i < names.length; i++) { li += '<li>' + esc(names[i]) + '</li>'; }
+    modal('Salvar sessão de abas', '<label>Nome da sessão<input type="text" id="sessName" autocomplete="off"></label><ol class="sess-ol">' + li + '</ol>', [
+      { label: 'Cancelar' },
+      { label: 'Salvar', cls: 'btn-primary', id: 'sessSave', click: function () {
+        var nm = trim($('sessName').value); if (!nm) { $('sessName').focus(); return false; }
+        var a = sessList().slice(0), j, put = false;
+        for (j = 0; j < a.length; j++) { if (a[j] && a[j].name === nm) { a[j] = { name: nm, models: names }; put = true; } }
+        if (!put) { a.push({ name: nm, models: names }); }
+        UStore.set('tabSessions', a); toast('Sessão salva: ' + nm);
+      } }
+    ]);
+    on($('sessName'), 'keydown', function (e) { if (e.keyCode === 13) { e.preventDefault(); $('sessSave').click(); } });
+  }
+  var sessMenu = null;
+  function closeSessMenu() { if (sessMenu && sessMenu.parentNode) { sessMenu.parentNode.removeChild(sessMenu); } sessMenu = null; }
+  function showSessMenu() {
+    if (sessMenu) { closeSessMenu(); return; }
+    var a = sessList(), h = '', i, b = $('btnSess'), r = b.getBoundingClientRect();
+    for (i = 0; i < a.length; i++) {
+      if (!a[i] || !a[i].name) { continue; }
+      h += '<div class="sm-i" data-si="' + i + '" title="' + esc((a[i].models || []).join('\n')) + '"><span class="sm-n">' + esc(a[i].name) + '</span>' +
+        '<button type="button" class="sm-x" data-sx="' + i + '" title="Excluir sessão" aria-label="Excluir sessão">&#215;</button></div>';
+    }
+    if (h) { h += '<div class="sm-sep"></div>'; }
+    h += '<div class="sm-i" data-ssave="1"><span class="sm-n">Salvar abas abertas&#8230;</span></div>';
+    sessMenu = document.createElement('div'); sessMenu.className = 'sess-menu'; sessMenu.id = 'sessMenu'; sessMenu.innerHTML = h;
+    document.body.appendChild(sessMenu);
+    sessMenu.style.top = Math.round(r.bottom + 2) + 'px';
+    sessMenu.style.left = Math.round(Math.max(4, Math.min(r.left, (window.innerWidth || 800) - sessMenu.offsetWidth - 4))) + 'px';
+    on(sessMenu, 'click', function (e) {
+      var x = closest(e.target, function (n) { return n.getAttribute && n.getAttribute('data-sx') !== null; }),
+        it = closest(e.target, function (n) { return n.getAttribute && (n.getAttribute('data-si') !== null || n.getAttribute('data-ssave') !== null); });
+      var all = sessList();
+      if (x) { var k = +x.getAttribute('data-sx'), se = all[k]; closeSessMenu(); if (!se) { return; }
+        confirmModal('Excluir sessão', 'Excluir a sessão "' + se.name + '"?', 'Excluir', function () {
+          var c = sessList().slice(0), q; for (q = 0; q < c.length; q++) { if (c[q] && c[q].name === se.name) { c.splice(q, 1); break; } }
+          UStore.set('tabSessions', c); }, true); return; }
+      if (!it) { return; }
+      closeSessMenu();
+      if (it.getAttribute('data-ssave') !== null) { saveSessionDialog(); return; }
+      var s2 = all[+it.getAttribute('data-si')]; if (s2) { openSession(s2); }
+    });
+  }
+  on($('btnSess'), 'click', function (e) { if (e && e.stopPropagation) { e.stopPropagation(); } showSessMenu(); });
+  on(document, 'mousedown', function (e) { if (sessMenu && !closest(e.target, function (n) { return n === sessMenu || n.id === 'btnSess'; })) { closeSessMenu(); } });
+  on(document, 'keydown', function (e) { if (sessMenu && e.keyCode === 27) { closeSessMenu(); } });
+  setInterval(updTitle, 1000);
+  window.UFSess = { list: sessList, open: openSession, openTabsModels: openTabsModels, findModelByName: findModelByName, updTitle: updTitle };
+
   /* ================= start ================= */
   applyTheme(); applyLayout();
   folderStatus(UFolder.status());
@@ -3143,6 +3245,11 @@ var UFMain = function () {
     buildModels(); renderNav(); afterChange(true);
     toast('Rascunho anterior incompatível foi descartado.');
   }
+  if (OPEN_TPL !== null) {   /* C6n: aba aberta por uma sessão: carrega o modelo e limpa o endereço */
+    try { if (window.history && window.history.replaceState) { window.history.replaceState(null, '', String(window.location.href).replace(/#.*$/, '')); } } catch (eR) {}
+    if (findModelByName(OPEN_TPL)) { useModel(findModelByName(OPEN_TPL), true); }
+  }
+  updTitle();
   $('repSearch').value = S.repQuery || ''; sxShow($('repSearch'));
   if (S.repQuery) { try { repSearch(false); } catch (eRs) {} }
 

@@ -54,15 +54,22 @@
   }
   function textOf(toks, a, b) { var t = '', i; for (i = a; i < b; i++) { if (toks[i].s != null) { t += toks[i].s; } else { t += '#'; } } return t; }
   function nextText(toks, i) { var t = '', j; for (j = i + 1; j < toks.length && toks[j].s != null; j++) { t += toks[j].s; } return t; }
-  /* "# x # x # mm" -> 3 campos numéricos ligados por "x"; devolve {f:[..], unit} ou null */
+  /* "# x # x # mm" -> 3 campos numéricos ligados por "x"; devolve {f:[..], unit} ou null.
+     C6n: outros campos na frase (ex.: "Ovário ?[direito|esquerdo] ... medindo # x # x # mm (~ # cm³)") não impedem;
+     vale o ÚLTIMO trio "# x # x # mm|cm" do trecho (o mais próximo do campo de volume). */
   function triple(toks, a, b) {
-    var fs = [], idx = [], i, t, u;
-    for (i = a; i < b; i++) { if (toks[i].f) { if (isNumFld(toks[i].f)) { fs.push(toks[i].f); idx.push(i); } else { return null; } } }
-    if (fs.length !== 3) { return null; }
-    for (i = 0; i < 2; i++) { t = textOf(toks, idx[i] + 1, idx[i + 1]); if (!/^\s*[x×]\s*$/i.test(t)) { return null; } }
-    u = /^\s*(mm|cm)\b/i.exec(nextText(toks, idx[2]) + ' ');
-    if (!u) { return null; }
-    return { f: fs, unit: u[1].toLowerCase() };
+    var idx = [], i, j, t, u, ok;
+    for (i = a; i < b; i++) { if (toks[i].f) { idx.push(i); } }
+    for (j = idx.length - 3; j >= 0; j--) {
+      ok = true;
+      for (i = j; i < j + 3; i++) { if (!isNumFld(toks[idx[i]].f)) { ok = false; } }
+      for (i = j; ok && i < j + 2; i++) { t = textOf(toks, idx[i] + 1, idx[i + 1]); if (!/^\s*[x\u00d7]\s*$/i.test(t)) { ok = false; } }
+      if (!ok) { continue; }
+      u = /^\s*(mm|cm)\b/i.exec(nextText(toks, idx[j + 2]) + ' ');
+      if (!u) { continue; }
+      return { f: [toks[idx[j]].f, toks[idx[j + 1]].f, toks[idx[j + 2]].f], unit: u[1].toLowerCase() };
+    }
+    return null;
   }
 
   function setAuto(v, val, key) {

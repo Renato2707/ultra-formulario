@@ -11,6 +11,14 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6n] Vários volumes no laudo, "Limpar" nas calculadoras, título e sessões de abas — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Volume: cada frase com "* x * x * mm" e campo de volume ("(~ * cm³)", "volume de * cm³", ou "Volume ..." na linha seguinte) é calculada separadamente, inclusive frases inseridas depois (ex.: Transvaginal padrão com útero calculado + "Teratoma 1", dois teratomas, cisto). Causa do erro: a frase só era reconhecida se TODOS os campos dela fossem numéricos; o "?[direito|esquerdo]" do "Ovário ..." impedia o cálculo. Agora vale o último trio "# x # x # mm" antes do campo de volume; outros campos da frase não atrapalham. Fórmula sem mudança (elipsoide 0,523; tireoide = soma dos lobos, sem istmo; índice esplênico). Editar uma medida recalcula aquela frase.
+- Calculadoras: botão "Limpar" no cabeçalho do painel: zera IG relatada, formulário do TI-RADS e a calculadora livre; o laudo não muda.
+- Abas: o título da aba do navegador mostra o nome do modelo aberto (sem modelo: título original). Renomear à mão não existe (aba do navegador).
+- Sessões: botão "Sessões" na barra de cima: "Salvar abas abertas…" (guarda, com um nome, os modelos das abas abertas na ordem em que foram abertas), clicar numa sessão abre uma aba por modelo na ordem (se a aba atual estiver vazia, ela recebe o 1º; com conteúdo, nada é apagado e todas vão para abas novas), "×" exclui (com confirmação). Modelo que não existe mais no banco é pulado. Guardado em `tabSessions` (dados.json da pasta de dados).
+- Limitações: o navegador pode bloquear a abertura de várias abas de uma vez (aparece um aviso rápido; é preciso permitir pop-ups para o arquivo). Uma aba aberta há menos de ~5 s pode não entrar ao salvar a sessão. A sessão identifica o modelo só pelo nome (dois modelos com o mesmo nome: vale o primeiro).
+- Testes: `test/c6n_test.py` (31 verificações).
+
 ## [etapa-C6m] Painel TI-RADS sem textos de aviso visíveis — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Saiu do cartão TI-RADS a linha cinza de avisos (C6k): extensão extratireoidiana/invasão óbvia, misto, indeterminável, espongiforme, combinações incoerentes (cístico/anecoico) e o corte de tamanho para PAAF/seguimento. O painel mostra só campos, "TRx · N pts", o botão "Inserir nódulo" e a opção "Calcular pelo texto do laudo".
 - Essas explicações ficam apenas no title (passar o mouse) do resultado "TRx · N pts" e dos campos travados. Travas (espongiforme, indeterminável), cálculo e texto do laudo sem mudança.

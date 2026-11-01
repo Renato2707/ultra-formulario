@@ -431,6 +431,14 @@
     }
     b.appendChild(g); updForm();
   }
+  /* C6n: botão "Limpar" do painel: formulário do nódulo volta ao início */
+  function resetForm() {
+    if (!F) { return; }
+    var i; for (i = 0; i < 4; i++) { F.sel[CAT[i].id].value = ''; }
+    for (i = 0; i < F.foc.length; i++) { F.foc[i].checked = F.foc[i].value === 'nenhum'; }
+    F.terco.value = ''; F.lado.value = ''; for (i = 0; i < 3; i++) { F.mm[i].value = ''; }
+    updForm();
+  }
   function initTxt() {
     ed = document.getElementById('editor'); if (!ed) { return; }
     if (window.UFCalc && UFCalc.onEditorChange) { UFCalc.onEditorChange(runTxt); }
@@ -438,7 +446,7 @@
     runTxt();
   }
   window.UFTirads = { score: score, level: level, lines: lines, recLines: recLines, header: header, sizeNote: sizeNote, CAT: CAT, LV: LV, initTxt: initTxt, runTxt: runTxt, textNodules: textNodules, mapTxt: mapTxt, bankSentence: bankSentence };
-  if (window.UFCalc) { UFCalc.register({ id: 'tirads', title: 'TI-RADS (ACR 2017)', build: build }); }
+  if (window.UFCalc) { UFCalc.register({ id: 'tirads', title: 'TI-RADS (ACR 2017)', build: build, reset: resetForm }); }
   if (window.UFCalcVol) {
     UFCalcVol.addToggle('ucTrTxt', 'Calcular pelo texto do laudo', true, function (v) { txtOn = !!v; runTxt(); },
       'Lê as 5 características da frase "Observa-se nódulo ..." e escreve o número em "TI-RADS ___" e as 6 linhas de recomendação logo abaixo. "Tipo cauda de cometa" = 0 ponto; "irregulares" = 2, como "lobuladas".', txtStatus, null, 'tirads');

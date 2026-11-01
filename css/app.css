@@ -446,3 +446,16 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 #popup .opt-m.on{font-weight:bold}
 #popup .opt-ok{border-top:1px solid #d9d9d9;border-top:1px solid var(--line);text-align:right;color:#1f5fbf;font-weight:bold}
 .fld.f-multi{border-bottom-style:double}
+
+/* C6n */
+.uc-reset{margin-left:auto;padding:1px 6px;font-size:11px;opacity:.75}
+.uc-reset:hover{opacity:1}
+#right.collapsed .uc-reset{display:none}
+#btnSess{margin-right:2px}
+.sess-menu{position:absolute;z-index:50;min-width:200px;max-width:320px;background:#fff;background:var(--panel);color:var(--fg);border:1px solid #bbb;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.2);padding:4px 0;font-size:13px}
+.sess-menu .sm-i{display:flex;align-items:center;padding:4px 8px;cursor:pointer}
+.sess-menu .sm-i:hover{background:rgba(0,0,0,.07)}
+.sess-menu .sm-n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sess-menu .sm-x{border:0;background:none;cursor:pointer;opacity:.6;padding:0 4px}
+.sess-menu .sm-x:hover{opacity:1}
+.sess-menu .sm-sep{border-top:1px solid #ddd;margin:3px 0}

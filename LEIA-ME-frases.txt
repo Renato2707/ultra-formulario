@@ -200,3 +200,11 @@ Exemplo:
 Pode ficar dentro de uma opção de ?[ ] (aparece depois de escolher a opção).
 As opções de ?+[ ] devem ser texto simples: campos (*) ou listas dentro
 delas não viram campo.
+
+VOLUME CALCULADO NO LAUDO
+Qualquer frase (do modelo ou inserida depois) com 3 medidas e um campo de volume
+é calculada sozinha, uma por frase:
+  ... medindo cerca de * x * x * mm (LxAPxT) (~ * cm³) ...
+  ... medindo * x * x * mm, com volume de * cm³.
+  Dimensões medindo cerca de * x * x * mm.   (e na linha seguinte)  Volume estimado em * cm³.
+As medidas precisam estar em mm. Sem campo "* cm³" a frase não ganha volume.

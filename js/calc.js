@@ -196,6 +196,9 @@ var UFCalc = (function () {
     mods.push(m); if (built) { addSection(m); }
     return true;
   }
+  function reset() {
+    for (var i = 0; i < mods.length; i++) { if (typeof mods[i].reset === 'function') { try { mods[i].reset(); } catch (e) { if (window.console) { window.console.error(e); } } } }
+  }
   function isOpen() { var r = $('right'); return !!r && !/(^|\s)collapsed(\s|$)/.test(r.className); }
   function toggle(want) { var t = $('rightToggle'); if (t && (want == null || want !== isOpen())) { t.click(); } }
   function init() {
@@ -206,9 +209,15 @@ var UFCalc = (function () {
     for (i = 0; i < mods.length; i++) { addSection(mods[i]); }
     watchEditor();
     on($('rightToggle'), 'mousedown', noFocusSteal);
+    /* C6n: botão discreto "Limpar" no cabeçalho do painel: zera os campos das calculadoras (o laudo não muda) */
+    var hd = right.querySelector('.rhead');
+    if (hd && !$('ucReset')) {
+      var rb = el('button', 'btn btn-sm uc-reset', 'Limpar'); rb.type = 'button'; rb.id = 'ucReset'; rb.title = 'Limpar os campos das calculadoras (o laudo não muda)';
+      on(rb, 'mousedown', noFocusSteal); on(rb, 'click', reset); hd.appendChild(rb);
+    }
   }
   var api = {
-    register: register, init: init, open: function () { toggle(true); }, close: function () { toggle(false); }, toggle: function () { toggle(); }, isOpen: isOpen,
+    register: register, init: init, reset: function () { reset(); }, open: function () { toggle(true); }, close: function () { toggle(false); }, toggle: function () { toggle(); }, isOpen: isOpen,
     /* IG relatada: total em dias, ou null se vazio/inválido */
     getIgRelatada: function () { return igDays; },
     onIgChange: function (fn) { if (typeof fn === 'function') { igSubs.push(fn); } return function () { for (var i = 0; i < igSubs.length; i++) { if (igSubs[i] === fn) { igSubs.splice(i, 1); return; } } }; },
@@ -217,9 +226,9 @@ var UFCalc = (function () {
     onEditorChange: function (fn) { if (typeof fn === 'function') { edSubs.push(fn); } },
     format: fmt, parseNum: parseNum, _calc: null
   };
-  register({ id: 'livre', title: 'Calculadora', build: function (b) { api._calc = buildCalc(b); } });
+  register({ id: 'livre', title: 'Calculadora', build: function (b) { api._calc = buildCalc(b); }, reset: function () { if (api._calc) { api._calc.press('C'); } } });
   /* C6e: tudo da obstetrícia num cartão só: IG relatada + linhas de PFE, IG, percentis e Doppler (módulos C3-C5) */
-  register({ id: 'obst', title: 'Obstetrícia', build: function (b) { var ig = el('div', 'uc-ig'); ig.setAttribute('data-calc-part', 'ig'); b.appendChild(ig); buildIg(ig); } });
+  register({ id: 'obst', title: 'Obstetrícia', build: function (b) { var ig = el('div', 'uc-ig'); ig.setAttribute('data-calc-part', 'ig'); b.appendChild(ig); buildIg(ig); }, reset: function () { if (api._igSet) { api._igSet('', ''); } } });
   return api;
 })();
 window.UFCalc = UFCalc;
