@@ -771,7 +771,7 @@ var UFMain = function () {
     var p = $('popup'), html = '', i;
     popupSel = chip.getAttribute('data-m') === '1' ? multiVals(chip) : null;
     for (i = 0; i < opts.length; i++) { html += '<div class="opt' + (popupSel ? ' opt-m' : '') + '" data-i="' + i + '">' + (popupSel ? '<span class="ck"></span> ' : '') + (i < 9 ? '<b>' + (i + 1) + '.</b> ' : '') + esc(opts[i]) + '</div>'; }
-    if (popupSel) { html += '<div class="opt opt-ok" data-ok="1">&#10003; Pronto <small>(Enter)</small></div>'; }
+    if (popupSel) { html += '<div class="opt opt-ok" data-ok="1">&#10003; Pronto <small>(Tab)</small></div>'; }
     p.innerHTML = html; if (popupSel) { multiPaint(); }
     var rc = chip.getBoundingClientRect();
     p.style.left = (rc.left + (window.pageXOffset || document.documentElement.scrollLeft)) + 'px';
@@ -3071,8 +3071,11 @@ var UFMain = function () {
       var n = qsa($('popup'), '.opt[data-i]').length;
       if (popupSel) {   /* multi list: Space / number ticks, Enter = done (next field), Tab = done + move, Esc = keep as it was */
         if (e.keyCode === 32 || (e.keyCode >= 49 && e.keyCode <= 57 && e.keyCode - 49 < n)) { e.preventDefault(); e.stopPropagation(); if (e.keyCode !== 32) { popupIdx = e.keyCode - 49; popupKbd(); } multiToggle(popupIdx); return; }
-        if (e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); multiApply(true); return; }
+        /* C6j: Enter marks/unmarks the focused option (list stays open); Enter on "Pronto" confirms */
+        if (e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); if (popupIdx >= n) { multiApply(true); } else { multiToggle(popupIdx); } return; }
         if (e.keyCode === 9) { e.preventDefault(); e.stopPropagation(); multiApply(true, e.shiftKey); return; }
+        if (e.keyCode === 40) { e.preventDefault(); popupIdx = Math.min(n, popupIdx + 1); popupKbd(); return; }
+        if (e.keyCode === 38) { e.preventDefault(); popupIdx = Math.max(0, popupIdx - 1); popupKbd(); return; }
       }
       if (e.keyCode === 40) { e.preventDefault(); popupIdx = Math.min(n - 1, popupIdx + 1); popupKbd(); return; }
       if (e.keyCode === 38) { e.preventDefault(); popupIdx = Math.max(0, popupIdx - 1); popupKbd(); return; }
@@ -3082,7 +3085,7 @@ var UFMain = function () {
       if (e.keyCode >= 49 && e.keyCode <= 57 && e.keyCode - 49 < n) { e.preventDefault(); chooseOption(e.keyCode - 49); return; }
       /* while the option list is open, typing must not overwrite the dropdown */
       if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.keyCode === 8 || e.keyCode === 46 || e.keyCode === 32 || e.keyCode >= 48)) {
-        e.preventDefault(); toast(popupSel ? 'Marque com Espaço ou o número; Enter confirma. Esc cancela.' : 'Escolha uma opção (setas + Enter, ou o número). Esc fecha a lista.'); return;
+        e.preventDefault(); toast(popupSel ? 'Marque com Enter, Espaço ou o número; Tab ou "Pronto" confirma. Esc cancela.' : 'Escolha uma opção (setas + Enter, ou o número). Esc fecha a lista.'); return;
       }
     }
     if (!$('modalBack').hidden && e.keyCode === 27) { e.preventDefault(); e.stopPropagation(); closeModal(); }

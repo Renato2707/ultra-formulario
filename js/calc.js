@@ -140,6 +140,9 @@ var UFCalc = (function () {
       msg.innerHTML = ''; if (!r.ok) { msg.appendChild(document.createTextNode('Semanas 0 a 45, dias 0 a 6.')); }
       if (old !== igDays) { fireIg(); }
     }
+    /* C6j: Enter em semanas vai para dias */
+    on(w, 'keydown', function (e) { if ((e.keyCode || e.which) === 13) { if (e.preventDefault) { e.preventDefault(); } d.focus(); } });
+    on(d, 'keydown', function (e) { if ((e.keyCode || e.which) === 13) { if (e.preventDefault) { e.preventDefault(); } upd(); } });
     on(w, 'input', upd); on(d, 'input', upd); on(w, 'keyup', upd); on(d, 'keyup', upd); on(w, 'change', upd); on(d, 'change', upd);
     body.appendChild(row); body.appendChild(msg);
     api._igSet = function (ws, ds) { w.value = ws == null ? '' : String(ws); d.value = ds == null ? '' : String(ds); upd(); };

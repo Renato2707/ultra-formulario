@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6j] Teclado da escolha múltipla, Enter no painel, 6 linhas do TI-RADS no lugar das 5 antigas — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
+- Escolha múltipla `?+[ ]`: a lista abre com o foco na 1ª opção; setas cima/baixo andam pelas opções e pela linha "Pronto"; Enter ou Espaço marcam/desmarcam a opção em foco sem fechar; número marca direto. Confirmar: Tab (segue ao próximo campo), Enter na linha "✓ Pronto (Tab)" (segue ao próximo campo) ou clicar fora. Esc descarta as marcas. "sem …" continua exclusivo.
+- Painel: cartão TI-RADS — Enter passa ao próximo campo (composição → ecogenicidade → forma → margem → terço → lobo → L → AP → T; pula campos desativados); Enter no T insere o nódulo como o botão (se completo). IG relatada: Enter em semanas vai a dias. Volume e biometria leem o laudo (não têm campos no painel).
+- TI-RADS no laudo: as 6 linhas ("Pontuação: …", "Categoria TIRADS: …", "Nível de Risco: …", "Risco de Malignidade: …", "Recomendação de PAAF: …", "Sugestão de Acompanhamento: …") substituem as 5 linhas antigas do banco ("TI-RADS 1 (nódulo benigno): …" a "TI-RADS 5 (…): …"): enquanto houver nódulo calculado, as 5 antigas saem do laudo; se nenhum nódulo ficar completo, voltam no mesmo lugar. O banco não é alterado. Laudo colado com as 6 linhas novas ou com as 5 antigas é reconhecido (as antigas viram as 6 novas). Linhas continuam editáveis/apagáveis (C6g) e com soma de focos (C6h).
+- Testes: `test/c6j_test.py` (25 verificações); `test/c6h_test.py` ajustado (Enter agora marca; confirmar é Enter no "Pronto").
+
 ## [etapa-C6i] Escolha múltipla: começo comum escrito uma vez — entregue, testado só em Chromium automatizado, NÃO testado pelo usuário
 - Antes: "com focos hiperecogênicos tipo cauda de cometa, com focos hiperecogênicos tipo macrocalcificações, ...". Agora: "com focos hiperecogênicos tipo cauda de cometa, macrocalcificações, calcificações periféricas e puntiformes".
 - Regra: o maior começo comum (palavras inteiras) de todas as marcadas sai uma vez; nos restos, uma palavra igual no início de itens seguidos ("tipo") fica só no primeiro; nenhum item fica vazio (opção igual ao começo sai inteira: "dor e dor forte"); uma só marcada sai inteira. Ordem do banco.

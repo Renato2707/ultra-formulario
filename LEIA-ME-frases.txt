@@ -177,9 +177,10 @@ CAMPOS DAS FRASES: ?[ ] e ?+[ ]
 ?[a|b|c]   escolha UMA opção (lista normal).
 ?+[a|b|c]  escolha VÁRIAS opções (escolha múltipla).
 
-Na escolha múltipla a lista abre com caixinhas: clique (ou Espaço, ou o
-número) para marcar/desmarcar; Enter ou "Pronto" confirma e vai ao próximo
-campo; Tab confirma e segue; Esc cancela; clicar fora também confirma.
+Na escolha múltipla a lista abre com caixinhas e o foco na 1ª opção:
+setas andam; Enter, Espaço, clique ou o número marcam/desmarcam (a lista
+fica aberta); Tab, ou Enter/clique em "Pronto", confirma e vai ao próximo
+campo; clicar fora também confirma; Esc descarta as marcas.
 O laudo recebe "a", "a e b" ou "a, b e c" (na ordem do banco).
 O começo igual das opções marcadas (palavras inteiras) é escrito uma vez só,
 e uma palavra repetida logo depois (ex.: "tipo") fica só no primeiro item:

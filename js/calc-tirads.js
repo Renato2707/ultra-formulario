@@ -167,6 +167,26 @@
     if (!made) { ln.setAttribute('data-trl', '1'); }
     return ch;
   }
+  /* C6j: as 5 linhas antigas do banco ("TI-RADS 1 (nódulo benigno): ..." a "TI-RADS 5 (...): ...") saem quando
+     há nódulo calculado (as 6 linhas as substituem) e voltam no mesmo lugar se nenhum nódulo ficar completo. */
+  var OLDREC = /^\s*TI-RADS\s*[1-5]\s*\(n[\u00f3o]dulo[^)]*\)\s*:/i, oldKept = null;
+  function oldBlock(on) {
+    var i, c, kids, out = [], ch = false, ref, par;
+    if (on) {
+      kids = ed.querySelectorAll('div,p');
+      for (i = 0; i < kids.length; i++) { c = kids[i]; if (!isRec(c) && !c.querySelector('.fld,div,p') && OLDREC.test(c.textContent || '')) { out.push(c); } }
+      if (!out.length) { return false; }
+      oldKept = { ref: out[0].previousSibling, par: out[0].parentNode, nodes: out };
+      for (i = 0; i < out.length; i++) { out[i].parentNode.removeChild(out[i]); }
+      return true;
+    }
+    if (!oldKept) { return false; }
+    ref = oldKept.ref; par = oldKept.par;
+    if (par && ed.contains(par) && (!ref || ref.parentNode === par)) {
+      for (i = oldKept.nodes.length - 1; i >= 0; i--) { par.insertBefore(oldKept.nodes[i], ref ? ref.nextSibling : par.firstChild); } ch = true;
+    }
+    oldKept = null; return ch;
+  }
   var gen = 0;
   function runTxt() {
     if (busyT || !ed) { return; }
@@ -178,6 +198,8 @@
         if (putT(NL[i].out, ok ? level(sc.total).substring(2) : null)) { ch = true; }
         if (setRec(NL[i].line, ok ? recLines(sc.total, maxMm(NL[i])) : null)) { ch = true; }
       }
+      var anyOk = false; for (i = 0; i < NL.length; i++) { if (NL[i].line.getAttribute('data-trl') === '1') { anyOk = true; } }
+      if (oldBlock(anyOk)) { ch = true; }
       old = ed.querySelectorAll('.uc-trl');
       for (q = old.length - 1; q >= 0; q--) { if (old[q].ucGen !== gen) { old[q].parentNode.removeChild(old[q]); ch = true; } }
       if (ch) { var ev; try { ev = new Event('input', { bubbles: true }); } catch (x) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); } ed.dispatchEvent(ev); }
@@ -313,6 +335,17 @@
     var foot = el('div', 'tr-foot'); F.res = el('span', 'tr-res'); F.ins = el('button', 'btn btn-sm btn-primary tr-ins', 'Inserir nódulo'); F.ins.type = 'button'; F.ins.id = 'trIns';
     foot.appendChild(F.res); foot.appendChild(F.ins); g.appendChild(foot);
     on(F.ins, 'click', insertForm);
+    /* C6j: Enter passa ao próximo campo do nódulo; no último (T), insere como o botão */
+    var chain = [F.sel.comp, F.sel.eco, F.sel.forma, F.sel.marg, F.terco, F.lado, F.mm[0], F.mm[1], F.mm[2]];
+    for (j = 0; j < chain.length; j++) {
+      (function (k) { on(chain[k], 'keydown', function (e) {
+        if ((e.keyCode || e.which) !== 13 || e.ctrlKey || e.altKey || e.metaKey) { return; }
+        if (e.preventDefault) { e.preventDefault(); } if (e.stopPropagation) { e.stopPropagation(); }
+        var q = k + 1; while (q < chain.length && chain[q].disabled) { q++; }
+        if (q < chain.length) { chain[q].focus(); if (chain[q].select && chain[q].type === 'text') { chain[q].select(); } }
+        else { updForm(); if (!F.ins.disabled) { insertForm(); } }
+      }); })(j);
+    }
     b.appendChild(g); updForm();
   }
   function initTxt() {
