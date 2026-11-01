@@ -11,6 +11,11 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6m] Painel TI-RADS sem textos de aviso visíveis — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Saiu do cartão TI-RADS a linha cinza de avisos (C6k): extensão extratireoidiana/invasão óbvia, misto, indeterminável, espongiforme, combinações incoerentes (cístico/anecoico) e o corte de tamanho para PAAF/seguimento. O painel mostra só campos, "TRx · N pts", o botão "Inserir nódulo" e a opção "Calcular pelo texto do laudo".
+- Essas explicações ficam apenas no title (passar o mouse) do resultado "TRx · N pts" e dos campos travados. Travas (espongiforme, indeterminável), cálculo e texto do laudo sem mudança.
+- Testes: `test/c6k_test.py` ajustado (verifica que não há texto visível; avisos no title).
+
 ## [etapa-C6l] TI-RADS: verificação exaustiva das combinações (só testes, sem mudança de código) — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Todas as 4.000 combinações do cálculo (5 composições × 5 ecogenicidades × 2 formas × 5 margens × 16 subconjuntos de focos, incluindo "nenhum") conferidas contra a tabela ACR 2017: pontuação, categoria e as 6 linhas.
 - Totais atingíveis: 0 a 17, todos. Nenhum total é impossível pela soma (focos somam 0–6 sem buraco; os outros itens completam até 17). Espongiforme trava em 0; mesmo só com combinações coerentes (cístico só anecoico, anecoico só cístico) todos os 18 totais continuam possíveis (cístico/anecoico: 0–12; sólido/misto: 2–17).

@@ -304,14 +304,13 @@
       for (i = 0; i < F.foc.length; i++) { F.foc[i].checked = false; }
     }
     setTxt(F.res, r.complete ? level(r.total) + ' · ' + ptsLab(r.total) : '');
-    /* C6k: avisos do ACR e o corte de tamanho (só no painel; o laudo não recebe veredito, C6g) */
+    /* C6m: avisos do ACR e corte de tamanho só no title do resultado (nenhum texto visível) */
     var mx = null, k, v, nt = r.notes.slice(0); for (k = 0; k < 3; k++) { v = parseMm(F.mm[k].value); if (v !== null && (mx === null || v > mx)) { mx = v; } }
     if (r.complete && mx !== null) { nt.push(sizeNote(r.total, String(mx))); }
-    setTxt(F.note, nt.join(' ')); F.note.style.display = nt.length ? '' : 'none';
     var NA = st.comp === 'esp' ? 'Não se aplica: espongiforme não soma outras categorias' : '';
     F.sel.eco.title = NA || (st.comp === 'ind' ? 'Composição indeterminável: ecogenicidade conta 1 ponto' : '');
     F.sel.forma.title = F.sel.marg.title = NA; for (i = 0; i < F.foc.length; i++) { F.foc[i].parentNode.title = NA || F.foc[i].parentNode.getAttribute('data-t'); }
-    F.res.title = r.complete ? LV[level(r.total)][0] : '';
+    F.res.title = r.complete ? [LV[level(r.total)][0]].concat(nt).join(' ') : nt.join(' ');
     F.ins.disabled = !r.complete;
   }
   function choiceHtml(opts, i) {
@@ -417,7 +416,6 @@
     mmr.appendChild(el('span', 'uc-u', 'mm')); g.appendChild(mmr);
     var foot = el('div', 'tr-foot'); F.res = el('span', 'tr-res'); F.ins = el('button', 'btn btn-sm btn-primary tr-ins', 'Inserir nódulo'); F.ins.type = 'button'; F.ins.id = 'trIns';
     foot.appendChild(F.res); foot.appendChild(F.ins); g.appendChild(foot);
-    F.note = el('div', 'tr-note'); F.note.style.cssText = 'font-size:11px;color:#666;margin-top:4px;display:none'; g.appendChild(F.note);
     for (j = 0; j < 3; j++) { on(F.mm[j], 'input', updForm); }
     on(F.ins, 'click', insertForm);
     /* C6j: Enter passa ao próximo campo do nódulo; no último (T), insere como o botão */
