@@ -128,7 +128,7 @@ with sync_playwright() as p:
                 ck('1 templates-intermediarios.txt = gerado do banco atual', open(inf, encoding='utf-8').read() == want)
         for t in tp:
             nm = t['name']
-            bad = [c for c in ('?[', '?+[', '*', '@@', '##', '|') if c in t['inter']]
+            bad = [c for c in ('?[', '?+[', '***', '**', '*,*', '@@', '##', '|') if c in t['inter']]
             ck('1 [%s] %s: intermediário sem marcação do banco' % (label, nm), not bad, bad)
             paste(pg, t['inter']); em = pg.evaluate(EMPTY)
             ck('1 [%s] %s: intermediário em branco colado vira campos vazios (%d num, %d escolhas)' % (label, nm, t['ei']['n'], t['ei']['sel']),

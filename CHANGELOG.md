@@ -11,6 +11,13 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C6p] Template intermediário com "*" no lugar do campo; colar tolera erros das assistentes — testado só em Chromium automatizado, NÃO testado pelo usuário
+- O template intermediário (`UFTest.interText`) agora usa `*` em cada campo (número, número com vírgula e texto), em vez de `___`. Escolhas continuam "a / b / c". As marcações do banco (`*****`, `***`, `**`, `*,*`, `?[`, `@@`) não aparecem no texto.
+- Ao colar: `*` ainda no lugar = campo em branco; número/texto no lugar do `*` = campo preenchido; `___` (C6o) e laudos já colados continuam reconhecidos.
+- Tolerância a erros comuns: `*` deixado ao lado do valor (`*52`, `52*`, `* 52 *`), espaços a mais, vírgula ou ponto no decimal, opção escrita com MAIÚSCULAS/minúsculas diferentes. Se a linha não bate exatamente (unidade repetida ou faltando, duas opções deixadas "a / b", escolha apagada), o app tenta uma segunda leitura mais solta da mesma linha: o que estiver claro vira campo; o que tiver dúvida fica em branco / "escolher". Palavras digitadas que não são opção nem número ficam como texto (nunca são apagadas). Linha que não bate com nada continua texto simples; nada do resto do laudo é perdido.
+- Sem texto novo na interface.
+- Testes: `test/c6p_test.py` (55 verificações com o banco de teste; 117 com `UF_BANCO`); `test/c6o_test.py` ajustado para o `*`.
+
 ## [etapa-C6o] Templates intermediários (colar de outro sistema), cartões "(padrão)" destacados, Tab/Enter na revisão, Editar banco na pasta — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Laudo colado (C6e) também reconhece o "template intermediário" (texto puro, para outro sistema, sem `?[`, `*`, `@@`): lacuna `___` (qualquer quantidade de sublinhados) = campo vazio; escolha ainda não feita escrita como "a / b / c" (opções separadas por " / ", na ordem do banco) = lista vazia ("escolher"). Depois de preenchido no outro sistema (número no lugar do `___`, só a opção escolhida), o laudo colado volta com os campos preenchidos, como antes. O texto intermediário é gerado pelo próprio app a partir do banco (`UFTest.interText`); os 5 modelos ficam fora do repositório.
 - Cartões cujo nome contém "(padrão)" (modelos e frases): borda esquerda na cor de destaque, sombra, título um pouco maior e mais espaço acima/abaixo, separando-os dos variantes. Só CSS + uma classe; nenhum texto novo.

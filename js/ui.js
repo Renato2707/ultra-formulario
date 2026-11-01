@@ -2690,9 +2690,19 @@ var UFMain = function () {
      Each bank line (models and phrases) that has fields becomes a pattern; a pasted line that matches it is rebuilt
      with the same field chips, already filled with the pasted values (so the calculators read them). Lines that
      match nothing stay plain text. Nothing is guessed: a value is only taken where the bank has a field. */
-  var RG = { bank: null, pats: [] };
-  function rgLit(t) {
-    var out = '', i, c;
+  var RG = { bank: null, pats: [], loose: [] };
+  var RG_UNIT = /^(mm|cm|cm\u00b3|cm3|ml|bpm|g|%|semanas?|dias?)([.,;:)]?)$/i;
+  function rgLit(t, loose) {   /* C6p loose: a unit word may be missing or repeated */
+    var out = '', i, c, w;
+    if (loose) {
+      w = String(t).split(/(\s+)/); out = '';
+      for (i = 0; i < w.length; i++) {
+        c = RG_UNIT.exec(w[i]);
+        if (c) { out += '(?:' + rgLit(c[1]) + '\\s*)*' + rgLit(c[2]); }
+        else { out += rgLit(w[i]); }
+      }
+      return out;
+    }
     for (i = 0; i < t.length; i++) {
       c = t.charAt(i);
       if (/\s/.test(c)) { if (!/\\s\*$/.test(out)) { out += '\\s*'; } }
@@ -2704,12 +2714,13 @@ var UFMain = function () {
     return out;
   }
   /* compile(text): segments [{lit} | {f: field}], src = regex source; capture=true wraps every segment in a group */
-  function rgCompile(text, capture, depth) {
+  function rgCompile(text, capture, depth, loose) {
     var fs = UltraParser.fieldsOf(text), seg = [], pos = 0, i, src = '', k, f, alts;
     function add(s2) { src += capture ? '(' + s2 + ')' : '(?:' + s2 + ')'; }
     for (i = 0; i < fs.length; i++) {
       f = fs[i]; if (f.offset < pos) { continue; }
-      if (f.offset > pos) { seg.push({ lit: text.substring(pos, f.offset) }); add(rgLit(text.substring(pos, f.offset))); }
+      if (f.offset > pos) { seg.push({ lit: text.substring(pos, f.offset) }); add(rgLit(text.substring(pos, f.offset), loose)); }
+      if (loose) { add(f.type === 'select' ? '.*?' : '.*?'); seg.push({ f: f, loose: 1 }); pos = f.offset + f.raw.length; continue; }
       if (f.type === 'select') {
         alts = [];
         for (k = 0; k < f.options.length; k++) { alts.push(depth < 3 ? rgCompile(f.options[k], false, depth + 1).src : rgLit(f.options[k])); }
@@ -2720,34 +2731,34 @@ var UFMain = function () {
           for (k = 0; k < f.options.length; k++) { tw = String(f.options[k]).split(/\s+/); for (ti = 1; ti < tw.length; ti++) { tails.push(rgLit(tw.slice(ti).join(' '))); } }
           tails.sort(function (a, b) { return b.length - a.length; });
           var any = '(?:' + alts.concat(tails).join('|') + ')';
-          add(one + '(?:(?:,\\s*|\\s+e\\s+)' + any + ')*|escolher|_+|' + rgListSrc(f));
+          add(one + '(?:(?:,\\s*|\\s+e\\s+)' + any + ')*|escolher|_+|\\*|' + rgListSrc(f));
         } else {
-          alts.push('escolher'); alts.push('_+');   /* an unchosen choice is printed as ___ */
+          alts.push('escolher'); alts.push('_+'); alts.push('\\*');   /* an unchosen choice is printed as ___ */
           alts.unshift(rgListSrc(f));   /* C6o: intermediate template, all options still listed "a / b / c" */
           add(alts.join('|'));
         }
       } else if (f.type === 'text') { add('.+?'); }
-      else { add('\\d+(?:[.,]\\d+)?|_+(?:,_+)?'); }
+      else { add('(?:\\*\\s*)?\\d+(?:[.,]\\d+)?(?:\\s*\\*)?|_+(?:,_+)?|\\*(?:,\\*)?'); }   /* C6p: "*" = blank; a "*" left beside the number is ignored */
       seg.push({ f: f }); pos = f.offset + f.raw.length;
     }
-    if (pos < text.length) { seg.push({ lit: text.substring(pos) }); add(rgLit(text.substring(pos))); }
+    if (pos < text.length) { seg.push({ lit: text.substring(pos) }); add(rgLit(text.substring(pos), loose)); }
     return { seg: seg, src: src };
   }
-  /* C6o: plain-text "intermediate" form of a bank text (for other systems): * -> ___, ?[a|b] -> "a / b", no markup */
+  /* C6o/C6p: plain-text "intermediate" form of a bank text (for other systems): any field -> *, ?[a|b] -> "a / b", no other markup */
   function interText(t) {
     var fs = UltraParser.fieldsOf(t), out = '', pos = 0, i, k, f, o;
     for (i = 0; i < fs.length; i++) {
       f = fs[i]; if (f.offset < pos) { continue; }
       out += t.substring(pos, f.offset);
       if (f.type === 'select') { o = []; for (k = 0; k < f.options.length; k++) { o.push(interText(f.options[k])); } out += o.join(' / '); }
-      else { out += '___'; }
+      else { out += '*'; }
       pos = f.offset + f.raw.length;
     }
     return out + t.substring(pos);
   }
   function rgListSrc(f) {
     var o = [], k;
-    for (k = 0; k < f.options.length; k++) { o.push(rgLit(interText(f.options[k])).replace(/___/g, '_+')); }
+    for (k = 0; k < f.options.length; k++) { o.push(rgLit(interText(f.options[k])).replace(/\\\*/g, '(?:\\*|_+(?:,_+)?)'));   /* C6p "*", C6o "___" */ }
     return o.join('\\s*\\/\\s*');
   }
   function rgPats() {
@@ -2759,7 +2770,7 @@ var UFMain = function () {
       for (j = 0; j < ex.templates.length; j++) { bodies.push(ex.templates[j].body); }
       for (j = 0; j < (ex.sections || []).length; j++) { for (k = 0; k < ex.sections[j].phrases.length; k++) { bodies.push(ex.sections[j].phrases[k].body); } }
     }
-    RG.pats = []; RG.bank = S.bank; var seen = {};
+    RG.pats = []; RG.loose = []; RG.bank = S.bank; var seen = {};
     for (i = 0; i < bodies.length; i++) {
       ls = String(bodies[i] || '').split('\n');
       for (j = 0; j < ls.length; j++) {
@@ -2769,9 +2780,12 @@ var UFMain = function () {
         if (lit.length < 4) { continue; }   /* too little fixed text to be sure */
         try { c = rgCompile(l, true, 0); if (!c.seg.length) { continue; } c.re = new RegExp('^' + c.src + '$', 'i'); c.lit = lit.length; } catch (e) { continue; }
         seen[l] = 1; RG.pats.push(c);
+        /* C6p: tolerant copy (any text where a field is, unit missing/repeated), tried only when no exact line matches */
+        if (lit.length >= 8) { try { var c2 = rgCompile(l, true, 0, true); c2.re = new RegExp('^' + c2.src + '$', 'i'); c2.lit = 0; for (k = 0; k < c2.seg.length; k++) { if (c2.seg[k].lit !== undefined) { c2.lit += c2.seg[k].lit.replace(/[^A-Za-z\u00c0-\u00ff]/g, '').length; } } if (c2.lit >= 8) { RG.loose.push(c2); } } catch (e2) { /* skip */ } }
       }
     }
     RG.pats.sort(function (a, b) { return b.lit - a.lit; });
+    RG.loose.sort(function (a, b) { return b.lit - a.lit; });
     return RG.pats;
   }
   /* C6h: split "a, b e c" into option indices; longest option first, with backtracking (options may contain commas) */
@@ -2806,8 +2820,10 @@ var UFMain = function () {
     }
     return go(0, []);
   }
-  function rgFieldHtml(f, v) {
+  function rgFieldHtml(f, v, loose) {
     var k, c, m;
+    v = String(v).replace(/^\s+|\s+$/g, '');
+    if (loose) { return rgLooseHtml(f, v); }
     if (f.type === 'select') {
       if (/^(escolher|_+)$/i.test(v) || new RegExp('^(?:' + rgListSrc(f) + ')$', 'i').test(v)) { return chipHtml(f); }
       if (f.multi) { var mi = rgMulti(f.options, v); return mi ? multiChipHtml(JSON.stringify(f.options), mi, f.options, true) : esc(v); }
@@ -2822,13 +2838,34 @@ var UFMain = function () {
       return esc(v);
     }
     var t = f.type === 'text' ? 't' : (f.decimal ? 'd' : 'n');
-    if (/^_+(,_+)?$/.test(v) || v === PH.t) { return chipHtml(f); }
+    if (t !== 't') { v = v.replace(/^\*\s*|\s*\*$/g, ''); }
+    if (/^_+(,_+)?$/.test(v) || /^\*+(,\*+)?$/.test(v) || !v || v === PH.t) { return chipHtml(f); }
     return '<span class="fld f-ok" data-t="' + t + '" data-ph="' + PH[t] + '">' + esc(v) + '</span>';
   }
   function rgHtml(c, m) {
     var out = '', i;
-    for (i = 0; i < c.seg.length; i++) { out += c.seg[i].lit !== undefined ? esc(m[i + 1]) : rgFieldHtml(c.seg[i].f, m[i + 1]); }
+    for (i = 0; i < c.seg.length; i++) { out += c.seg[i].lit !== undefined ? esc(m[i + 1]) : rgFieldHtml(c.seg[i].f, m[i + 1], c.seg[i].loose); }
     return out;
+  }
+  /* C6p: value from a tolerant match: what is clear becomes the field; anything doubtful = blank / not chosen */
+  function rgLooseHtml(f, v) {
+    var k, n, h;
+    if (f.type === 'select') {
+      try { h = rgFieldHtml(f, v); } catch (e) { h = ''; }
+      if (/class="fld/.test(h)) { return h; }
+      /* blank, or only some of the options left ("a / b"): not chosen; any other text is kept as typed */
+      var ps = v.split(/\s*\/\s*/), ok = true, j;
+      for (k = 0; k < ps.length && ok; k++) {
+        if (/^[*_\s]*$|^escolher$/i.test(ps[k])) { continue; }
+        ok = false; for (j = 0; j < f.options.length; j++) { if (rgNorm(interText(f.options[j])).replace(/\*/g, '') === rgNorm(ps[k]).replace(/[*_]/g, '')) { ok = true; } }
+      }
+      return ok ? chipHtml(f) : esc(v);
+    }
+    if (f.type === 'text') { v = v.replace(/^[*_\s]+|[*_\s]+$/g, ''); return v ? rgFieldHtml(f, v) : chipHtml(f); }
+    n = v.match(/\d+(?:[.,]\d+)?/g);
+    k = v.replace(/\d+(?:[.,]\d+)?/g, '').replace(/[*_\s]|mm|cm|ml|bpm|[3\u00b3%]/gi, '');
+    if (n && n.length === 1 && !k) { return rgFieldHtml(f, n[0]); }
+    return /[A-Za-z\u00c0-\u00ff]/.test(k) ? esc(v) : chipHtml(f);   /* words are never thrown away */
   }
   /* text -> html of line divs, or null when no line was recognized */
   function recognizeText(text) {
@@ -2837,8 +2874,10 @@ var UFMain = function () {
     for (i = 0; i < ls.length; i++) {
       l = ls[i]; b = /^\s*[\u2022\-\u2013]\s*/.exec(l); core = l.replace(/^\s*[\u2022\-\u2013]\s*/, '').replace(/\s+$/, '');
       m = null;
+      var pz = pats;
       if (core.length > 3) { for (j = 0; j < pats.length; j++) { m = pats[j].re.exec(core); if (m) { break; } } }
-      if (m) { hit++; out.push('<div>' + (b ? esc(b[0]) : '') + rgHtml(pats[j], m) + '</div>'); }
+      if (!m && core.length > 3) { pz = RG.loose; for (j = 0; j < pz.length; j++) { try { m = pz[j].re.exec(core); } catch (e) { m = null; } if (m) { break; } } }
+      if (m) { hit++; out.push('<div>' + (b ? esc(b[0]) : '') + rgHtml(pz[j], m) + '</div>'); }
       else { out.push('<div>' + (l ? esc(l) : '<br>') + '</div>'); }
     }
     return hit ? { html: out.join(''), hits: hit, lines: ls.length } : null;
