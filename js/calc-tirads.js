@@ -30,6 +30,12 @@
     else if (st.eco) { per.eco = pts('eco', st.eco); }
     if (st.forma) { per.forma = pts('forma', st.forma); }
     if (st.marg) { per.marg = pts('marg', st.marg); }
+    /* C6k: combinações incoerentes pelas definições do ACR: só avisam (a pontuação segue a soma do ACR) */
+    if (st.comp === 'cist' && st.eco && st.eco !== 'anec') { notes.push('Atenção: cístico costuma ser anecoico (anecoico = cístico ou quase completamente cístico); confira.'); }
+    if (st.eco === 'anec' && (st.comp === 'sol' || st.comp === 'mist')) { notes.push('Atenção: anecoico corresponde a cístico; confira a composição.'); }
+    if (st.eco === 'anec' && f.length && (f.length > 1 || f[0] !== 'nenhum')) { notes.push('Atenção: anecoico (cístico) com focos que pontuam; confira.'); }
+    if (st.comp === 'mist') { notes.push('Misto: pontue o componente predominantemente sólido.'); }
+    if (st.marg === 'ete') { notes.push('Extensão extratireoidiana: invasão óbvia = malignidade (ACR TI-RADS).'); }
     if (f.length) { per.focos = 0; for (i = 0; i < f.length; i++) { per.focos += pts('focos', f[i]); } }
     var complete = per.comp !== null && per.eco !== null && per.forma !== null && per.marg !== null && per.focos !== null;
     var total = (per.comp || 0) + (per.eco || 0) + (per.forma || 0) + (per.marg || 0) + (per.focos || 0);
@@ -81,14 +87,21 @@
       var prev = f.previousSibling, pt = prev && prev.nodeType === 3 ? prev.nodeValue : '';
       if (!/TI-RADS\s*$/i.test(pt)) { continue; }
       ln = blockOf(f); if (!ln || seen.indexOf(ln) >= 0) { continue; }
-      var all = ln.querySelectorAll('.fld'), k = -1, chips = [], txt;
+      var all = ln.querySelectorAll('.fld'), k = -1, chips = [], txt, last;
       for (j = 0; j < all.length; j++) { if (all[j] === f) { k = j; break; } }
       /* a frase do nódulo: do "nódulo" até o campo do TI-RADS */
       txt = ln.textContent || '';
       if (!/n[óo]dulo/i.test(txt)) { continue; }
       for (j = 0; j < k; j++) { if (all[j].getAttribute('data-t') === 's') { chips.push(all[j]); } }
+      /* C6k: espongiforme = as demais características não se aplicam; a frase pode estar encurtada (só a composição) */
+      var isEsp = chips.length && mapTxt('comp', chips[0].getAttribute('data-v') !== null ? chips[0].textContent : '') === 'esp';
+      if (isEsp && (chips.length < 5 || ln.getAttribute('data-esprest') !== null)) {
+        var nn = [], st0 = -1; for (j = 0; j < k; j++) { if (all[j] === chips[0]) { st0 = j; } }
+        for (j = st0 + 1; j < k; j++) { var t0 = all[j].getAttribute('data-t'); if (t0 === 'n' || t0 === 'd') { nn.push(all[j]); } }
+        seen.push(ln); out.push({ chips: [chips[0]], out: f, nums: nn, line: ln, esp: true }); continue;
+      }
       if (chips.length < 5) { continue; }
-      var nums = [], last = -1;
+      var nums = []; last = -1;
       for (j = 0; j < k; j++) { if (all[j] === chips[4]) { last = j; } }
       for (j = last + 1; j < k; j++) { var tt = all[j].getAttribute('data-t'); if (tt === 'n' || tt === 'd') { nums.push(all[j]); } }
       seen.push(ln); out.push({ chips: chips.slice(0, 5), out: f, nums: nums, line: ln });
@@ -106,10 +119,12 @@
   }
   function readTxt(n) {
     var st = { focos: [] }, i, c, v, miss = 0;
+    if (n.esp || (n.chips[0].getAttribute('data-v') !== null && mapTxt('comp', n.chips[0].textContent) === 'esp')) { return { st: { comp: 'esp', focos: [] }, miss: 0 }; }
     for (i = 0; i < 5; i++) {
       c = n.chips[i];
       if (c.getAttribute('data-m') === '1' && ORDER[i] === 'focos') { v = multiFocos(c); if (v === null) { miss++; } else { st.focos = v; } continue; }
       v = c.getAttribute('data-v') !== null ? mapTxt(ORDER[i], c.textContent) : null;
+      if (v === null && ORDER[i] === 'eco' && st.comp === 'ind') { continue; }   /* C6k: composição indeterminável: ecogenicidade = 1 ponto, não exigida */
       if (v === null) { miss++; continue; }
       if (ORDER[i] === 'focos') { st.focos = [v]; } else { st[ORDER[i]] = v; }
     }
@@ -131,12 +146,15 @@
   }
   function isRec(n) { return n && n.nodeType === 1 && (' ' + n.className + ' ').indexOf(' uc-trl ') >= 0; }
   /* bloco de 6 linhas logo depois da linha do nódulo (texto comum, editável; as linhas não mexidas somem se o nódulo ficar incompleto) */
-  function setRec(ln, L) {
+  function setRec(ln, L, A) {
     var cur = [], n = ln.nextSibling, i, j, d, ch = false, made, last = null, LB = /^(Pontua\u00e7\u00e3o|Categoria TIRADS|N\u00edvel de Risco|Risco de Malignidade|Recomenda\u00e7\u00e3o de PAAF|Sugest\u00e3o de Acompanhamento):/, nx;
     /* um laudo colado/importado já traz as 6 linhas como texto: elas passam a ser as linhas calculadas (sem duplicar) */
     while (L && n && n.nodeType === 1 && !isRec(n) && !n.querySelector('.fld') && LB.test(n.textContent || '')) { nx = n.nextSibling; n.parentNode.removeChild(n); ch = true; n = nx; }
     n = ln.nextSibling;
     while (n && (n.nodeType === 3 && !/\S/.test(n.nodeValue) ? true : isRec(n))) { if (isRec(n)) { cur.push(n); } n = n.nextSibling; }
+    /* C6k: com as 5 antigas no laudo, as 6 linhas vão no lugar delas (A = âncora logo abaixo do título) */
+    var mode = A && L ? 'a' : '1';
+    if (A && L) { for (i = 0; i < cur.length; i++) { if (cur[i].getAttribute('data-auto') === null || cur[i].getAttribute('data-auto') === cur[i].textContent) { cur[i].parentNode.removeChild(cur[i]); ch = true; } } cur = A.groups[A.k] || []; A.k++; }
     /* C6g: as linhas são texto comum (editável e apagável). Cada uma lembra o texto que o app escreveu (data-auto):
        se Renato mexer, a linha fica como ele deixou; se apagar, ela não volta enquanto o nódulo continuar completo. */
     for (i = cur.length - 1; i >= 0; i--) { if (cur[i].getAttribute('data-i') === null) { cur[i].parentNode.removeChild(cur[i]); cur.splice(i, 1); ch = true; } }
@@ -147,7 +165,7 @@
       if (ln.getAttribute('data-trl') !== null) { ln.removeAttribute('data-trl'); }
       return ch;
     }
-    made = ln.getAttribute('data-trl') === '1';
+    made = ln.getAttribute('data-trl') === mode;
     for (i = 0; i < L.length; i++) {
       d = null;
       for (j = 0; j < cur.length; j++) { if (cur[j].getAttribute('data-i') === String(i)) { d = cur[j]; break; } }
@@ -161,21 +179,29 @@
       }
       if (made) { continue; }   /* apagada de propósito: não volta */
       d = document.createElement('div'); d.className = 'uc-trl'; d.setAttribute('data-i', String(i)); d.setAttribute('data-auto', L[i]); d.textContent = L[i]; d.ucGen = gen;
-      var ref = last ? last : ln; ref.parentNode.insertBefore(d, ref.nextSibling); cur.push(d); last = d; ch = true;
+      var ref = last ? last : (mode === 'a' ? A.tail : ln);
+      if (ref) { ref.parentNode.insertBefore(d, ref.nextSibling); } else { A.par.insertBefore(d, A.par.firstChild); }
+      cur.push(d); last = d; ch = true;
     }
     for (i = 0; i < cur.length; i++) { cur[i].ucGen = gen; }
-    if (!made) { ln.setAttribute('data-trl', '1'); }
+    if (mode === 'a' && last) { A.tail = last; }
+    if (!made) { ln.setAttribute('data-trl', mode); }
     return ch;
   }
   /* C6j: as 5 linhas antigas do banco ("TI-RADS 1 (nódulo benigno): ..." a "TI-RADS 5 (...): ...") saem quando
      há nódulo calculado (as 6 linhas as substituem) e voltam no mesmo lugar se nenhum nódulo ficar completo. */
-  var OLDREC = /^\s*TI-RADS\s*[1-5]\s*\(n[\u00f3o]dulo[^)]*\)\s*:/i, oldKept = null;
+  var RECLB = /^(Pontua\u00e7\u00e3o|Categoria TIRADS|N\u00edvel de Risco|Risco de Malignidade|Recomenda\u00e7\u00e3o de PAAF|Sugest\u00e3o de Acompanhamento):/, OLDREC = /^\s*TI-RADS\s*[1-5]\s*\(n[\u00f3o]dulo[^)]*\)\s*:/i, oldKept = null;
   function oldBlock(on) {
     var i, c, kids, out = [], ch = false, ref, par;
+    if (oldKept && !(oldKept.par && ed.contains(oldKept.par) && (!oldKept.ref || oldKept.ref.parentNode === oldKept.par))) { oldKept = null; }
     if (on) {
       kids = ed.querySelectorAll('div,p');
-      for (i = 0; i < kids.length; i++) { c = kids[i]; if (!isRec(c) && !c.querySelector('.fld,div,p') && OLDREC.test(c.textContent || '')) { out.push(c); } }
+      var pl = [];
+      for (i = 0; i < kids.length; i++) { c = kids[i]; if (!isRec(c) && !c.querySelector('.fld,div,p')) { if (OLDREC.test(c.textContent || '')) { out.push(c); } else if (RECLB.test(c.textContent || '')) { pl.push(c); } } }
+      /* C6k: laudo colado no formato novo (6 linhas abaixo do título): o lugar delas vira a âncora */
+      if (!out.length && pl.length && !oldKept) { oldKept = { ref: pl[0].previousSibling, par: pl[0].parentNode, nodes: [] }; for (i = 0; i < pl.length; i++) { pl[i].parentNode.removeChild(pl[i]); } return true; }
       if (!out.length) { return false; }
+      for (i = 0; i < pl.length; i++) { pl[i].parentNode.removeChild(pl[i]); }
       oldKept = { ref: out[0].previousSibling, par: out[0].parentNode, nodes: out };
       for (i = 0; i < out.length; i++) { out[i].parentNode.removeChild(out[i]); }
       return true;
@@ -187,19 +213,64 @@
     }
     oldKept = null; return ch;
   }
+  /* C6k: espongiforme no laudo: tira da frase ", ecogenicidade, forma, margens ..., focos" (guarda no data-esprest da linha);
+     trocando a composição para outra, o trecho volta no mesmo lugar. */
+  function espFix() {
+    var ch = false, NL = textNodules(), i, n, c, f4, x, h, box, L;
+    for (i = 0; i < NL.length; i++) {
+      n = NL[i]; if (n.esp || n.chips.length < 5) { continue; }
+      c = n.chips[0]; f4 = n.chips[4];
+      if (c.getAttribute('data-v') === null || mapTxt('comp', c.textContent) !== 'esp' || f4.parentNode !== c.parentNode) { continue; }
+      box = document.createElement('div'); x = c.nextSibling;
+      while (x) { h = x.nextSibling; box.appendChild(x); if (x === f4) { break; } x = h; }
+      n.line.setAttribute('data-esprest', box.innerHTML); ch = true;
+    }
+    L = ed.querySelectorAll('[data-esprest]');
+    for (i = 0; i < L.length; i++) {
+      x = L[i].querySelectorAll('.fld[data-t=s]'); c = x.length ? x[0] : null;
+      if (!c || (c.getAttribute('data-v') !== null && mapTxt('comp', c.textContent) === 'esp')) { continue; }
+      box = document.createElement('div'); box.innerHTML = L[i].getAttribute('data-esprest');
+      h = c.nextSibling; while (box.firstChild) { c.parentNode.insertBefore(box.firstChild, h); }
+      L[i].removeAttribute('data-esprest'); ch = true;
+    }
+    return ch;
+  }
   var gen = 0;
   function runTxt() {
     if (busyT || !ed) { return; }
     busyT = true; gen++;
     try {
-      var NL = textNodules(), i, r, sc, ch = false, ok, q, old;
+      var chE = espFix();
+      var NL = textNodules(), i, r, sc, ch = false, ok, q, old, RS = [], anyOk = false, A = null, n, g, pv;
       for (i = 0; i < NL.length; i++) {
         r = readTxt(NL[i]); sc = r.miss ? null : score(r.st); ok = txtOn && sc && sc.complete;
-        if (putT(NL[i].out, ok ? level(sc.total).substring(2) : null)) { ch = true; }
-        if (setRec(NL[i].line, ok ? recLines(sc.total, maxMm(NL[i])) : null)) { ch = true; }
+        RS.push(ok ? sc : null); if (ok) { anyOk = true; }
+        if (ok) {   /* 6 linhas coladas como texto logo após a frase do nódulo (formato C6j) */
+          n = NL[i].line.nextSibling;
+          while (n && n.nodeType === 1 && !isRec(n) && !n.querySelector('.fld') && RECLB.test(n.textContent || '')) { q = n.nextSibling; n.parentNode.removeChild(n); ch = true; n = q; }
+        }
       }
-      var anyOk = false; for (i = 0; i < NL.length; i++) { if (NL[i].line.getAttribute('data-trl') === '1') { anyOk = true; } }
       if (oldBlock(anyOk)) { ch = true; }
+      if (oldKept && oldKept.par && ed.contains(oldKept.par) && (!oldKept.ref || oldKept.ref.parentNode === oldKept.par)) {
+        /* C6k: âncora = logo abaixo do título; os blocos já escritos ali são agrupados por nódulo (data-i recomeça) */
+        A = { par: oldKept.par, tail: oldKept.ref, k: 0, groups: [] }; g = null; pv = 99;
+        n = oldKept.ref ? oldKept.ref.nextSibling : oldKept.par.firstChild;
+        while (n && (n.nodeType === 3 && !/\S/.test(n.nodeValue) ? true : isRec(n))) {
+          if (isRec(n)) { q = parseInt(n.getAttribute('data-i'), 10); if (!g || !(q > pv)) { g = []; A.groups.push(g); } g.push(n); pv = q; A.tail = n; }
+          n = n.nextSibling;
+        }
+        A.tail = oldKept.ref;
+      }
+      /* C6k: cada nódulo mostra o seu TI-RADS na frase; a recomendação (6 linhas) é UMA só: a do nódulo de maior
+         pontuação (empate: maior categoria, que segue a pontuação; ainda empatado: o primeiro do laudo) */
+      if (chE) { ch = true; }
+      var best = -1; for (i = 0; i < NL.length; i++) { if (RS[i] && (best < 0 || RS[i].total > RS[best].total)) { best = i; } }
+      for (i = 0; i < NL.length; i++) {
+        sc = RS[i];
+        if (putT(NL[i].out, sc ? level(sc.total).substring(2) : null)) { ch = true; }
+        if (setRec(NL[i].line, i === best ? recLines(sc.total, maxMm(NL[i])) : null, A)) { ch = true; }
+      }
+      if (A) { for (i = A.k; i < A.groups.length; i++) { for (q = 0; q < A.groups[i].length; q++) { n = A.groups[i][q]; if (n.getAttribute('data-auto') !== null && n.getAttribute('data-auto') !== n.textContent) { n.ucGen = gen; } } } }
       old = ed.querySelectorAll('.uc-trl');
       for (q = old.length - 1; q >= 0; q--) { if (old[q].ucGen !== gen) { old[q].parentNode.removeChild(old[q]); ch = true; } }
       if (ch) { var ev; try { ev = new Event('input', { bubbles: true }); } catch (x) { ev = document.createEvent('Event'); ev.initEvent('input', true, false); } ed.dispatchEvent(ev); }
@@ -228,7 +299,18 @@
     var st = formState(), r = score(st), i;
     F.sel.eco.disabled = st.comp === 'esp' || st.comp === 'ind'; F.sel.forma.disabled = F.sel.marg.disabled = st.comp === 'esp';
     for (i = 0; i < F.foc.length; i++) { F.foc[i].disabled = st.comp === 'esp'; }
+    if (st.comp === 'esp') {   /* C6k: espongiforme: as demais características não se aplicam (zeradas) */
+      F.sel.eco.value = F.sel.forma.value = F.sel.marg.value = '';
+      for (i = 0; i < F.foc.length; i++) { F.foc[i].checked = false; }
+    }
     setTxt(F.res, r.complete ? level(r.total) + ' · ' + ptsLab(r.total) : '');
+    /* C6k: avisos do ACR e o corte de tamanho (só no painel; o laudo não recebe veredito, C6g) */
+    var mx = null, k, v, nt = r.notes.slice(0); for (k = 0; k < 3; k++) { v = parseMm(F.mm[k].value); if (v !== null && (mx === null || v > mx)) { mx = v; } }
+    if (r.complete && mx !== null) { nt.push(sizeNote(r.total, String(mx))); }
+    setTxt(F.note, nt.join(' ')); F.note.style.display = nt.length ? '' : 'none';
+    var NA = st.comp === 'esp' ? 'Não se aplica: espongiforme não soma outras categorias' : '';
+    F.sel.eco.title = NA || (st.comp === 'ind' ? 'Composição indeterminável: ecogenicidade conta 1 ponto' : '');
+    F.sel.forma.title = F.sel.marg.title = NA; for (i = 0; i < F.foc.length; i++) { F.foc[i].parentNode.title = NA || F.foc[i].parentNode.getAttribute('data-t'); }
     F.res.title = r.complete ? LV[level(r.total)][0] : '';
     F.ins.disabled = !r.complete;
   }
@@ -276,7 +358,8 @@
           mv.sort(function (a, b) { return a - b; });
           out += multiHtml(fs[i].options, mv); si++; continue;
         }
-        if (si < 5) { idx = pickIdx(fs[i].options, ORDER[si], ORDER[si] === 'focos' ? foc : st[ORDER[si]]); }
+        if (si === 1 && st.comp === 'ind') { idx = pickIdx(fs[i].options, 'eco', 'ind'); }
+        else if (si < 5) { idx = pickIdx(fs[i].options, ORDER[si], ORDER[si] === 'focos' ? foc : st[ORDER[si]]); }
         else if (si === 5 && f.terco) { idx = fs[i].options.indexOf(f.terco); }
         else if (si === 6 && f.lado && f.lado !== 'istmo') { idx = fs[i].options.indexOf(f.lado); }
         out += choiceHtml(fs[i].options, idx); si++;
@@ -314,7 +397,7 @@
     var SH = { nenhum: 'Sem focos / cometa grande', macro: 'Macrocalcificações', perif: 'Periféricas', punct: 'Puntiformes' };
     for (j = 0; j < CAT[4].o.length; j++) {
       var lb = el('label', 'tr-chip'), cb = el('input'); cb.type = 'checkbox'; cb.value = CAT[4].o[j][0]; cb.checked = cb.value === 'nenhum'; cb.setAttribute('data-cat', 'focos');
-      lb.title = CAT[4].o[j][1]; lb.appendChild(cb); lb.appendChild(document.createTextNode(' ' + SH[cb.value] + ' · ' + CAT[4].o[j][2]));
+      lb.title = CAT[4].o[j][1]; lb.setAttribute('data-t', lb.title); lb.appendChild(cb); lb.appendChild(document.createTextNode(' ' + SH[cb.value] + ' · ' + CAT[4].o[j][2]));
       (function (box) { on(box, 'click', function () {
         var k; if (box.checked) { for (k = 0; k < F.foc.length; k++) { if ((box.value === 'nenhum') !== (F.foc[k].value === 'nenhum')) { F.foc[k].checked = false; } } }
         updForm(); }); })(cb);
@@ -334,6 +417,8 @@
     mmr.appendChild(el('span', 'uc-u', 'mm')); g.appendChild(mmr);
     var foot = el('div', 'tr-foot'); F.res = el('span', 'tr-res'); F.ins = el('button', 'btn btn-sm btn-primary tr-ins', 'Inserir nódulo'); F.ins.type = 'button'; F.ins.id = 'trIns';
     foot.appendChild(F.res); foot.appendChild(F.ins); g.appendChild(foot);
+    F.note = el('div', 'tr-note'); F.note.style.cssText = 'font-size:11px;color:#666;margin-top:4px;display:none'; g.appendChild(F.note);
+    for (j = 0; j < 3; j++) { on(F.mm[j], 'input', updForm); }
     on(F.ins, 'click', insertForm);
     /* C6j: Enter passa ao próximo campo do nódulo; no último (T), insere como o botão */
     var chain = [F.sel.comp, F.sel.eco, F.sel.forma, F.sel.marg, F.terco, F.lado, F.mm[0], F.mm[1], F.mm[2]];
