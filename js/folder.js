@@ -237,7 +237,7 @@ var UFolder = (function () {
       return new Promise(function (ok) {
         decode(f, function (txt) {
           var cur = UStore.get('bank', null);
-          if (!touched.bank && (!cur || cur.text !== txt)) { UStore.set('bank', { name: BANK, text: txt }, true); }
+          if (!touched.bank && !UStore.get('folderBankPending', 0) && (!cur || cur.text !== txt)) { UStore.set('bank', { name: BANK, text: txt }, true); }
           UStore.set('folderBankMod', f.lastModified, true); ok();
         });
       });
@@ -263,8 +263,13 @@ var UFolder = (function () {
     for (i = 0; i < ks.length; i++) { o.push(JSON.stringify(UStore.get(ks[i], null))); }
     return o.join('\n');
   }
+  function pushBank() {   /* C6o: a bank edited/changed in the app while the folder was away wins over the folder's copy */
+    var b = UStore.get('bank', null);
+    if (!UStore.get('folderBankPending', 0) || !b || !b.text) { return Promise.resolve(null); }
+    return backupBank().then(function () { return writeBankText(b.text); }).then(function (f) { UStore.remove('folderBankPending', true); return f; });
+  }
   function exportAll(skipBank) {
-    var ws = [writeFile(CONF, json(UStore.get('settings', {}))), writeFile(DATA, json(dataObj()))], b = UStore.get('bank', null), ks = UStore.keys(), i;
+    var ws = [skipBank ? pushBank() : null, writeFile(CONF, json(UStore.get('settings', {}))), writeFile(DATA, json(dataObj()))], b = UStore.get('bank', null), ks = UStore.keys(), i;
     if (b && b.text && !skipBank) { ws.push(writeBankText(b.text)); }
     for (i = 0; i < ks.length; i++) { if (ks[i].indexOf('draft.') === 0) { ws.push(writeFile(DRAFTS + '/' + ks[i].slice(6) + '.json', json(UStore.get(ks[i], null)))); } }
     return Promise.all(ws);
@@ -297,7 +302,7 @@ var UFolder = (function () {
     setTimeout(function () { if (!done) { late = true; setState('loading'); go(); } }, 4000);
     function ready(how) {
       if (!late) { setState('folder'); go(); return; }
-      setState('folder'); touched = {}; UStore.remove('folderDirty', true);
+      setState('folder'); touched = {}; UStore.remove('folderDirty', true); pushBank()['catch'](function (e) { fail(e, BANK); });
       if (!timer) { timer = setTimeout(flush, 0); }   /* what was changed meanwhile goes to the folder */
       for (var i = 0; i < lateFns.length; i++) { try { lateFns[i](how); } catch (e) {} }
     }
@@ -345,7 +350,11 @@ var UFolder = (function () {
   }
   function useBrowser(cb) { dir = null; UStore.set('storeMode', 'browser', true); idbPut(null, function () { setState(available ? 'browser' : 'unavailable'); if (cb) { cb(); } }); }
   function saveBank(blobOrText, cb) {   /* "Trocar arquivo": backup the old bank, write the new one byte-for-byte */
-    if (state !== 'folder') { if (cb) { cb(null); } return; }
+    if (state !== 'folder') {   /* C6o: folder chosen but not connected now: the bank goes to the folder when it comes back */
+      if (dir) { UStore.set('folderBankPending', 1, true); UStore.set('folderDirty', 1, true); }
+      if (cb) { cb(null); } return;
+    }
+    UStore.remove('folderBankPending', true);
     backupBank().then(function () { return writeFile(BANK, blobOrText); }).then(function (f) { noteBank(f); if (cb) { cb(f); } },
       function (e) { fail(e); if (cb) { cb(null); } });   /* the caller always gets an answer */
   }

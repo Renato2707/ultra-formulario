@@ -13,6 +13,7 @@
 | C6l | TI-RADS: verificação exaustiva (4.000 combinações; totais 0–17 todos atingíveis; total 1 fora da tabela ACR, tratado como TR1) e 114+7 casos no laudo real; só testes, sem mudança de código | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6m | Painel TI-RADS sem textos de aviso visíveis (extratireoidiana, misto, PAAF/tamanho, incoerências): só no title ao passar o mouse; travas e cálculo iguais | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6n | Vários volumes por laudo (frases inseridas depois, ex.: teratoma), botão "Limpar" nas calculadoras, título da aba = modelo, sessões de abas ("Sessões") | Entregue (só Chromium automatizado), **não testada pelo usuário** |
+| C6o | Templates intermediários (texto puro "___" e "a / b / c") reconhecidos ao colar; cartões "(padrão)" destacados; Tab/Enter na revisão vai a campos preenchidos; Editar banco gravado na pasta mesmo se ela estava desconectada | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6j | Escolha múltipla pelo teclado (Enter marca, Tab/"Pronto" confirma), Enter-para-próximo no painel, 6 linhas do TI-RADS no lugar das 5 antigas | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6i | Escolha múltipla: começo comum das opções escrito uma vez | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6h | Escolha múltipla `?+[ ]` no banco (TI-RADS soma todos os focos) | Entregue (só Chromium automatizado), **não testada pelo usuário** |

@@ -208,3 +208,13 @@ Qualquer frase (do modelo ou inserida depois) com 3 medidas e um campo de volume
   ... medindo * x * x * mm, com volume de * cm³.
   Dimensões medindo cerca de * x * x * mm.   (e na linha seguinte)  Volume estimado em * cm³.
 As medidas precisam estar em mm. Sem campo "* cm³" a frase não ganha volume.
+
+TEMPLATE INTERMEDIÁRIO (OUTRO SISTEMA -> APP)
+Para usar o modelo num sistema que não aceita ?[ ] nem *, escreva-o como texto puro:
+  campo de número ou texto  ->  ___   (sublinhados; a quantidade não importa)
+  ?[a|b|c]                  ->  a / b / c   (opções separadas por " / ", na ordem do banco)
+  ***linha crítica          ->  a linha sem os asteriscos
+No outro sistema: troque cada ___ pelo valor e apague as opções que não servem,
+deixando só a escolhida. Ao colar o laudo no app, as linhas iguais às do banco voltam
+com os campos (preenchidos, ou vazios se ficou ___ ou "a / b / c").
+Se o texto fixo da linha for mudado, aquela linha fica como texto comum.

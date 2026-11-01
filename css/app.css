@@ -65,6 +65,9 @@ button:focus,input:focus,select:focus,textarea:focus,.card:focus,.split:focus{ou
 .card .n{float:right;font-size:12px;color:#6b6b6b;color:var(--muted);font-weight:normal}
 .card .grip{cursor:grab;color:#999;margin-right:4px}
 .card.dragover{border-top:3px solid #3d5a80}
+.card.pad{border-left:4px solid #3d5a80;border-left:4px solid var(--accent);border-color:#bdbdbd;border-color:var(--line2);border-left-color:#3d5a80;border-left-color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.16);padding:9px 10px;margin:8px 0 16px}
+.card.pad .ct,.card.pad .ph1 b{font-size:15px}
+.card.pad:first-child{margin-top:0}
 .card.special{border-style:dashed;box-shadow:none;color:#6b6b6b;color:var(--muted)}
 /* section accordion */
 .sec{margin-bottom:6px}

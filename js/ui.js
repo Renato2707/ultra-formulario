@@ -692,7 +692,13 @@ var UFMain = function () {
 
   /* Tab / Shift+Tab between unfilled fields */
   function nextField(back, noWrap) {
-    var unf = checkFields(); if (!unf.length) { return false; }
+    var unf = checkFields();
+    if (!unf.length) {   /* C6o: everything filled (review): every field in order, selected to overwrite; the end stays as before */
+      var al = qsa(editor, '.fld'), q;
+      for (q = 0; q < al.length; q++) { if (!closest(al[q].parentNode, function (n) { return hasCls(n, 'fld'); }, editor)) { unf.push(al[q]); } }
+      noWrap = true;
+      if (!unf.length) { return false; }
+    }
     var sel = window.getSelection(), cur = sel.rangeCount ? sel.getRangeAt(0) : null, i, pick = null;
     if (cur && !editor.contains(cur.commonAncestorContainer)) { cur = S.savedRange; }
     var curChip = cur ? closest(cur.startContainer, function (n) { return hasCls(n, 'fld'); }, editor) : null;
@@ -1086,8 +1092,9 @@ var UFMain = function () {
     $('navList').innerHTML = html;
     if (keepFocus) { restoreNavFocus(); }
   }
+  function isPad(t) { return String(t || '').indexOf('(padr\u00e3o)') >= 0; }   /* C6o: "(padrão)" cards stand out */
   function modelCard(m) {
-    return '<button type="button" class="card' + (m.id === (S.selModel || S.activeModelId) ? ' sel' : '') + '" data-model="' + esc(m.id) + '"' +
+    return '<button type="button" class="card' + (isPad(m.name) ? ' pad' : '') + (m.id === (S.selModel || S.activeModelId) ? ' sel' : '') + '" data-model="' + esc(m.id) + '"' +
       (S.settings.dragReorder ? ' draggable="true"' : '') + '>' +
       (S.settings.showUsage ? '<span class="n">(' + (S.usage[m.id] || 0) + ')</span>' : '') +
       '<div class="ct">' + (S.settings.dragReorder ? '<span class="grip">&#8942;</span>' : '') + esc(m.name) + '</div>' +
@@ -1145,7 +1152,7 @@ var UFMain = function () {
         S.phraseIndex[c.id] = c; c.dispSec = s.name;
         shown++; if (q) { matches.push(c.id); }
         var meta = (ph.help ? '(' + ph.help + ')' : '') + (ph.help && ph.hypothesis ? ' · ' : '') + (ph.hypothesis ? ph.hypothesis : '');
-        inner += '<button type="button" class="card pcard' + (c.user ? ' user' : '') + (c.id === S.selCard ? ' sel' : '') + '" data-ph="' + esc(c.id) +
+        inner += '<button type="button" class="card pcard' + (isPad(ph.title + (ph.help ? ' (' + ph.help + ')' : '')) ? ' pad' : '') + (c.user ? ' user' : '') + (c.id === S.selCard ? ' sel' : '') + '" data-ph="' + esc(c.id) +
           '">' +
           '<div class="ph1"><b>' + highlight(ph.title, q) + '</b>' + (meta ? '<span class="meta">' + highlight(meta, q) + '</span>' : '') +
           ((ph.critical && ph.critical.length) ? '<span class="wf" title="Contém linha crítica">&#9888;</span>' : '') + '</div>' +
@@ -2251,7 +2258,7 @@ var UFMain = function () {
       UStore.remove('bankBackup');
       if (!UStore.set('bank', { name: name, text: txt })) { toast('Atenção: o banco foi recarregado, mas não coube no navegador (não será lembrado).'); }
     }
-    if (UFolder.status() === 'folder') { UFolder.saveBank(txt, function (w) { if (!w) { toast('Atenção: não foi possível gravar o banco na pasta de dados.'); } }); }
+    if (UFolder.status() === 'folder') { UFolder.saveBank(txt, function (w) { if (!w) { toast('Atenção: não foi possível gravar o banco na pasta de dados.'); } }); } else { UFolder.saveBank(txt); }
     beClose();
     var n = allIssues().filter(function (it) { return it.severity !== 'info'; }).length;
     toast('Banco salvo e recarregado. ' + (n ? n + ' erro(s)/aviso(s) no relatório.' : 'Nenhum erro ou aviso.'));
@@ -2343,7 +2350,7 @@ var UFMain = function () {
     readBankFile(f, function (txt) {
       setBank(txt, f.name);
       if (!UStore.set('bank', { name: f.name, text: txt })) { toast('Banco carregado (não será lembrado na próxima vez).'); }
-      if (UFolder.status() === 'folder') { UFolder.saveBank(f, function (w) { if (!w) { toast('Atenção: não foi possível gravar o banco na pasta de dados.'); } }); }
+      if (UFolder.status() === 'folder') { UFolder.saveBank(f, function (w) { if (!w) { toast('Atenção: não foi possível gravar o banco na pasta de dados.'); } }); } else { UFolder.saveBank(f); }
     });
   }
   on($('bankFile0'), 'change', function () { var f = this.files && this.files[0]; if (f) { loadBankFile(f); } this.value = ''; });
@@ -2423,7 +2430,7 @@ var UFMain = function () {
     S.lastChoice = null; S.lastRemoval = null; S.userCaret = true;
     return how;
   };
-  window.UFTest = { recognizeText: recognizeText, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel,
+  window.UFTest = { recognizeText: recognizeText, interText: interText, allIssues: function () { return allIssues(); }, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel,
                     insertCard: insertCard, editorLines: editorLines, lineText: lineText, openSelect: openSelect, chooseOption: chooseOption, reportText: reportText, directiveRule: directiveRule, anchorHits: anchorHits };
   on(navList, 'dblclick', function (e) {
     if (now() - examDblAt < DBL_MS || inExamDbl()) { return; }   /* handled by the click pair */
@@ -2713,9 +2720,10 @@ var UFMain = function () {
           for (k = 0; k < f.options.length; k++) { tw = String(f.options[k]).split(/\s+/); for (ti = 1; ti < tw.length; ti++) { tails.push(rgLit(tw.slice(ti).join(' '))); } }
           tails.sort(function (a, b) { return b.length - a.length; });
           var any = '(?:' + alts.concat(tails).join('|') + ')';
-          add(one + '(?:(?:,\\s*|\\s+e\\s+)' + any + ')*|escolher|_+');
+          add(one + '(?:(?:,\\s*|\\s+e\\s+)' + any + ')*|escolher|_+|' + rgListSrc(f));
         } else {
           alts.push('escolher'); alts.push('_+');   /* an unchosen choice is printed as ___ */
+          alts.unshift(rgListSrc(f));   /* C6o: intermediate template, all options still listed "a / b / c" */
           add(alts.join('|'));
         }
       } else if (f.type === 'text') { add('.+?'); }
@@ -2724,6 +2732,23 @@ var UFMain = function () {
     }
     if (pos < text.length) { seg.push({ lit: text.substring(pos) }); add(rgLit(text.substring(pos))); }
     return { seg: seg, src: src };
+  }
+  /* C6o: plain-text "intermediate" form of a bank text (for other systems): * -> ___, ?[a|b] -> "a / b", no markup */
+  function interText(t) {
+    var fs = UltraParser.fieldsOf(t), out = '', pos = 0, i, k, f, o;
+    for (i = 0; i < fs.length; i++) {
+      f = fs[i]; if (f.offset < pos) { continue; }
+      out += t.substring(pos, f.offset);
+      if (f.type === 'select') { o = []; for (k = 0; k < f.options.length; k++) { o.push(interText(f.options[k])); } out += o.join(' / '); }
+      else { out += '___'; }
+      pos = f.offset + f.raw.length;
+    }
+    return out + t.substring(pos);
+  }
+  function rgListSrc(f) {
+    var o = [], k;
+    for (k = 0; k < f.options.length; k++) { o.push(rgLit(interText(f.options[k])).replace(/___/g, '_+')); }
+    return o.join('\\s*\\/\\s*');
   }
   function rgPats() {
     if (!S.bank) { return []; }
@@ -2784,7 +2809,7 @@ var UFMain = function () {
   function rgFieldHtml(f, v) {
     var k, c, m;
     if (f.type === 'select') {
-      if (/^(escolher|_+)$/i.test(v)) { return chipHtml(f); }
+      if (/^(escolher|_+)$/i.test(v) || new RegExp('^(?:' + rgListSrc(f) + ')$', 'i').test(v)) { return chipHtml(f); }
       if (f.multi) { var mi = rgMulti(f.options, v); return mi ? multiChipHtml(JSON.stringify(f.options), mi, f.options, true) : esc(v); }
       for (k = 0; k < f.options.length; k++) {
         if (UltraParser.fieldsOf(f.options[k]).length) {
