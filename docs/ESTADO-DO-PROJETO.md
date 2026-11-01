@@ -10,6 +10,7 @@
 | D3b | Editor do banco mantém final de linha só CR | Entregue, **não testada pelo usuário** |
 | D3c | Clique no meio do campo em branco substitui o campo inteiro | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6k | TI-RADS: 6 linhas no lugar das 5 antigas, abaixo do título; recomendação única do nódulo de maior pontuação (empate: o primeiro); espongiforme dispensa as demais características (painel e laudo); avisos do ACR e de combinações incoerentes no painel | Entregue (só Chromium automatizado), **não testada pelo usuário** |
+| C6l | TI-RADS: verificação exaustiva (4.000 combinações; totais 0–17 todos atingíveis; total 1 fora da tabela ACR, tratado como TR1) e 114+7 casos no laudo real; só testes, sem mudança de código | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6j | Escolha múltipla pelo teclado (Enter marca, Tab/"Pronto" confirma), Enter-para-próximo no painel, 6 linhas do TI-RADS no lugar das 5 antigas | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6i | Escolha múltipla: começo comum das opções escrito uma vez | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6h | Escolha múltipla `?+[ ]` no banco (TI-RADS soma todos os focos) | Entregue (só Chromium automatizado), **não testada pelo usuário** |
