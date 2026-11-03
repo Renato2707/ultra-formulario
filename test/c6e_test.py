@@ -104,7 +104,7 @@ with sync_playwright() as p:
     pg.keyboard.press('Escape'); pg.keyboard.press('Escape'); pg.wait_for_timeout(200)
     # ---------- 4/5/7/8/10: painel ----------
     ids = ev(pg, "[].map.call(document.querySelectorAll('[data-calc]'),function(e){return e.getAttribute('data-calc')}).join()")
-    ck('8/7 cartões: Calculadora, Obstetrícia, Volume, TI-RADS (um só)', ids == 'livre,obst,auto,tirads', ids)
+    ck('8/7 cartões: Calculadora, Obstetrícia, Volume, TI-RADS (um só), BI-RADS (C7)', ids == 'livre,obst,auto,tirads,birads', ids)
     ck('8 obstetrícia reúne IG relatada, PFE, IG composta, IG pelo PFE, percentis e Doppler', ev(pg, "(function(){var c=document.querySelector('[data-calc=obst]'); return ['ucPfe','ucIgc','ucIgp','ucPct','ucDop'].every(function(i){return c.querySelector('#'+i)}) && !!c.querySelector('[data-calc-part=ig] input')})()"))
     ck('7 TI-RADS: chave do texto e formulário no mesmo cartão; sem "adicionar nódulo"', ev(pg, "(function(){var c=document.querySelector('[data-calc=tirads]'); return !!c.querySelector('#ucTrTxt') && !!c.querySelector('#trIns') && !document.getElementById('trAdd')})()"))
     ck('5 modelo sem medidas: todos os cartões recolhidos', not any(cardOpen(pg, i) for i in ('livre', 'obst', 'auto', 'tirads')))

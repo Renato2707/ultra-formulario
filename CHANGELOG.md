@@ -11,6 +11,16 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C7] Calculadora BI-RADS de ultrassom de mama (ACR BI-RADS v2025) — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Novo cartão "BI-RADS US (ACR v2025)" no painel (`js/calc-birads.js`), no padrão do TI-RADS: "+ adicionar nódulo" cria um cartão por achado; cartões colapsam num resumo ("Nódulo 2 – MD 10h – 12 mm – BI-RADS 3") com ponto verde (pronto) ou cinza; Enter passa ao próximo campo e, no último, insere; "Limpar" volta a um cartão vazio.
+- Campos na ordem do léxico: tipo (nódulo, cisto simples, cisto complicado, microcistos agrupados, linfonodo intramamário, lesão não nodular, abscesso, achado benigno conhecido), mama, quadrante, horário, distância da papila, distância da pele, L × AP × T, forma, orientação, margem, padrão ecogênico, características acústicas posteriores, calcificações. Bloco "mais" (recolhido): características associadas, vascularização, elastografia e componente de tecido glandular.
+- Sem pontuação. Sugestão de categoria só onde o manual tem regra escrita (cisto simples com as 4 características, microcistos, cisto complicado isolado/múltiplos, nódulo sólido oval circunscrito paralelo hipoecogênico sem outra característica, múltiplos bilaterais semelhantes, linfonodo tipicamente benigno, achado benigno da categoria 2, abscesso, lesão não nodular, biópsia maligna); regra e página só no title. Nos demais casos aparece "requer julgamento". Sugestão 2, 3 ou 6 preenche a categoria até o médico escolher outra; 4 exige 4A/4B/4C (não há "4" puro).
+- A frase vem do banco (frase com "BI-RADS-US *"): os marcadores recebem os valores do cartão e a categoria do achado vai no próprio "BI-RADS-US". A frase em branco do modelo é preenchida; os achados seguintes entram logo depois do último.
+- Categoria final do exame pela hierarquia do manual 5 > 4 > 0 > 6 > 3 > 2 > 1 (empate: o primeiro do laudo), escrita em "Classificação: BI-RADS-US" (valor digitado à mão é respeitado); da legenda "Categoria 0 … 6" fica só a linha da categoria final (conduta única); sem categoria, a legenda volta inteira. Opção "Categoria final pelo laudo" liga/desliga.
+- Laudo colado: "BI-RADS-US 4A/4B/4C" é reconhecido (também com "*" esquecido, espaço e minúscula). Campo BI-RADS com valor fora de 0, 1, 2, 3, 4A, 4B, 4C, 5, 6 fica marcado (title explica) e não entra na categoria final.
+- `js/ui.js`: `UFInsertHtml` aceita a linha onde inserir; reconhecimento e checagem do campo BI-RADS. Banco real não alterado: proposta do trecho MAMAS fora do repositório, para aprovação.
+- Testes: `test/c7_test.py` (120 verificações com o banco de teste; com `UF_BANCO=<cópia do banco com a proposta>` usa o banco).
+
 ## [etapa-C6p] Template intermediário com "*" no lugar do campo; colar tolera erros das assistentes — testado só em Chromium automatizado, NÃO testado pelo usuário
 - O template intermediário (`UFTest.interText`) agora usa `*` em cada campo (número, número com vírgula e texto), em vez de `___`. Escolhas continuam "a / b / c". As marcações do banco (`*****`, `***`, `**`, `*,*`, `?[`, `@@`) não aparecem no texto.
 - Ao colar: `*` ainda no lugar = campo em branco; número/texto no lugar do `*` = campo preenchido; `___` (C6o) e laudos já colados continuam reconhecidos.

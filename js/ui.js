@@ -568,6 +568,8 @@ var UFMain = function () {
       f = l[i]; t = f.getAttribute('data-t');
       var filled = fieldFilled(f);
       if (filled) { addCls(f, 'f-ok'); } else { rmCls(f, 'f-ok'); unf.push(f); }
+      var bir = (t === 'n' || t === 'd') && window.UFBirads && UFBirads.isMarkFld(f);   /* C7: BI-RADS: 0-6 com 4A/4B/4C */
+      if (filled && bir) { if (UFBirads.normCat(f.textContent)) { rmCls(f, 'f-bad'); f.removeAttribute('title'); } else { addCls(f, 'f-bad'); f.title = 'BI-RADS: 0, 1, 2, 3, 4A, 4B, 4C, 5 ou 6'; } continue; }
       if (filled && (t === 'n' || t === 'd') && !/^\s*-?\d+([.,]\d+)?\s*$/.test(f.textContent)) { addCls(f, 'f-bad'); f.title = 'Valor numérico esperado'; }
       else { rmCls(f, 'f-bad'); if (t !== 's') { f.removeAttribute('title'); } }
     }
@@ -2411,15 +2413,21 @@ var UFMain = function () {
   /* C6e: insert ready-made inline HTML (fields included). If the report still has an unchosen choice chip that offers
      exactly this option text (optText), the chip is replaced (as if the option had been chosen); otherwise the HTML goes
      on its own line at the caret / end (UFInsertLines rules). One Ctrl+Z undoes it. Returns 'chip'/'caret'/'end'. */
-  window.UFInsertHtml = function (html, optText, post) {
+  window.UFInsertHtml = function (html, optText, post, at) {
     var undoBefore = edHtml(), undoBeforeText = edText(), how, cs = qsa(editor, '.fld[data-t="s"]'), i, o, chip = null, r = S.savedRange;
+    /* C7: at = {el, mode: 'replace'|'after'}: a line of the report to fill (blank bank line) or to insert after */
+    if (at && at.el && at.el.parentNode && editor.contains(at.el)) {
+      if (at.mode === 'replace') { at.el.innerHTML = html; how = 'line'; }
+      else { var nd = document.createElement('div'); nd.innerHTML = html; at.el.parentNode.insertBefore(nd, at.el.nextSibling); how = 'after'; }
+      afterChange(true); optText = null; cs = [];
+    }
     for (i = 0; i < cs.length && !chip && optText; i++) {
       if (cs[i].getAttribute('data-v') !== null) { continue; }
       try { o = JSON.parse(cs[i].getAttribute('data-o')) || []; } catch (e) { o = []; }
       if (o.indexOf(optText) >= 0) { chip = cs[i]; }
     }
     if (chip) { how = 'chip'; replaceNodeWithHtml(chip, html); afterChange(true); }
-    else {
+    else if (!how) {
       if (r && editor.contains(r.commonAncestorContainer)) { how = 'caret'; }
       else { how = 'end'; ensureNotEmpty(); focusEditor(); var e2 = document.createRange(); e2.selectNodeContents(editor); e2.collapse(false); setRange(e2); saveRange(); }
       insertBlock('<div>' + html + '</div>');
@@ -2738,6 +2746,7 @@ var UFMain = function () {
           add(alts.join('|'));
         }
       } else if (f.type === 'text') { add('.+?'); }
+      else if (/BI-RADS(?:-US)?\s*$/i.test(text.substring(0, f.offset))) { add('(?:\\*\\s*)?(?:4\\s*[ABCabc]|\\d+(?:[.,]\\d+)?)(?:\\s*\\*)?\\s*|_+(?:,_+)?|\\*(?:,\\*)?'); }   /* C7: BI-RADS 4A/4B/4C */
       else { add('(?:\\*\\s*)?\\d+(?:[.,]\\d+)?(?:\\s*\\*)?|_+(?:,_+)?|\\*(?:,\\*)?'); }   /* C6p: "*" = blank; a "*" left beside the number is ignored */
       seg.push({ f: f }); pos = f.offset + f.raw.length;
     }

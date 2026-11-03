@@ -218,3 +218,12 @@ No outro sistema: troque cada ___ pelo valor e apague as opções que não serve
 deixando só a escolhida. Ao colar o laudo no app, as linhas iguais às do banco voltam
 com os campos (preenchidos, ou vazios se ficou ___ ou "a / b / c").
 Se o texto fixo da linha for mudado, aquela linha fica como texto comum.
+
+BI-RADS DE ULTRASSOM DE MAMA (CALCULADORA)
+O cartão "BI-RADS US" usa a frase do banco que tem "BI-RADS-US *" (um só por frase):
+  Observa-se nódulo de forma ?[oval|lobulada|redonda|irregular], ... medindo * x * x * mm (LxAPxT). BI-RADS-US *.
+Também as frases de cisto simples, cisto complicado, microcistos agrupados, linfonodo intramamário
+e lesão não nodular, se terminarem em "BI-RADS-US *.". Os campos são achados pelo texto em volta:
+"às * horas" / "das * hs", "* mm da papila", "* mm da pele", "* x * x *" (L, AP, T).
+"Classificação: BI-RADS-US *." (linha com só esse campo) recebe a categoria final do exame.
+Linhas da legenda que começam com "Categoria 0" ... "Categoria 6" (4A, 4B, 4C): fica só a da categoria final.
