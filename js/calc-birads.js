@@ -228,11 +228,23 @@
     kept.par.insertBefore(d, kept.ref ? kept.ref.nextSibling : kept.par.firstChild);
     return true;
   }
+  /* C7a: linha em branco posta antes de um achado inserido: sai se o achado saiu (sem linhas em branco sobrando) */
+  function blankLn(n) { return !n || n.nodeType === 1 && !n.querySelector('.fld') && trim(n.textContent || '') === ''; }
+  function tidySep() {
+    var l = ed.querySelectorAll('[data-brsep]'), i, d, ch = false;
+    for (i = l.length - 1; i >= 0; i--) {
+      d = l[i];
+      if (trim(d.textContent || '') !== '' || d.querySelector('.fld')) { d.removeAttribute('data-brsep'); continue; }
+      if (blankLn(d.nextSibling) || blankLn(d.previousSibling)) { d.parentNode.removeChild(d); ch = true; }
+    }
+    return ch;
+  }
   function runTxt() {
     if (busy || !ed) { return; }
     busy = true;
     try {
       var s = scan(), i, cs = [], F, ch = false;
+      if (tidySep()) { ch = true; }
       for (i = 0; i < s.nod.length; i++) { cs.push(s.nod[i].cat); }
       F = txtOn ? finalCat(cs) : null;
       for (i = 0; i < s.fin.length; i++) { if (putF(s.fin[i], F)) { ch = true; } }

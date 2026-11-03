@@ -2418,7 +2418,14 @@ var UFMain = function () {
     /* C7: at = {el, mode: 'replace'|'after'}: a line of the report to fill (blank bank line) or to insert after */
     if (at && at.el && at.el.parentNode && editor.contains(at.el)) {
       if (at.mode === 'replace') { at.el.innerHTML = html; how = 'line'; }
-      else { var nd = document.createElement('div'); nd.innerHTML = html; at.el.parentNode.insertBefore(nd, at.el.nextSibling); how = 'after'; }
+      else {
+        /* C7a: o laudo separa parágrafos com linha em branco: o novo achado ganha a sua (marcada, some se o achado sair) */
+        var nd = document.createElement('div'), pv = at.el.previousSibling, nx = at.el.nextSibling, sep = null;
+        var isBl = function (n) { return n && n.nodeType === 1 && !n.querySelector('.fld') && trim(n.textContent || '') === ''; };
+        nd.innerHTML = html;
+        if (isBl(pv) || isBl(nx)) { sep = document.createElement('div'); sep.setAttribute('data-brsep', '1'); sep.innerHTML = '<br>'; at.el.parentNode.insertBefore(sep, nx); }
+        at.el.parentNode.insertBefore(nd, sep ? sep.nextSibling : nx); how = 'after';
+      }
       afterChange(true); optText = null; cs = [];
     }
     for (i = 0; i < cs.length && !chip && optText; i++) {
