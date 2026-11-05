@@ -11,6 +11,11 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C7b] BI-RADS: campos na ordem da frase do banco — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Ordem visual/DOM e Enter: tipo, descritores, calcificações e campos específicos, bloco "mais" (continua recolhido), localização, distâncias, medidas e categoria/Inserir.
+- Sem campos ou textos novos, mudanças nas regras clínicas ou nas frases do banco.
+- `test/c7_test.py`: navegação Enter atualizada e ordem DOM visível do nódulo conferida explicitamente.
+
 ## [etapa-C7] Calculadora BI-RADS de ultrassom de mama (ACR BI-RADS v2025) — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Novo cartão "BI-RADS US (ACR v2025)" no painel (`js/calc-birads.js`), no padrão do TI-RADS: "+ adicionar nódulo" cria um cartão por achado; cartões colapsam num resumo ("Nódulo 2 – MD 10h – 12 mm – BI-RADS 3") com ponto verde (pronto) ou cinza; Enter passa ao próximo campo e, no último, insere; "Limpar" volta a um cartão vazio.
 - Campos na ordem do léxico: tipo (nódulo, cisto simples, cisto complicado, microcistos agrupados, linfonodo intramamário, lesão não nodular, abscesso, achado benigno conhecido), mama, quadrante, horário, distância da papila, distância da pele, L × AP × T, forma, orientação, margem, padrão ecogênico, características acústicas posteriores, calcificações. Bloco "mais" (recolhido): características associadas, vascularização, elastografia e componente de tecido glandular.

@@ -1,4 +1,4 @@
-/* UFBirads (etapa C7): BI-RADS de ultrassom de mama (ACR BI-RADS v2025, léxico de US; termos do CBR).
+/* UFBirads (etapa C7b): BI-RADS de ultrassom de mama (ACR BI-RADS v2025, léxico de US; termos do CBR).
    Sem pontuação: a categoria é do médico. Sugestão só onde o manual tem regra escrita (página no title);
    nos demais casos "requer julgamento". 4 exige 4A/4B/4C. Categoria final do exame pela hierarquia
    5 > 4 > 0 > 6 > 3 > 2 > 1 (empate: o primeiro do laudo). Nada é gravado (só nesta janela). ES5 estrito. */
@@ -375,15 +375,6 @@
     C.h.appendChild(C.chev); C.h.appendChild(C.sum); C.h.appendChild(C.dot);
     C.body = el('div', 'tr-form br-b');
     C.tipo = mkSel('', 'Tipo de achado', TIPOS, 'tipo'); C.body.appendChild(C.tipo);
-    var loc = grp('tr-loc'); C.sel.lado = mkSel('tr-half', 'Mama', [['direita', 'mama direita'], ['esquerda', 'mama esquerda']], 'lado');
-    C.sel.quad = mkSel('tr-half', 'Quadrante', (function () { var a = [], q; for (q = 0; q < G.quad.length; q++) { a.push([G.quad[q][0], G.quad[q][1]]); } return a; })(), 'quad');
-    loc.appendChild(C.sel.lado); loc.appendChild(C.sel.quad); C.body.appendChild(loc);
-    var r1 = grp('tr-mmr'); C.hora = mkNum('h', 'Horário (1 a 12)', 'br-h1'); C.pap = mkNum('papila', 'Distância da papila em mm'); C.pele = mkNum('pele', 'Distância da pele em mm');
-    r1.appendChild(C.hora); r1.appendChild(el('span', 'uc-u', 'h')); r1.appendChild(C.pap); r1.appendChild(el('span', 'uc-u', 'mm')); r1.appendChild(C.pele); r1.appendChild(el('span', 'uc-u', 'mm'));
-    r1.title = 'Horário; distância da papila (da base da papila ao centro do achado); distância da pele'; C.body.appendChild(r1);
-    var mmr = grp('tr-mmr'), ML = ['L', 'AP', 'T']; C.mm = [];
-    for (j = 0; j < 3; j++) { x = mkNum(ML[j], ML[j] + ' em mm'); C.mm.push(x); mmr.appendChild(x); if (j < 2) { mmr.appendChild(el('span', 'uc-u', '×')); } }
-    mmr.appendChild(el('span', 'uc-u', 'mm')); C.body.appendChild(mmr);
     C.gDesc = grp('br-g');
     var D = [['forma', 'Forma'], ['orient', 'Orientação'], ['marg', 'Margem'], ['eco', 'Padrão ecogênico'], ['post', 'Características acústicas posteriores']];
     for (j = 0; j < D.length; j++) { C.sel[D[j][0]] = mkSel('', D[j][1], G[D[j][0]], D[j][0]); C.gDesc.appendChild(C.sel[D[j][0]]); }
@@ -414,6 +405,15 @@
     C.sel.elas = mkSel('', 'Elastografia', [['emole', 'mole'], ['einter', 'intermediária'], ['edura', 'dura']], 'elas');
     C.sel.ctg = mkSel('', 'Componente de tecido glandular', [['min', 'mínimo (<25%)'], ['leve', 'leve (25–49%)'], ['mod', 'moderado (50–74%)'], ['acen', 'acentuado (≥75%)']], 'ctg');
     C.more.appendChild(C.sel.vasc); C.more.appendChild(C.sel.elas); C.more.appendChild(C.sel.ctg); show(C.more, false); C.body.appendChild(C.more);
+    var loc = grp('tr-loc'); C.sel.lado = mkSel('tr-half', 'Mama', [['direita', 'mama direita'], ['esquerda', 'mama esquerda']], 'lado');
+    C.sel.quad = mkSel('tr-half', 'Quadrante', (function () { var a = [], q; for (q = 0; q < G.quad.length; q++) { a.push([G.quad[q][0], G.quad[q][1]]); } return a; })(), 'quad');
+    loc.appendChild(C.sel.lado); loc.appendChild(C.sel.quad); C.body.appendChild(loc);
+    var r1 = grp('tr-mmr'); C.hora = mkNum('h', 'Horário (1 a 12)', 'br-h1'); C.pap = mkNum('papila', 'Distância da papila em mm'); C.pele = mkNum('pele', 'Distância da pele em mm');
+    r1.appendChild(C.hora); r1.appendChild(el('span', 'uc-u', 'h')); r1.appendChild(C.pap); r1.appendChild(el('span', 'uc-u', 'mm')); r1.appendChild(C.pele); r1.appendChild(el('span', 'uc-u', 'mm'));
+    r1.title = 'Horário; distância da papila (da base da papila ao centro do achado); distância da pele'; C.body.appendChild(r1);
+    var mmr = grp('tr-mmr'), ML = ['L', 'AP', 'T']; C.mm = [];
+    for (j = 0; j < 3; j++) { x = mkNum(ML[j], ML[j] + ' em mm'); C.mm.push(x); mmr.appendChild(x); if (j < 2) { mmr.appendChild(el('span', 'uc-u', '×')); } }
+    mmr.appendChild(el('span', 'uc-u', 'mm')); C.body.appendChild(mmr);
     var foot = grp('tr-foot'); C.res = el('span', 'tr-res br-res'); C.cat = el('select', 'tr-sel br-cat'); C.cat.setAttribute('aria-label', 'Categoria BI-RADS');
     var o0 = el('option', null, 'BI-RADS'); o0.value = ''; C.cat.appendChild(o0);
     for (j = 0; j < CATS.length; j++) { var oc = el('option', null, CATS[j]); oc.value = CATS[j]; oc.title = CATL[CATS[j]]; C.cat.appendChild(oc); }

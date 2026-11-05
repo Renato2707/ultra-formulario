@@ -281,12 +281,22 @@ with sync_playwright() as p:
     ck('6 componente de tecido glandular (CTG) preenche a lista do modelo', any('Componente de tecido glandular leve' in l for l in rep(pg3)))
     add(pg3); ck('6 novo cartão: "mais" recolhido de novo', not pg3.is_visible(OC + '.br-more'))
     # ---------- 7) Enter avança ----------
-    pg3.focus(OC + '[data-f=tipo]'); pg3.select_option(OC + '[data-f=tipo]', 'nod'); pg3.keyboard.press('Enter')
-    ck('7 Enter no tipo vai para a mama', pg3.evaluate("document.activeElement.getAttribute('data-f')") == 'lado')
-    pg3.keyboard.press('Enter'); ck('7 Enter na mama vai ao quadrante', pg3.evaluate("document.activeElement.getAttribute('data-f')") == 'quad')
-    pg3.keyboard.press('Enter'); ck('7 depois o horário', pg3.evaluate("document.activeElement.getAttribute('aria-label')").startswith('Hor'))
-    for i in range(6): pg3.keyboard.press('Enter')
-    ck('7 papila, pele, L, AP, T e então forma (ordem do léxico)', pg3.evaluate("document.activeElement.getAttribute('data-f')") == 'forma')
+    pg3.focus(OC + '[data-f=tipo]'); pg3.select_option(OC + '[data-f=tipo]', 'nod')
+    order = pg3.locator(OC + '[data-f]:visible').evaluate_all("els => els.map(e => e.getAttribute('data-f'))")
+    ck('7 DOM visível: tipo, descritores, depois mama e quadrante', order == ['tipo', 'forma', 'orient', 'marg', 'eco', 'post', 'lado', 'quad'], order)
+    for field in ['forma', 'orient', 'marg', 'eco', 'post']:
+        pg3.keyboard.press('Enter')
+        ck('7 Enter avança para ' + field, pg3.evaluate("document.activeElement.getAttribute('data-f')") == field)
+    # Calcificações e campos específicos precedem a localização; "mais" segue recolhido.
+    for value in ['macro', 'micro', 'intra', 'mbil', 'bx']:
+        pg3.keyboard.press('Enter')
+        ck('7 Enter avança para ' + value, pg3.evaluate("document.activeElement.value") == value)
+    for field in ['lado', 'quad']:
+        pg3.keyboard.press('Enter')
+        ck('7 Enter avança para ' + field, pg3.evaluate("document.activeElement.getAttribute('data-f')") == field)
+    for label in ['Horário (1 a 12)', 'Distância da papila em mm', 'Distância da pele em mm', 'L em mm', 'AP em mm', 'T em mm', 'Categoria BI-RADS']:
+        pg3.keyboard.press('Enter')
+        ck('7 Enter avança para ' + label, pg3.evaluate("document.activeElement.getAttribute('aria-label')") == label)
     pg3.click('#ucReset'); pg3.wait_for_timeout(100); fill(pg3, dict(NOD3, lado='esquerda'))
     pg3.focus(OC + '.br-cat'); n0 = len(birl(pg3)); pg3.keyboard.press('Enter'); pg3.wait_for_timeout(300)
     ck('7 Enter no último campo insere', len(birl(pg3)) == n0 + 1 and birl(pg3)[-1].endswith('BI-RADS-US 3.'))
