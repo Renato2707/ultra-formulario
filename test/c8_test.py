@@ -55,6 +55,28 @@ Frase comum:
 FRASE-COMUM de todos.
 
 ##SECTION TODOS VAZIA
+
+@@EXAME Delta
+@@EXAME_FULL ULTRASSONOGRAFIA DELTA
+@@TEMPLATE Delta variante
+TEXTO-DELTA-VARIANTE
+
+@@TEMPLATE Delta (padrão)
+TEXTO-DELTA-PADRAO
+
+@@EXAME Gama
+@@EXAME_FULL ULTRASSONOGRAFIA GAMA
+@@TEMPLATE Gama primeiro
+TEXTO-GAMA-PRIMEIRO
+
+@@TEMPLATE Gama segundo
+TEXTO-GAMA-SEGUNDO
+
+@@EXAME Sem modelo
+@@EXAME_FULL ULTRASSONOGRAFIA SEM
+##SECTION NOTAS
+Nota solta:
+TEXTO-NOTA-SEM-MODELO
 '''
 R = []
 ERR = []
@@ -80,6 +102,11 @@ def href_of(pg, text):
     return model_by_text(pg, text).get_attribute('href')
 def id_of(pg, text):
     return model_by_text(pg, text).get_attribute('data-model')
+def exam_card(pg, name):
+    return pg.locator('#navList [data-exam="%s"]' % name)
+def exam_href_id(pg, name):
+    href = exam_card(pg, name).get_attribute('href') or ''
+    return unquote(href.split('=', 1)[1]) if 'ufmodel=' in href else ''
 def go_exams(pg):
     for _ in range(4):
         if pg.locator('[data-exam="Alfa"]').count():
@@ -105,8 +132,49 @@ with sync_playwright() as p:
     pg.on('pageerror', lambda e: ERR.append(str(e)))
     pg.goto(IDX); pg.evaluate('localStorage.clear(); sessionStorage.clear()'); pg.reload(); pg.wait_for_timeout(250)
     pg.set_input_files('#bankFile0', f.name); pg.wait_for_timeout(300)
-    # ---------- 1) cartões de modelo são links; exames e "ver frases" continuam botões ----------
-    ck('1 exames são botões', pg.evaluate("document.querySelector('[data-exam]').nodeName") == 'BUTTON')
+    # ---------- 0) cartão de exame abre o modelo padrão noutra guia; clique esquerdo só entra ----------
+    def pad_id(exam):
+        return pg.evaluate('(e) => { var m = UFTest.defaultModelOf(e); return m ? m.id : ""; }', exam)
+    ck('0 Alfa aponta para o (padrão), o mesmo do duplo clique', exam_card(pg, 'Alfa').evaluate('el => el.nodeName') == 'A' and exam_href_id(pg, 'Alfa') == pad_id('Alfa') == 'b:Alfa|Alfa (padrão)', exam_href_id(pg, 'Alfa'))
+    ck('0 Delta: (padrão) mesmo não sendo o primeiro', exam_href_id(pg, 'Delta') == pad_id('Delta') == 'b:Delta|Delta (padrão)', exam_href_id(pg, 'Delta'))
+    ck('0 Gama sem (padrão): o primeiro, como o duplo clique', exam_href_id(pg, 'Gama') == pad_id('Gama') == 'b:Gama|Gama primeiro', exam_href_id(pg, 'Gama'))
+    ck('0 exame sem modelo continua botão', exam_card(pg, 'Sem modelo').evaluate('el => el.nodeName') == 'BUTTON' and exam_card(pg, 'TODOS').evaluate('el => el.nodeName') == 'BUTTON')
+    st_ex = exam_card(pg, 'Alfa').evaluate("""el => { var s = getComputedStyle(el); return { dec: (s.textDecorationLine || s.textDecoration || ''), color: s.color, disp: s.display, drag: el.getAttribute('draggable') }; }""")
+    ck('0 cartão de exame sem sublinhado e não arrastável', 'none' in st_ex['dec'] and st_ex['disp'] == 'block' and st_ex['color'] not in ('rgb(0, 0, 238)', 'rgb(0, 0, 255)', 'blue') and st_ex['drag'] == 'false', st_ex)
+    ex_menu = exam_card(pg, 'Alfa').evaluate("""el => { var ev = document.createEvent('MouseEvents'); ev.initMouseEvent('contextmenu', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 2, null); return el.dispatchEvent(ev); }""")
+    ck('0 menu de contexto do exame não é cancelado', ex_menu is True, ex_menu)
+    laudo0 = rep(pg)
+    n_ex = len(pages)
+    exam_card(pg, 'Alfa').click(); pg.wait_for_timeout(200)
+    ck('0 clique esquerdo entra no exame', pg.evaluate('UFTest.S.level') == 2 and pg.evaluate('UFTest.S.navExam') == 'Alfa' and pg.locator('#navList [data-model]').count() == 3, pg.evaluate('UFTest.S.level'))
+    ck('0 clique esquerdo não carrega o modelo nem abre guia', rep(pg) == laudo0 and 'TEXTO-ALFA-PADRAO' not in rep(pg) and 'ufmodel' not in pg.url and len(pages) == n_ex, rep(pg)[:80])
+    pg.click('#navBack'); pg.wait_for_timeout(200)
+    exam_card(pg, 'Alfa').focus(); pg.keyboard.press('Enter'); pg.wait_for_timeout(200)
+    ck('0 Enter entra no exame, sem carregar o modelo', pg.evaluate('UFTest.S.level') == 2 and pg.evaluate('UFTest.S.navExam') == 'Alfa' and 'TEXTO-ALFA-PADRAO' not in rep(pg) and 'ufmodel' not in pg.url)
+    pg.click('#navBack'); pg.wait_for_timeout(200)
+    exam_card(pg, 'Gama').focus(); pg.keyboard.press('Space'); pg.wait_for_timeout(200)
+    ck('0 Espaço entra no exame sem (padrão), sem carregar o primeiro', pg.evaluate('UFTest.S.navExam') == 'Gama' and pg.evaluate('UFTest.S.level') == 2 and 'TEXTO-GAMA-PRIMEIRO' not in rep(pg) and 'ufmodel' not in pg.url)
+    go_exams(pg); pg.wait_for_timeout(700)
+    npx = open_href(c, exam_card(pg, 'Alfa').get_attribute('href'))
+    ck('0 href do exame aplica o (padrão) na outra guia', 'TEXTO-ALFA-PADRAO' in rep(npx) and 'ufmodel' not in npx.url, rep(npx)[:120])
+    ck('0 a guia de origem segue na lista, sem o modelo', pg.evaluate('UFTest.S.level') == 1 and 'TEXTO-ALFA-PADRAO' not in rep(pg))
+    n_mid = len(pages)
+    with c.expect_page(timeout=8000) as pi:
+        exam_card(pg, 'Delta').click(modifiers=['Control'])
+    npd = pi.value
+    npd.wait_for_function('function () { return window.UFTest && document.getElementById("editor"); }')
+    npd.wait_for_timeout(300)
+    ck('0 Ctrl+clique no exame abre o (padrão)', len(pages) == n_mid + 1 and 'TEXTO-DELTA-PADRAO' in rep(npd) and 'TEXTO-DELTA-VARIANTE' not in rep(npd) and 'ufmodel' not in npd.url, rep(npd)[:120])
+    ck('0 Ctrl+clique não entra no exame nesta guia', pg.evaluate('UFTest.S.level') == 1 and 'TEXTO-DELTA-PADRAO' not in rep(pg))
+    n_g = len(pages)
+    with c.expect_page(timeout=8000) as pm:
+        exam_card(pg, 'Gama').click(button='middle')
+    npg = pm.value
+    npg.wait_for_function('function () { return window.UFTest && document.getElementById("editor"); }')
+    npg.wait_for_timeout(300)
+    ck('0 clique do meio no exame sem (padrão) abre o primeiro', len(pages) == n_g + 1 and 'TEXTO-GAMA-PRIMEIRO' in rep(npg) and 'TEXTO-GAMA-SEGUNDO' not in rep(npg), rep(npg)[:120])
+    ck('0 clique do meio não mexe nesta guia', pg.evaluate('UFTest.S.level') == 1 and 'TEXTO-GAMA-PRIMEIRO' not in rep(pg))
+    # ---------- 1) cartões de modelo são links; "ver frases" continua botão ----------
     pg.click('[data-exam="Alfa"]'); pg.wait_for_timeout(700)
     ck('1 ver frases continua botão', pg.evaluate("document.querySelector('[data-go=\"3\"]').nodeName") == 'BUTTON')
     info = pg.evaluate("""(function () {

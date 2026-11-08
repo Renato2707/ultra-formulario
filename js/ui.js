@@ -1103,8 +1103,7 @@ var UFMain = function () {
         var nm = names[i], label = nm === UltraParser.GLOBAL_EXAM ? 'TODOS (comuns a todos)' : nm;
         if (q && foldKeep(label).indexOf(q) < 0) { continue; }
         n++;
-        html += '<button type="button" class="card' + (nm === S.activeExam ? ' sel' : '') + '" data-exam="' + esc(nm) + '"><div class="ct">' +
-          esc(label) + '</div><div class="cm">' + esc(examCount(nm)) + '</div></button>';
+        html += examCard(nm, label);
       }
       if (!n) { html = '<div class="empty">Nenhum exame encontrado</div>'; }
     } else if (S.level === 2) {
@@ -1118,6 +1117,14 @@ var UFMain = function () {
   function isPad(t) { return String(t || '').indexOf('(padr\u00e3o)') >= 0; }   /* C6o: "(padrão)" cards stand out */
   /* C8: hash relativo. Nova guia carrega o arquivo e aplica o modelo; o clique simples não navega. */
   function modelHref(id) { return '#ufmodel=' + encodeURIComponent(id); }
+  /* C8: cartão do exame aponta para o mesmo modelo que o duplo clique carrega aqui
+     (defaultModelOf: nome com "padrão"/"padrao", senão o primeiro da lista). Sem modelo, continua botão. */
+  function examCard(nm, label) {
+    var dm = defaultModelOf(nm), open = '';
+    if (dm) { open = ' href="' + esc(modelHref(dm.id)) + '" draggable="false"'; }
+    return '<' + (dm ? 'a' : 'button type="button"') + open + ' class="card' + (nm === S.activeExam ? ' sel' : '') + '" data-exam="' + esc(nm) + '"><div class="ct">' +
+      esc(label) + '</div><div class="cm">' + esc(examCount(nm)) + '</div></' + (dm ? 'a' : 'button') + '>';
+  }
   function modelCard(m) {
     return '<a href="' + esc(modelHref(m.id)) + '" class="card' + (isPad(m.name) ? ' pad' : '') + (m.id === (S.selModel || S.activeModelId) ? ' sel' : '') + '" data-model="' + esc(m.id) + '"' +
       (S.settings.dragReorder ? ' draggable="true"' : ' draggable="false"') + '>' +
@@ -2417,6 +2424,12 @@ var UFMain = function () {
     var c = navCard(e.target);
     if (inExamDbl()) { e.preventDefault(); examDouble(); return; }
     if (!c) { return; }
+    /* C8: exame e modelo são links (#ufmodel=). Clique simples fica aqui; Ctrl/meio seguem o href. */
+    if (c.nodeName === 'A' && (c.getAttribute('data-exam') !== null || c.getAttribute('data-model') !== null)) {
+      if (!sameTabClick(e)) { return; }
+      if (e.preventDefault) { e.preventDefault(); }
+      e.returnValue = false;
+    }
     if (c.getAttribute('data-exam') !== null && (e.detail || 1) <= 1) { lastExamClick = { exam: c.getAttribute('data-exam'), t: now() }; }
     if (c.getAttribute('data-ph') !== null) {
       if (closest(e.target, function (n) { return n.getAttribute && n.getAttribute('data-insbtn') !== null; })) {   /* arrow on the card edge: insert */
@@ -2425,12 +2438,7 @@ var UFMain = function () {
       }
       selectCard(c.getAttribute('data-ph')); return;   /* single click selects = full verbatim text */
     }
-    if (c.getAttribute('data-model') !== null) {
-      if (!sameTabClick(e)) { return; }
-      if (e.preventDefault) { e.preventDefault(); }
-      e.returnValue = false;
-      if (e.detail > 1) { return; }
-    }
+    if (c.getAttribute('data-model') !== null && e.detail > 1) { return; }
     activateNav(c);
   });
   /* C6: insert plain text lines as one block at the saved caret (or at the very end of the report when there is
@@ -2481,7 +2489,7 @@ var UFMain = function () {
     S.lastChoice = null; S.lastRemoval = null; S.userCaret = true;
     return how;
   };
-  window.UFTest = { recognizeText: recognizeText, interText: interText, allIssues: function () { return allIssues(); }, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel, modelHref: modelHref,
+  window.UFTest = { recognizeText: recognizeText, interText: interText, allIssues: function () { return allIssues(); }, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel, modelHref: modelHref, defaultModelOf: defaultModelOf,
                     insertCard: insertCard, editorLines: editorLines, lineText: lineText, openSelect: openSelect, chooseOption: chooseOption, reportText: reportText, directiveRule: directiveRule, anchorHits: anchorHits };
   on(navList, 'dblclick', function (e) {
     if (now() - examDblAt < DBL_MS || inExamDbl()) { return; }   /* handled by the click pair */
