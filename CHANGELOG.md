@@ -11,10 +11,17 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C8] Modelo em nova guia e seções sem frase ocultas — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Cartão de modelo (e o nome do modelo no caminho do painel) virou um link. Clique esquerdo continua carregando o modelo nesta guia, sem recarregar a página. Botão direito → "Abrir em nova guia", Ctrl+clique e clique do meio usam o menu/gesto nativo do navegador.
+- A nova guia abre o mesmo `index.html` com o hash `#ufmodel=` + id do modelo (`b:<exame>|<template>` ou o id do modelo do usuário), codificado com `encodeURIComponent`. Funciona em `file://` (hash relativo, sem servidor) e no IE11. Ao carregar, o app aplica esse modelo numa aba nova (não reaproveita o laudo de outra aba) e tira o hash do endereço, para um recarregamento não descartar o que foi digitado. O esquema antigo das sessões (`#ufopen=<nome>&uford=<ordem>`) permanece.
+- Painel de frases: seção com zero frases não aparece — seção vazia no banco e seção que ficou sem frase por causa da pesquisa. Seção que tem frases continua na lista mesmo recolhida.
+- Testes: `test/c8_test.py`.
+
 ## [etapa-C7b] BI-RADS: campos na ordem da frase do banco — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Ordem visual/DOM e Enter: tipo, descritores, calcificações e campos específicos, bloco "mais" (continua recolhido), localização, distâncias, medidas e categoria/Inserir.
 - Sem campos ou textos novos, mudanças nas regras clínicas ou nas frases do banco.
 - `test/c7_test.py`: navegação Enter atualizada e ordem DOM visível do nódulo conferida explicitamente.
+
 
 ## [etapa-C7] Calculadora BI-RADS de ultrassom de mama (ACR BI-RADS v2025) — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Novo cartão "BI-RADS US (ACR v2025)" no painel (`js/calc-birads.js`), no padrão do TI-RADS: "+ adicionar nódulo" cria um cartão por achado; cartões colapsam num resumo ("Nódulo 2 – MD 10h – 12 mm – BI-RADS 3") com ponto verde (pronto) ou cinza; Enter passa ao próximo campo e, no último, insere; "Limpar" volta a um cartão vazio.
