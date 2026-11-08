@@ -13,6 +13,7 @@ O banco de frases **nunca** faz parte do repositório.
 
 ## [etapa-C8] Modelo em nova guia e seções sem frase ocultas — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Cartão de modelo (e o nome do modelo no caminho do painel) virou um link. Clique esquerdo continua carregando o modelo nesta guia, sem recarregar a página. Botão direito → "Abrir em nova guia", Ctrl+clique e clique do meio usam o menu/gesto nativo do navegador.
+- Cartão de exame (a lista "Abdome Total", "N modelos · M frases") também é um link, para o mesmo `#ufmodel=`. O alvo é o modelo que o duplo clique já carrega: o primeiro cujo nome tem "padrão" (em geral "(padrão)"); se não houver, o primeiro da lista. Sem modelo, o cartão continua botão. Clique esquerdo, Enter e Espaço só entram no exame, como antes.
 - A nova guia abre o mesmo `index.html` com o hash `#ufmodel=` + id do modelo (`b:<exame>|<template>` ou o id do modelo do usuário), codificado com `encodeURIComponent`. Funciona em `file://` (hash relativo, sem servidor) e no IE11. Ao carregar, o app aplica esse modelo numa aba nova (não reaproveita o laudo de outra aba) e tira o hash do endereço, para um recarregamento não descartar o que foi digitado. O esquema antigo das sessões (`#ufopen=<nome>&uford=<ordem>`) permanece.
 - Painel de frases: seção com zero frases não aparece — seção vazia no banco e seção que ficou sem frase por causa da pesquisa. Seção que tem frases continua na lista mesmo recolhida.
 - Testes: `test/c8_test.py`.
