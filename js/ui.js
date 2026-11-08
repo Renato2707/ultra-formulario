@@ -638,15 +638,36 @@ var UFMain = function () {
   function markAlive(on) {
     var m = tabsMap(); if (on) { m[TAB] = now(); } else { delete m[TAB]; } UStore.set('tabs', m);
   }
-  /* C6n: aba aberta por "Sessões" (index.html#ufopen=<nome do modelo>) */
-  var OPEN_TPL = null, BASE_TITLE = document.title;
+  /* C6n: aba aberta por "Sessões" (index.html#ufopen=<nome do modelo>)
+     C8: cartão de modelo é um link (index.html#ufmodel=<id>): botão direito, Ctrl+clique e clique do meio
+     abrem o mesmo arquivo noutra guia, com esse modelo carregado. O id vai no hash (funciona em file:// e no IE11). */
+  var OPEN_TPL = null, OPEN_MODEL = null, BASE_TITLE = document.title;
   var OPEN_ORD = 0, TAB_ORD = 0;
+  function rawHash() {
+    var href = '', i;
+    try { href = String(window.location.href || ''); } catch (e1) { href = ''; }
+    i = href.indexOf('#');
+    if (i >= 0) { return href.slice(i); }
+    try { return String(window.location.hash || ''); } catch (e2) { return ''; }
+  }
+  /* valor de um parâmetro do hash; corta só em &ufopen= / &uford= / &ufmodel= (um & no nome, se o
+     navegador já tiver decodificado o hash, continua a fazer parte do valor) */
+  function hashParam(name) {
+    var h = rawHash(), key = name + '=', i = h.indexOf(key), rest, cut;
+    if (i < 0) { return null; }
+    if (i > 0 && h.charAt(i - 1) !== '#' && h.charAt(i - 1) !== '&') { return null; }
+    rest = h.slice(i + key.length);
+    cut = rest.search(/&uf(?:open|ord|model)=/);
+    if (cut >= 0) { rest = rest.slice(0, cut); }
+    try { return decodeURIComponent(rest); } catch (eD) { return rest; }
+  }
   try { var hm = /[#&]ufopen=([^&]*)/.exec(String(window.location.hash || '')), ho = /[#&]uford=(\d+)/.exec(String(window.location.hash || ''));
     if (hm) { OPEN_TPL = decodeURIComponent(hm[1]); OPEN_ORD = ho ? +ho[1] : 0; } } catch (eH) { OPEN_TPL = null; }
+  try { OPEN_MODEL = hashParam('ufmodel'); } catch (eM) { OPEN_MODEL = null; }
   function draftIndex() { var m = UStore.get('drafts', {}); return (m && typeof m === 'object') ? m : {}; }
   function pickTab() {
     var id = ssGet(), m = tabsMap(), idx = draftIndex(), t = now(), k, best = null, legacy;
-    if (OPEN_TPL !== null) { id = null; m = {}; idx = {}; }   /* C6n: aba aberta por uma sessão: sempre uma aba nova, vazia */
+    if (OPEN_TPL !== null || OPEN_MODEL !== null) { id = null; m = {}; idx = {}; }   /* C6n/C8: sessão ou #ufmodel: sempre uma aba nova, vazia */
     else if (!id && /^uf\.tab=/.test(String(window.name || ''))) { id = String(window.name).slice(7); }
     if (id && m[id] && t - m[id] < TAB_ALIVE_MS) {           /* duplicated tab: same id still alive elsewhere */
       var nid = 't' + t.toString(36) + Math.floor(Math.random() * 1e6).toString(36), d0 = UStore.get('draft.' + id, null);
@@ -657,10 +678,10 @@ var UFMain = function () {
       legacy = UStore.get('draft', null);                       /* single draft from versions before B21 */
       if (legacy && legacy.html) { UStore.set('draft.legacy', legacy); idx.legacy = legacy.t || 1; UStore.remove('draft'); UStore.set('drafts', idx); }
       for (k in idx) { if (idx.hasOwnProperty(k) && !(m[k] && t - m[k] < TAB_ALIVE_MS) && (!best || idx[k] > idx[best])) { best = k; } }
-      id = (OPEN_TPL === null && best) || ('t' + t.toString(36) + Math.floor(Math.random() * 1e6).toString(36));
+      id = ((OPEN_TPL === null && OPEN_MODEL === null) && best) || ('t' + t.toString(36) + Math.floor(Math.random() * 1e6).toString(36));
     }
     TAB = id; ssSet(id); markAlive(true);
-    if (OPEN_TPL !== null) { idx = draftIndex(); }
+    if (OPEN_TPL !== null || OPEN_MODEL !== null) { idx = draftIndex(); }
     var dd = UStore.get('draft.' + TAB, null); TAB_ORD = OPEN_ORD || (dd && dd.ord) || t;   /* C6n: ordem de abertura da aba (sessões) */
     /* prune: keep the newest MAX_DRAFTS drafts, drop drafts older than 30 days */
     var ks = []; for (k in idx) { if (idx.hasOwnProperty(k)) { ks.push(k); } }
@@ -1050,7 +1071,7 @@ var UFMain = function () {
     if (S.level === 2) { return h + '<span class="c2 clast" title="' + esc(S.navExam) + '">' + esc(S.navExam) + '</span>'; }
     var m = getModel(S.activeModelId);
     h += '<a class="c2" data-go="2" title="' + esc(S.navExam) + '">' + esc(S.navExam) + '</a>';
-    if (m && m.exam === S.navExam) { h += '<span class="sepc">›</span><a class="ccur clast" data-cur="' + esc(m.id) + '" title="' + esc(m.name) + ' — clique para recarregar do zero (Ctrl+Z desfaz)">' + esc(m.name) + '</a>'; }
+    if (m && m.exam === S.navExam) { h += '<span class="sepc">›</span><a class="ccur clast" href="' + esc(modelHref(m.id)) + '" data-cur="' + esc(m.id) + '" title="' + esc(m.name) + ' — clique para recarregar do zero (Ctrl+Z desfaz)">' + esc(m.name) + '</a>'; }
     return h;
   }
   function toolsHtml() {
@@ -1095,12 +1116,14 @@ var UFMain = function () {
     if (keepFocus) { restoreNavFocus(); }
   }
   function isPad(t) { return String(t || '').indexOf('(padr\u00e3o)') >= 0; }   /* C6o: "(padrão)" cards stand out */
+  /* C8: hash relativo. Nova guia carrega o arquivo e aplica o modelo; o clique simples não navega. */
+  function modelHref(id) { return '#ufmodel=' + encodeURIComponent(id); }
   function modelCard(m) {
-    return '<button type="button" class="card' + (isPad(m.name) ? ' pad' : '') + (m.id === (S.selModel || S.activeModelId) ? ' sel' : '') + '" data-model="' + esc(m.id) + '"' +
-      (S.settings.dragReorder ? ' draggable="true"' : '') + '>' +
+    return '<a href="' + esc(modelHref(m.id)) + '" class="card' + (isPad(m.name) ? ' pad' : '') + (m.id === (S.selModel || S.activeModelId) ? ' sel' : '') + '" data-model="' + esc(m.id) + '"' +
+      (S.settings.dragReorder ? ' draggable="true"' : ' draggable="false"') + '>' +
       (S.settings.showUsage ? '<span class="n">(' + (S.usage[m.id] || 0) + ')</span>' : '') +
       '<div class="ct">' + (S.settings.dragReorder ? '<span class="grip">&#8942;</span>' : '') + esc(m.name) + '</div>' +
-      (m.user ? '<div class="cm">meu modelo</div>' : (m.override ? '<div class="cm">editado neste computador</div>' : '')) + '</button>';
+      (m.user ? '<div class="cm">meu modelo</div>' : (m.override ? '<div class="cm">editado neste computador</div>' : '')) + '</a>';
   }
   function renderModelsLevel(q) {
     var arr = sortedModels(), html = '', glob = '', i, m, n = 0;
@@ -1161,7 +1184,7 @@ var UFMain = function () {
           '<div class="pb">' + highlight(ph.body, q) + '</div><div class="raw">' + rawHtml(c.src, q) + '</div>' +
           '<span class="pins" data-insbtn="1" title="Inserir no laudo">&#8594;</span></button>';
       }
-      if (q && !shown) { continue; }
+      if (!shown) { continue; }   /* C8: sem frases (seção vazia no banco, ou nada passou no filtro) não aparece; recolhida com frases continua */
       var open = q ? true : !!S.openSecs[s.key];
       html += '<div class="sec' + (open ? ' open' : '') + (open && S.animSec === s.key ? ' sec-anim' : '') + '"><button type="button" class="card" data-sec="' + esc(s.key) + '" aria-expanded="' + open + '">' +
         '<span class="arr">' + (open ? '&#9662;' : '&#9656;') + '</span><span class="ct">' + esc(s.name) + (s.org ? '<span class="org"> \u00b7 ' + esc(s.org) + '</span>' : '') + '</span><span class="n">' +
@@ -2382,6 +2405,14 @@ var UFMain = function () {
     if (m) { S.selModel = m.id; useModel(m, true); } else { goLevel(2, ex); }
   }
   function inExamDbl() { return lastExamClick && now() - lastExamClick.t < DBL_MS; }
+  /* clique simples fica nesta guia; Ctrl/Cmd/Shift/Alt ou outro botão seguem o href (nova guia/janela) */
+  function sameTabClick(e) {
+    var b = e.button;
+    if ((b === undefined || b === null || b === 0) && e.which && e.which > 1) { b = e.which - 1; }
+    if (b && b !== 0) { return false; }
+    if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) { return false; }
+    return true;
+  }
   on(navList, 'click', function (e) {
     var c = navCard(e.target);
     if (inExamDbl()) { e.preventDefault(); examDouble(); return; }
@@ -2394,7 +2425,12 @@ var UFMain = function () {
       }
       selectCard(c.getAttribute('data-ph')); return;   /* single click selects = full verbatim text */
     }
-    if (c.getAttribute('data-model') !== null && e.detail > 1) { return; }
+    if (c.getAttribute('data-model') !== null) {
+      if (!sameTabClick(e)) { return; }
+      if (e.preventDefault) { e.preventDefault(); }
+      e.returnValue = false;
+      if (e.detail > 1) { return; }
+    }
     activateNav(c);
   });
   /* C6: insert plain text lines as one block at the saved caret (or at the very end of the report when there is
@@ -2445,7 +2481,7 @@ var UFMain = function () {
     S.lastChoice = null; S.lastRemoval = null; S.userCaret = true;
     return how;
   };
-  window.UFTest = { recognizeText: recognizeText, interText: interText, allIssues: function () { return allIssues(); }, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel,
+  window.UFTest = { recognizeText: recognizeText, interText: interText, allIssues: function () { return allIssues(); }, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel, modelHref: modelHref,
                     insertCard: insertCard, editorLines: editorLines, lineText: lineText, openSelect: openSelect, chooseOption: chooseOption, reportText: reportText, directiveRule: directiveRule, anchorHits: anchorHits };
   on(navList, 'dblclick', function (e) {
     if (now() - examDblAt < DBL_MS || inExamDbl()) { return; }   /* handled by the click pair */
@@ -2478,6 +2514,9 @@ var UFMain = function () {
   on($('crumb'), 'click', function (e) {
     var a = closest(e.target, function (n) { return n.getAttribute && n.getAttribute('data-cur') !== null; });
     if (!a) { return; }
+    if (!sameTabClick(e)) { return; }   /* C8: Ctrl/clique do meio abre o href noutra guia */
+    if (e.preventDefault) { e.preventDefault(); }
+    e.returnValue = false;
     if ((e.detail || 1) > 1 && now() - crumbAt < 800) { return; }
     crumbAt = now(); useModel(getModel(a.getAttribute('data-cur')), true);
   });
@@ -3325,9 +3364,11 @@ var UFMain = function () {
     buildModels(); renderNav(); afterChange(true);
     toast('Rascunho anterior incompatível foi descartado.');
   }
-  if (OPEN_TPL !== null) {   /* C6n: aba aberta por uma sessão: carrega o modelo e limpa o endereço */
+  if (OPEN_TPL !== null || OPEN_MODEL !== null) {   /* C6n sessão (#ufopen) ou C8 link (#ufmodel): carrega e limpa o endereço */
     try { if (window.history && window.history.replaceState) { window.history.replaceState(null, '', String(window.location.href).replace(/#.*$/, '')); } } catch (eR) {}
-    if (findModelByName(OPEN_TPL)) { useModel(findModelByName(OPEN_TPL), true); }
+    var bootModel = OPEN_MODEL !== null ? getModel(OPEN_MODEL) : null;
+    if (!bootModel && OPEN_TPL !== null) { bootModel = findModelByName(OPEN_TPL); }
+    if (bootModel) { useModel(bootModel, true); }
   }
   updTitle();
   $('repSearch').value = S.repQuery || ''; sxShow($('repSearch'));
