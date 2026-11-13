@@ -180,8 +180,32 @@ with sync_playwright() as p:
     # ---------- 5) em 1024 nada do cabeçalho sai do painel; laudo e calculadoras ----------
     lay2 = pg.evaluate(INSIDE)
     ck('5 cabeçalhos dentro do próprio painel', lay2['bad'] == [] and not lay2['overlap'] and lay2['fits'], lay2)
-    ck('5 laudo: buscar, sessões, limpar, formatação, copiar/imprimir/gerar',
-       pg.get_attribute('#repSearch', 'placeholder') == 'Buscar no laudo...' and pg.locator('#btnSess').count() == 1 and pg.locator('#btnClear').count() == 1 and pg.locator('#fmtBar .tb').count() >= 9 and 'Copiar' in pg.inner_text('#centerFoot') and 'Imprimir' in pg.inner_text('#centerFoot') and 'Gerar' in pg.inner_text('#centerFoot') and 'btn-primary' in (pg.get_attribute('#btnGen', 'class') or ''))
+    hdr = pg.evaluate("""(function () {
+      function r(id) { var e = document.getElementById(id); return e ? e.getBoundingClientRect() : null; }
+      var ids = ['repSearch', 'btnCopy', 'btnPrint', 'btnGen', 'btnSess', 'btnClear', 'btnSettings'];
+      var c = r('center'), i, b, out = [], bad = [];
+      for (i = 0; i < ids.length; i++) {
+        b = r(ids[i]);
+        out.push({ id: ids[i], t: Math.round(b.top), l: Math.round(b.left), right: Math.round(b.right) });
+        if (b.left < c.left - 1 || b.right > c.right + 1 || b.bottom > c.bottom + 1) { bad.push(ids[i]); }
+      }
+      var order = true;
+      for (i = 1; i < out.length; i++) {
+        if (out[i].t > out[i - 1].t + 8) { continue; }
+        if (out[i].l < out[i - 1].l) { order = false; }
+      }
+      var inp = document.getElementById('repSearch'), cs = getComputedStyle(inp);
+      var ctx = document.createElement('canvas').getContext('2d'); ctx.font = cs.font;
+      var room = inp.getBoundingClientRect().width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      var foot = document.getElementById('centerFoot');
+      return { order: order, bad: bad, room: Math.round(room), need: Math.round(ctx.measureText(inp.placeholder).width),
+        inHead: document.getElementById('btnCopy').parentNode.id === 'repActs' && document.getElementById('editorToolbar').contains(document.getElementById('btnGen')),
+        footBtns: foot.querySelectorAll('#btnCopy, #btnPrint, #btnGen').length,
+        footHidden: foot.hidden, primary: document.getElementById('btnGen').className.indexOf('btn-primary') >= 0,
+        rows: out };
+    })()""")
+    ck('5 Copiar, Imprimir e Gerar no cabeçalho do laudo, Gerar primário',
+       hdr['inHead'] and hdr['footBtns'] == 0 and hdr['primary'] and hdr['order'] and hdr['bad'] == [] and hdr['room'] >= hdr['need'] and hdr['footHidden'], hdr)
     ck('5 calculadoras: título e Limpar', 'Calculadoras' in pg.inner_text('#right .rhead') and pg.inner_text('#ucReset').strip() == 'Limpar')
     # ---------- 7) nome recarrega o modelo; trocar continua à parte; Limpar volta ao modelo ----------
     LONGM = 'Doppler de Fluxo Obstétrico (padrão)'

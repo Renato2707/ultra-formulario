@@ -605,6 +605,7 @@ var UFMain = function () {
     fb.hidden = unf.length === 0;
     fb.innerHTML = unf.length + (unf.length === 1 ? ' campo' : ' campos');
     fb.title = unf.length + (unf.length === 1 ? ' campo a preencher' : ' campos a preencher') + ' (clique para ir ao próximo)';
+    if ($('centerFoot')) { $('centerFoot').hidden = b.hidden && fb.hidden; }
     updatePrintHold();
   }
   var saveTimer = null;
