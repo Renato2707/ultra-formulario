@@ -111,9 +111,7 @@ def go_exams(pg):
     for _ in range(4):
         if pg.locator('[data-exam="Alfa"]').count():
             return
-        if pg.locator('[data-go="1"]').count():
-            pg.click('[data-go="1"]'); pg.wait_for_timeout(200); continue
-        if not pg.locator('#navBack').is_disabled():
+        if pg.locator('#navBack').is_visible():
             pg.click('#navBack'); pg.wait_for_timeout(200); continue
         break
 def open_href(c, href):
@@ -174,9 +172,9 @@ with sync_playwright() as p:
     npg.wait_for_timeout(300)
     ck('0 clique do meio no exame sem (padrão) abre o primeiro', len(pages) == n_g + 1 and 'TEXTO-GAMA-PRIMEIRO' in rep(npg) and 'TEXTO-GAMA-SEGUNDO' not in rep(npg), rep(npg)[:120])
     ck('0 clique do meio não mexe nesta guia', pg.evaluate('UFTest.S.level') == 1 and 'TEXTO-GAMA-PRIMEIRO' not in rep(pg))
-    # ---------- 1) cartões de modelo são links; "ver frases" continua botão ----------
+    # ---------- 1) cartões de modelo são links; o cartão "ver frases" saiu (a aba Frases cobre) ----------
     pg.click('[data-exam="Alfa"]'); pg.wait_for_timeout(700)
-    ck('1 ver frases continua botão', pg.evaluate("document.querySelector('[data-go=\"3\"]').nodeName") == 'BUTTON')
+    ck('1 cartão Ver frases saiu; a aba Frases cobre', 'Ver frases sem carregar modelo' not in pg.inner_text('#navList') and pg.locator('#navList .card.special').count() == 0 and pg.locator('#tabFrases').count() == 1)
     info = pg.evaluate("""(function () {
       var a = document.querySelectorAll('#navList [data-model]'), i, o = [], s;
       for (i = 0; i < a.length; i++) {
@@ -215,23 +213,24 @@ with sync_playwright() as p:
     pg.locator('#navList .pcard', has_text='Frase alfa').locator('.pins').click(); pg.wait_for_timeout(250)
     ck('2 seta insere a frase', 'FRASE-ALFA' in rep(pg) and 'TEXTO-ALFA-PADRAO' in rep(pg), rep(pg))
     # ---------- 3) teclado: Enter e Espaço aplicam aqui ----------
-    pg.click('#navBack'); pg.wait_for_timeout(200)
+    pg.click('#tabModelos'); pg.wait_for_timeout(200)
     model_by_text(pg, 'Alfa & 1º').focus(); pg.keyboard.press('Enter'); pg.wait_for_timeout(300)
     ck('3 Enter carrega o modelo nesta guia', 'TEXTO-ALFA-E' in rep(pg) and 'ufmodel' not in pg.url, (pg.url, rep(pg)[:80]))
-    pg.click('#navBack'); pg.wait_for_timeout(200)
+    pg.click('#tabModelos'); pg.wait_for_timeout(200)
     model_by_text(pg, 'Comum').focus(); pg.keyboard.press('Space'); pg.wait_for_timeout(300)
     ck('3 Espaço carrega o modelo (não só rola a página)', 'TEXTO-COMUM-ALFA' in rep(pg) and 'ufmodel' not in pg.url, rep(pg)[:80])
-    # ---------- 4) miolo do caminho também é o link do modelo ----------
-    cur = pg.locator('#crumb .ccur').get_attribute('href')
-    ck('4 miolo é #ufmodel do Comum de Alfa', cur and unquote(cur.split('=', 1)[1]) == 'b:Alfa|Comum', cur)
+    # ---------- 4) modelo carregado (aba Modelos) recarrega do zero, como o miolo do caminho fazia ----------
+    pg.click('#tabModelos'); pg.wait_for_timeout(200)
+    cur = model_by_text(pg, 'Comum').get_attribute('href')
+    ck('4 modelo carregado é #ufmodel do Comum de Alfa', cur and unquote(cur.split('=', 1)[1]) == 'b:Alfa|Comum', cur)
     pg.evaluate("""(function () { var d = document.createElement('div'); d.textContent = 'RASCUNHO-C8'; document.getElementById('editor').appendChild(d); })()""")
-    pg.locator('#crumb .ccur').click(); pg.wait_for_timeout(300)
-    ck('4 clique no miolo recarrega aqui e limpa o rascunho', 'TEXTO-COMUM-ALFA' in rep(pg) and 'RASCUNHO-C8' not in rep(pg) and 'ufmodel' not in pg.url, rep(pg)[:120])
+    model_by_text(pg, 'Comum').click(); pg.wait_for_timeout(300)
+    ck('4 clique no modelo carregado recarrega aqui e limpa o rascunho', 'TEXTO-COMUM-ALFA' in rep(pg) and 'RASCUNHO-C8' not in rep(pg) and 'ufmodel' not in pg.url, rep(pg)[:120])
     # ---------- 5) nova guia pelo href (o que o botão direito faz) e pelo Ctrl+clique ----------
     pg.evaluate("""(function () { var d = document.createElement('div'); d.textContent = 'MARCA-ABA-1'; document.getElementById('editor').appendChild(d);
       document.getElementById('editor').dispatchEvent(new Event('input', { bubbles: true })); })()""")
     pg.wait_for_timeout(150)
-    pg.click('#navBack'); pg.wait_for_timeout(200)
+    pg.click('#tabModelos'); pg.wait_for_timeout(200)
     href_e = href_of(pg, 'Alfa & 1º')
     np = open_href(c, href_e)
     ck('5 nova guia aplica Alfa & 1º', 'TEXTO-ALFA-E' in rep(np), rep(np)[:160])
@@ -280,8 +279,8 @@ with sync_playwright() as p:
     # ---------- 6) seções sem frase ocultas; recolhida com frases continua ----------
     model_by_text(pg, 'Alfa (padrão)').click(); pg.wait_for_timeout(300)
     names = sec_names(pg)
-    ck('6 seções com frase aparecem', all(x in names for x in ['COM FRASES', 'OUTRA', 'ECO COMPARTILHADO', 'COMUNS']), names)
-    ck('6 vazia do exame, vazia de TODOS e aviso somem', 'VAZIA' not in names and 'TODOS VAZIA' not in names and 'Sem frases ainda' not in pg.inner_text('#navList'), names)
+    ck('6 seções com frase aparecem', all(x in names for x in ['Com frases', 'Outra', 'Eco compartilhado', 'Comuns']), names)
+    ck('6 vazia do exame, vazia de TODOS e aviso somem', 'Vazia' not in names and 'Todos vazia' not in names and 'Sem frases ainda' not in pg.inner_text('#navList'), names)
     exp = pg.evaluate("""(function () {
       var nodes = document.querySelectorAll('#navList [data-sec]'), i, o = [];
       for (i = 0; i < nodes.length; i++) { o.push(nodes[i].getAttribute('aria-expanded')); }
@@ -290,27 +289,27 @@ with sync_playwright() as p:
     ck('6 aparecem recolhidas (não é o recolhimento que esconde)', exp and all(x == 'false' for x in exp) and pg.locator('#navList .pcard').count() == 0, exp)
     pg.locator('#navList [data-sec]', has_text='ECO COMPARTILHADO').click(); pg.wait_for_timeout(200)
     ck('6 referência com frases emprestadas mostra a frase', pg.locator('#navList .pcard', has_text='FRASE-COMPARTILHADA').count() == 1)
-    ck('6 vazia continua oculta depois de abrir outra', 'VAZIA' not in sec_names(pg))
+    ck('6 vazia continua oculta depois de abrir outra', 'Vazia' not in sec_names(pg) and 'Todos vazia' not in sec_names(pg))
     pg.fill('#navSearch', 'unica-alfa'); pg.wait_for_timeout(200)
     fn = sec_names(pg)
-    ck('6 filtro deixa só a seção com a frase', fn == ['COM FRASES'], fn)
+    ck('6 filtro deixa só a seção com a frase', fn == ['Com frases'], fn)
     ck('6 contagem do filtro é 1/2', pg.locator('#navList [data-sec] .n').inner_text().strip() == '1/2', pg.locator('#navList [data-sec] .n').inner_text())
     ck('6 frase que não bate some, a que bate fica', pg.locator('#navList .pcard', has_text='unica-alfa').count() == 1 and pg.locator('#navList .pcard', has_text='unica-beta').count() == 0)
     pg.fill('#navSearch', 'zzz-nenhuma'); pg.wait_for_timeout(200)
     ck('6 filtro sem match não lista seção', sec_names(pg) == [] and 'Nenhuma frase encontrada' in pg.inner_text('#navList'), sec_names(pg))
     pg.click('#navSearchX'); pg.wait_for_timeout(200)
     back = sec_names(pg)
-    ck('6 limpar a pesquisa devolve as seções com frase', all(x in back for x in ['COM FRASES', 'OUTRA', 'ECO COMPARTILHADO', 'COMUNS']) and 'VAZIA' not in back, back)
+    ck('6 limpar a pesquisa devolve as seções com frase', all(x in back for x in ['Com frases', 'Outra', 'Eco compartilhado', 'Comuns']) and 'Vazia' not in back and 'Todos vazia' not in back, back)
     pg.evaluate("""(function () {
       UFTest.S.userPhrases.push({ id: 'up1', exam: 'Alfa', section: 'VAZIA', titleLine: 'Minha:', body: 'TEXTO-USUARIO' });
       document.getElementById('navSearch').dispatchEvent(new Event('input', { bubbles: true }));
     })()""")
     pg.wait_for_timeout(150)
-    ck('6 frase do usuário faz a seção vazia aparecer', 'VAZIA' in sec_names(pg), sec_names(pg))
+    ck('6 frase do usuário faz a seção vazia aparecer', 'Vazia' in sec_names(pg), sec_names(pg))
     pg.fill('#navSearch', 'TEXTO-USUARIO'); pg.wait_for_timeout(150)
-    ck('6 filtro dessa frase deixa a seção', sec_names(pg) == ['VAZIA'], sec_names(pg))
+    ck('6 filtro dessa frase deixa a seção', sec_names(pg) == ['Vazia'], sec_names(pg))
     pg.fill('#navSearch', 'nao-esta'); pg.wait_for_timeout(150)
-    ck('6 filtro que não bate esconde de novo', 'VAZIA' not in sec_names(pg) and sec_names(pg) == [], sec_names(pg))
+    ck('6 filtro que não bate esconde de novo', 'Vazia' not in sec_names(pg) and sec_names(pg) == [], sec_names(pg))
     ck('sem erros de página', not ERR, ERR[:4])
     c.close(); b.close()
 os.unlink(f.name)
