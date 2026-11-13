@@ -67,7 +67,7 @@ var UFMain = function () {
   var DEFAULT_SETTINGS = {
     dragReorder: false, sortByUsage: false, showUsage: false, divider: 0.75,
     normPunct: true, normSymbols: false, eol: 'crlf', ascii: false, warnFields: true, theme: 'light', paperDark: false,
-    leftW: 260, rightW: 340, rightCollapsed: false, autoNextSec: true, hypUnderline: true, dragInReport: true, blockCopy: true
+    leftW: 300, rightW: 280, rightCollapsed: false, autoNextSec: true, hypUnderline: true, dragInReport: true, blockCopy: true
   };
   var S = {
     bank: null, bankName: '', settings: {}, usage: UStore.get('usage', {}), usageLast: UStore.get('usageLast', {}) || {}, order: UStore.get('order', []),
@@ -1055,8 +1055,7 @@ var UFMain = function () {
   }
 
   /* ================= navigator (left column) ================= */
-  /* Level 1 = exams, Level 2 = models of exam, Level 3 = sections/phrases */
-  var ICON = { add: '+', edit: '&#9998;', clone: '&#10697;', imp: '&#8681;', ins: '&#8594;' };
+  /* Level 1 = exams, Level 2 = Modelos tab, Level 3 = Frases tab */
   function navItems() { return qsa($('navList'), '.card'); }
   function examCount(nm) {
     var ex = findExam(nm), nt = 0, np = 0, i;
@@ -1064,21 +1063,27 @@ var UFMain = function () {
     if (ex) { for (i = 0; i < ex.sections.length; i++) { np += ex.sections[i].phrases.length; } }
     return nt + (nt === 1 ? ' modelo' : ' modelos') + (np ? ' · ' + np + ' frases' : '');
   }
-  function crumbHtml() {
-    var h = '';
-    if (S.level === 1) { return 'Exames'; }
-    h = '<a class="c1" data-go="1">Exames</a><span class="sepc">›</span>';
-    if (S.level === 2) { return h + '<span class="c2 clast" title="' + esc(S.navExam) + '">' + esc(S.navExam) + '</span>'; }
-    var m = getModel(S.activeModelId);
-    h += '<a class="c2" data-go="2" title="' + esc(S.navExam) + '">' + esc(S.navExam) + '</a>';
-    if (m && m.exam === S.navExam) { h += '<span class="sepc">›</span><a class="ccur clast" href="' + esc(modelHref(m.id)) + '" data-cur="' + esc(m.id) + '" title="' + esc(m.name) + ' — clique para recarregar do zero (Ctrl+Z desfaz)">' + esc(m.name) + '</a>'; }
-    return h;
-  }
   function toolsHtml() {
-    function b(id, ic, t) { return '<button type="button" class="ib" id="' + id + '" title="' + t + '" aria-label="' + t + '">' + ic + '</button>'; }
-    if (S.level === 2) { return b('tMAdd', ICON.add, 'Adicionar modelo') + b('tMEdit', ICON.edit, 'Editar modelo selecionado') + b('tMClone', ICON.clone, 'Clonar modelo selecionado'); }
-    if (S.level === 3) { return b('tPAdd', ICON.add, 'Adicionar frase') + b('tPImp', ICON.imp, 'Importar frases') + b('tPEdit', ICON.edit, 'Editar frase selecionada') + b('tPIns', ICON.ins, 'Inserir frase selecionada no laudo'); }
+    function b(id, label, t) { return '<button type="button" class="btn btn-sm" id="' + id + '" title="' + t + '">' + label + '</button>'; }
+    if (S.level === 2) { return b('tMAdd', '+ Novo modelo', 'Adicionar modelo') + b('tMEdit', 'Editar', 'Editar modelo selecionado') + b('tMClone', 'Clonar', 'Clonar modelo selecionado'); }
+    if (S.level === 3) { return b('tPAdd', '+ Nova frase', 'Adicionar frase') + b('tPImp', '&#8681; Importar', 'Importar frases') + b('tPEdit', '&#9998; Editar', 'Editar frase selecionada'); }
     return '';
+  }
+  function syncExamChrome() {
+    var inExam = S.level > 1 && !!S.navExam, lab, modelos;
+    $('examBox').hidden = !inExam;
+    $('listHead').hidden = inExam;
+    $('navFoot').hidden = !inExam;
+    $('navBack').disabled = !inExam;
+    if (!inExam) { return; }
+    lab = S.navExam === UltraParser.GLOBAL_EXAM ? 'TODOS (comuns a todos)' : S.navExam;
+    $('examName').textContent = lab;
+    $('examName').title = lab;
+    modelos = S.level === 2;
+    $('tabModelos').setAttribute('aria-selected', modelos ? 'true' : 'false');
+    $('tabFrases').setAttribute('aria-selected', modelos ? 'false' : 'true');
+    if (modelos) { addCls($('tabModelos'), 'on'); rmCls($('tabFrases'), 'on'); }
+    else { addCls($('tabFrases'), 'on'); rmCls($('tabModelos'), 'on'); }
   }
   var PLACE = ['', 'Pesquisar exame...', 'Pesquisar modelo...', 'Pesquisar frases...'];
   function renderNav(keepFocus) {
@@ -1088,8 +1093,7 @@ var UFMain = function () {
     $('navList').style.display = noBank ? 'none' : '';
     if (noBank) { return; }
     if (S.level > 1 && !S.navExam) { S.level = 1; }
-    $('navBack').disabled = S.level === 1;
-    $('crumb').innerHTML = crumbHtml();
+    syncExamChrome();
     $('navTools').innerHTML = toolsHtml();
     var si = $('navSearch');
     si.setAttribute('placeholder', PLACE[S.level]);
@@ -1126,7 +1130,9 @@ var UFMain = function () {
       esc(label) + '</div><div class="cm">' + esc(examCount(nm)) + '</div></' + (dm ? 'a' : 'button') + '>';
   }
   function modelCard(m) {
-    return '<a href="' + esc(modelHref(m.id)) + '" class="card' + (isPad(m.name) ? ' pad' : '') + (m.id === (S.selModel || S.activeModelId) ? ' sel' : '') + '" data-model="' + esc(m.id) + '"' +
+    var loaded = m.id === S.activeModelId;
+    return '<a href="' + esc(modelHref(m.id)) + '" class="card' + (isPad(m.name) ? ' pad' : '') + (m.id === (S.selModel || S.activeModelId) ? ' sel' : '') + (loaded ? ' loaded' : '') + '" data-model="' + esc(m.id) + '"' +
+      (loaded ? ' title="' + esc(m.name) + ' — clique para recarregar do zero (Ctrl+Z desfaz)"' : '') +
       (S.settings.dragReorder ? ' draggable="true"' : ' draggable="false"') + '>' +
       (S.settings.showUsage ? '<span class="n">(' + (S.usage[m.id] || 0) + ')</span>' : '') +
       '<div class="ct">' + (S.settings.dragReorder ? '<span class="grip">&#8942;</span>' : '') + esc(m.name) + '</div>' +
@@ -1142,8 +1148,21 @@ var UFMain = function () {
     }
     if (glob) { html += '<div class="glabel">Comuns a todos os exames</div>' + glob; }
     if (!n && q) { html = '<div class="empty">Nenhum modelo encontrado</div>'; }
-    html += '<button type="button" class="card special" data-go="3"><div class="ct">Ver frases sem carregar modelo</div></button>';
+    else if (!n) { html = '<div class="empty">Este exame não tem modelos.</div>'; }
     return html;
+  }
+  /* display only: first letter upper, the rest lower, text inside parentheses kept as written */
+  function sentenceCase(name) {
+    var s = String(name || ''), out = '', i, ch, depth = 0, capped = false;
+    for (i = 0; i < s.length; i++) {
+      ch = s.charAt(i);
+      if (ch === '(') { depth++; out += ch; continue; }
+      if (ch === ')' && depth) { depth--; out += ch; continue; }
+      if (depth) { out += ch; continue; }
+      if (!capped && /[A-Za-z\u00C0-\u00FF]/.test(ch)) { out += ch.toUpperCase(); capped = true; }
+      else { out += ch.toLowerCase(); }
+    }
+    return out;
   }
   /* verbatim txt lines; first (title) line in bold */
   function rawHtml(src, q) {
@@ -1193,8 +1212,8 @@ var UFMain = function () {
       }
       if (!shown) { continue; }   /* C8: sem frases (seção vazia no banco, ou nada passou no filtro) não aparece; recolhida com frases continua */
       var open = q ? true : !!S.openSecs[s.key];
-      html += '<div class="sec' + (open ? ' open' : '') + (open && S.animSec === s.key ? ' sec-anim' : '') + '"><button type="button" class="card" data-sec="' + esc(s.key) + '" aria-expanded="' + open + '">' +
-        '<span class="arr">' + (open ? '&#9662;' : '&#9656;') + '</span><span class="ct">' + esc(s.name) + (s.org ? '<span class="org"> \u00b7 ' + esc(s.org) + '</span>' : '') + '</span><span class="n">' +
+      html += '<div class="sec' + (open ? ' open' : '') + (open && S.animSec === s.key ? ' sec-anim' : '') + '"><button type="button" class="card" data-sec="' + esc(s.key) + '" aria-expanded="' + open + '" title="' + esc(s.name) + '">' +
+        '<span class="arr">' + (open ? '&#9662;' : '&#9656;') + '</span><span class="ct">' + esc(sentenceCase(s.name)) + (s.org ? '<span class="org"> \u00b7 ' + esc(s.org) + '</span>' : '') + '</span><span class="n">' +
         (s.cards.length ? (q ? shown + '/' : '') + s.cards.length : '') + '</span></button>';
       if (open) {
         html += '<div class="sec-body">' +
@@ -1227,7 +1246,7 @@ var UFMain = function () {
     (want || l[0] || $('navSearch')).focus();
     if (want && want.scrollIntoView) { want.scrollIntoView(false); }
   }
-  function navBack() { if (S.level > 1) { goLevel(S.level - 1); } }
+  function navBack() { if (S.level > 1) { goLevel(1); } }
   function activateNav(el) {
     var v;
     if ((v = el.getAttribute('data-go')) !== null) {
@@ -2366,8 +2385,8 @@ var UFMain = function () {
   /* ================= layout: column widths, right panel ================= */
   function applyLayout() {
     var st = S.settings, maxL = Math.max(200, Math.floor(window.innerWidth * 0.45));
-    st.leftW = Math.max(200, Math.min(maxL, st.leftW || 260));
-    st.rightW = Math.max(280, Math.min(480, st.rightW || 340));
+    st.leftW = Math.max(200, Math.min(maxL, st.leftW || 300));
+    st.rightW = Math.max(200, Math.min(420, st.rightW || 280));
     $('left').style.width = st.leftW + 'px';
     var r = $('right');
     if (st.rightCollapsed) { addCls(r, 'collapsed'); r.style.width = ''; } else { rmCls(r, 'collapsed'); r.style.width = st.rightW + 'px'; }
@@ -2393,7 +2412,16 @@ var UFMain = function () {
   var navList = $('navList');
   function navCard(t) { return closest(t, function (n) { return hasCls(n, 'card'); }, navList); }
   on($('navBack'), 'click', navBack);
-  on($('crumb'), 'click', function (e) { var a = closest(e.target, function (n) { return n.getAttribute && n.getAttribute('data-go') !== null; }); if (a) { goLevel(parseInt(a.getAttribute('data-go'), 10)); } });
+  on($('tabModelos'), 'click', function () { if (S.navExam) { goLevel(2); } });
+  on($('tabFrases'), 'click', function () { if (!S.navExam) { return; } S.activeExam = S.navExam; goLevel(3); });
+  on($('examBox'), 'keydown', function (e) {
+    var k = e.keyCode;
+    if (k === 27) { e.preventDefault(); navBack(); return; }
+    if ((k === 37 || k === 39) && (e.target === $('tabModelos') || e.target === $('tabFrases'))) {
+      e.preventDefault();
+      if (S.level === 2) { S.activeExam = S.navExam; goLevel(3); } else if (S.level === 3) { goLevel(2); }
+    }
+  });
   /* exam double-click, detected manually: the 1st click re-renders the list (level 2),
      so the 2nd click / dblclick lands on a different element */
   var lastExamClick = null, examDblAt = 0, DBL_MS = 600;
@@ -2489,7 +2517,7 @@ var UFMain = function () {
     S.lastChoice = null; S.lastRemoval = null; S.userCaret = true;
     return how;
   };
-  window.UFTest = { recognizeText: recognizeText, interText: interText, allIssues: function () { return allIssues(); }, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel, modelHref: modelHref, defaultModelOf: defaultModelOf,
+  window.UFTest = { recognizeText: recognizeText, interText: interText, allIssues: function () { return allIssues(); }, S: S, removeGroup: removeGroup, critGroups: critGroups, critState: critState, examNames: examNames, examSections: examSections, sortedModels: sortedModels, useModel: useModel, modelHref: modelHref, defaultModelOf: defaultModelOf, sentenceCase: sentenceCase,
                     insertCard: insertCard, editorLines: editorLines, lineText: lineText, openSelect: openSelect, chooseOption: chooseOption, reportText: reportText, directiveRule: directiveRule, anchorHits: anchorHits };
   on(navList, 'dblclick', function (e) {
     if (now() - examDblAt < DBL_MS || inExamDbl()) { return; }   /* handled by the click pair */
@@ -2517,17 +2545,6 @@ var UFMain = function () {
   on(navList, 'mouseleave', function () { phTip.style.display = 'none'; tipFor = null; });
   on(navList, 'scroll', function () { phTip.style.display = 'none'; tipFor = null; });
   on(navList, 'mousedown', function () { phTip.style.display = 'none'; tipFor = null; });
-  /* current template crumb: single click reloads; the 2nd click of a double click is ignored (no double reload) */
-  var crumbAt = 0;
-  on($('crumb'), 'click', function (e) {
-    var a = closest(e.target, function (n) { return n.getAttribute && n.getAttribute('data-cur') !== null; });
-    if (!a) { return; }
-    if (!sameTabClick(e)) { return; }   /* C8: Ctrl/clique do meio abre o href noutra guia */
-    if (e.preventDefault) { e.preventDefault(); }
-    e.returnValue = false;
-    if ((e.detail || 1) > 1 && now() - crumbAt < 800) { return; }
-    crumbAt = now(); useModel(getModel(a.getAttribute('data-cur')), true);
-  });
   on(navList, 'keydown', function (e) {
     var c = navCard(e.target); if (!c) { return; }
     var l = navItems(), i = l.indexOf(c), k = e.keyCode, j = -1;
@@ -2565,7 +2582,6 @@ var UFMain = function () {
     else if (id === 'tPAdd') { phraseDialog(null); }
     else if (id === 'tPImp') { importDialog(); }
     else if (id === 'tPEdit') { c = S.phraseIndex[S.selCard]; if (c) { phraseDialog(c); } else { toast('Selecione uma frase.'); } }
-    else if (id === 'tPIns') { if (S.selCard) { insertCard(S.selCard); } else { toast('Selecione uma frase.'); } }
   });
   var dragId = null;
   on(navList, 'dragstart', function (e) {
@@ -3187,8 +3203,8 @@ var UFMain = function () {
   }
   on($('splitL'), 'keydown', splitKey('L'));
   on($('splitR'), 'keydown', splitKey('R'));
-  on($('splitL'), 'dblclick', function () { S.settings.leftW = 260; applyLayout(); saveSettings(); });
-  on($('splitR'), 'dblclick', function () { S.settings.rightW = 340; applyLayout(); saveSettings(); });
+  on($('splitL'), 'dblclick', function () { S.settings.leftW = 300; applyLayout(); saveSettings(); });
+  on($('splitR'), 'dblclick', function () { S.settings.rightW = 280; applyLayout(); saveSettings(); });
   on($('rightToggle'), 'click', function () { S.settings.rightCollapsed = !S.settings.rightCollapsed; applyLayout(); saveSettings(); });
   on(window, 'resize', applyLayout);
 

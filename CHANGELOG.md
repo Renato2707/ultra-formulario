@@ -11,6 +11,20 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C9] Layout Opção B — cada painel com o seu cabeçalho — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Saiu a barra de cima, de ponta a ponta. Cada painel (modelos/frases, laudo, calculadoras) tem o próprio cabeçalho, no mesmo cinza. Nenhum elemento de um painel fica por cima do outro.
+- Entre os painéis: uma divisória cinza de 8 px, com pegada para arrastar. Arrastar para mudar a largura continua igual.
+- Painel da esquerda (abre com cerca de 300 px). Com um exame escolhido: o rótulo EXAME, o nome do exame em negrito e "trocar ▾", que volta à lista de exames (no lugar do caminho cortado "E… › T… › …"). Abaixo, as abas Modelos e Frases.
+- Aba Modelos: os modelos daquele exame. O que tem "(padrão)" continua destacado. O modelo carregado fica marcado; clicar nele recarrega o laudo do zero (o que antes era o clique no nome do modelo, no caminho).
+- Aba Frases: campo "Pesquisar frases..." e as seções numa lista, com uma linha fina entre elas (sem o botão em caixa). O nome da seção aparece como frase, só na tela — o que está entre parênteses fica como foi escrito, por exemplo "(CCN)". Nome comprido quebra a linha em vez de ser cortado; o nome inteiro aparece na dica ao passar o mouse. A quantidade fica pequena e cinza, à direita. Seção sem frase continua oculta.
+- Os botões de ação, agora com texto, ficam numa barra no pé do painel da esquerda. Na aba Frases: "+ Nova frase", "⇩ Importar", "✎ Editar". Na aba Modelos: "+ Novo modelo", "Editar", "Clonar". Saiu o botão "Inserir →" da barra (a seta em cada frase continua; é ela que insere). Saiu o cartão "Ver frases sem carregar modelo": a aba Frases mostra as frases do exame mesmo sem modelo carregado.
+- Sem exame escolhido, a lista de exames fica como estava. Clique com o botão direito, clique do meio ou Ctrl+clique no exame abre o modelo padrão noutra guia; clique esquerdo só entra no exame.
+- Laudo, 1ª linha do cabeçalho: "Buscar no laudo", setas ▲▼, contagem, depois Sessões, Limpar e ⚙. 2ª linha: formatação (N I S, alinhamento, desfazer/refazer). No pé do laudo: críticas e campos à esquerda (o clique continua igual); à direita, Copiar, Imprimir e Gerar (botão escuro).
+- Calculadoras: cabeçalho "Calculadoras" com Limpar. A largura inicial é cerca de 280 px.
+- Esc nas abas Modelos ou Frases volta à lista de exames. As setas continuam percorrendo a lista. O link `#ufmodel=` e as sessões `#ufopen` não mudaram.
+- Em 1024 px de largura os três painéis cabem sem um invadir o outro. Em tela mais estreita os botões podem quebrar a linha, mas ficam dentro do próprio painel.
+- Testes: `test/c9_test.py`. Os testes que olhavam o caminho (breadcrumb) e o botão Inserir foram ajustados para o layout novo.
+
 ## [etapa-C8] Modelo em nova guia e seções sem frase ocultas — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Cartão de modelo (e o nome do modelo no caminho do painel) virou um link. Clique esquerdo continua carregando o modelo nesta guia, sem recarregar a página. Botão direito → "Abrir em nova guia", Ctrl+clique e clique do meio usam o menu/gesto nativo do navegador.
 - Cartão de exame (a lista "Abdome Total", "N modelos · M frases") também é um link, para o mesmo `#ufmodel=`. O alvo é o modelo que o duplo clique já carrega: o primeiro cujo nome tem "padrão" (em geral "(padrão)"); se não houver, o primeiro da lista. Sem modelo, o cartão continua botão. Clique esquerdo, Enter e Espaço só entram no exame, como antes.
