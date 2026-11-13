@@ -15,10 +15,12 @@
       <div id="navHead" class="phead">
         <div id="listHead" class="listhead">Exames</div>
         <div id="examBox" hidden>
-          <div class="exlbl">EXAME</div>
+          <div class="exrow" id="examLabelRow">
+            <div class="exlbl">EXAME</div>
+            <button type="button" class="trocar" id="navBack" data-go="1" title="Voltar à lista de exames (Esc)">trocar &#9662;</button>
+          </div>
           <div class="exbox" id="examReload">
             <a id="examName" class="exname" draggable="false"></a>
-            <button type="button" class="trocar" id="navBack" data-go="1" title="Voltar à lista de exames (Esc)">trocar &#9662;</button>
           </div>
           <div class="tabs" role="tablist">
             <button type="button" class="tab" id="tabModelos" data-go="2" role="tab" aria-selected="true">Modelos</button>

@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C9d] Nome do modelo inteiro; "trocar" na linha do rótulo EXAME — testado só em Chromium automatizado, NÃO testado pelo usuário
+- O botão "trocar ▾" saiu da caixa do nome e foi para a direita da linha do rótulo EXAME (rótulo à esquerda, botão pequeno à direita). A caixa do nome ocupa a largura do painel.
+- O nome do modelo (ou do exame, se não houver modelo) aparece inteiro, em quantas linhas precisar. Sem corte, sem reticências e sem altura fixa. Palavra muito longa quebra. A caixa não cobre o rótulo EXAME nem as abas.
+- Continua sendo o link que recarrega o modelo do zero (`#ufmodel=`, dica "Recarregar o modelo do zero"). "trocar" continua voltando à lista de exames.
+- Testes: `test/c9_test.py` (nomes longos em 220 px, 300 px, 1024×600 e 1366×768).
+
 ## [etapa-C9c] Copiar, Imprimir e Gerar sobem para o cabeçalho do laudo — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Os botões Copiar, Imprimir e Gerar saíram do rodapé do laudo e foram para a primeira linha do cabeçalho, na ordem: busca no laudo (▲▼), depois Copiar, Imprimir e Gerar (Gerar continua o botão escuro), depois Sessões, Limpar e ⚙. Um traço separa Gerar de Sessões. Os ids e o que cada botão faz não mudaram.
 - A pesquisa pode encolher, mas o texto "Buscar no laudo..." continua legível. Em 1024 px, se não couber tudo numa linha, Sessões, Limpar e ⚙ descem juntos para a linha de baixo, ainda dentro do painel do laudo. Nada invade o painel ao lado.
