@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C9c] Copiar, Imprimir e Gerar sobem para o cabeçalho do laudo — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Os botões Copiar, Imprimir e Gerar saíram do rodapé do laudo e foram para a primeira linha do cabeçalho, na ordem: busca no laudo (▲▼), depois Copiar, Imprimir e Gerar (Gerar continua o botão escuro), depois Sessões, Limpar e ⚙. Um traço separa Gerar de Sessões. Os ids e o que cada botão faz não mudaram.
+- A pesquisa pode encolher, mas o texto "Buscar no laudo..." continua legível. Em 1024 px, se não couber tudo numa linha, Sessões, Limpar e ⚙ descem juntos para a linha de baixo, ainda dentro do painel do laudo. Nada invade o painel ao lado.
+- O rodapé do laudo ficou só com as pendências (críticas e campos). Sem pendência, essa faixa some.
+- Testes: `test/c9_test.py`.
+
 ## [etapa-C9b] Caixa do exame recarrega o modelo; Limpar volta ao modelo — testado só em Chromium automatizado, NÃO testado pelo usuário
 - A caixa do nome, no cabeçalho da esquerda, mostra o modelo carregado (antes só o exame, cortado numa linha). O nome quebra em até 2 linhas e o nome inteiro fica na dica. Clicar na caixa — menos no botão "trocar ▾" — recarrega esse modelo do zero, como clicar no modelo marcado na aba Modelos. A dica diz "Recarregar o modelo do zero". "trocar ▾" continua um botão à parte e volta à lista de exames.
 - Com modelo carregado, a caixa é um link `#ufmodel=`. Clique esquerdo recarrega nesta guia. Botão direito, clique do meio e Ctrl+clique abrem o mesmo modelo noutra guia.

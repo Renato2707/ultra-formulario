@@ -511,17 +511,18 @@ a.exname[href]:hover{background:#f4f4f4;background:var(--hover)}
 #centerHead{padding:0}
 #centerHead .crow,#centerHead .toolbar{background:transparent}
 #centerHead .crow{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-align:center;align-items:center;padding:4px 6px;border-bottom:1px solid #d9d9d9;border-bottom:1px solid var(--line)}
-#centerHead .search{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex:1 1 210px;flex:1 1 210px;min-width:210px;max-width:100%}
+#centerHead .search{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex:1 1 160px;flex:1 1 160px;min-width:150px;max-width:100%}
 #repSearchCount:empty{display:none}
 #centerHead .sbox{display:block;-ms-flex:1 1 auto;flex:1 1 auto;min-width:0}
 #centerHead #repSearch{width:100%;max-width:none;height:28px;box-sizing:border-box}
-#centerHead .grow{-ms-flex:1 1 8px;flex:1 1 8px;min-width:4px}
+#centerHead .hgrp{display:-ms-flexbox;display:flex;-ms-flex-align:center;align-items:center;-ms-flex-wrap:nowrap;flex-wrap:nowrap;-ms-flex:0 0 auto;flex:0 0 auto}
+#repActs{margin:0 0 0 6px;padding-right:8px;border-right:1px solid #c8c8c8;border-right:1px solid var(--line2)}
+#repTools{margin-left:8px}
 #centerHead .btn-sm{margin:2px 0 2px 4px;padding:3px 8px}
+#centerHead .hgrp .btn-sm:first-child{margin-left:0}
 #fmtBar{border-bottom:0;padding:2px 4px}
-#centerFoot{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-align:center;align-items:center;-ms-flex-pack:justify;justify-content:space-between;padding:4px 6px}
-#centerFoot .pend,#centerFoot .acts{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-align:center;align-items:center}
-#centerFoot .acts{margin-left:auto}
-#centerFoot .btn{margin:2px 0 2px 4px}
+#centerFoot{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-align:center;align-items:center;padding:4px 6px}
+#centerFoot .pend{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-align:center;align-items:center}
 #centerFoot .pill{margin:2px 4px 2px 0}
 .rhead.phead{padding:4px 6px}
 .rtitle{font-size:14px}

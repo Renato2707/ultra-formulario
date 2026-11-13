@@ -49,10 +49,16 @@
             <button type="button" class="tb" id="repPrev" title="Anterior">&#9650;</button>
             <button type="button" class="tb" id="repNext" title="Próximo">&#9660;</button>
           </span>
-          <span class="grow"></span>
-          <button type="button" class="btn btn-sm" id="btnSess" title="Sessões de abas: salvar as abas abertas ou abrir uma sessão salva">Sessões</button>
-          <button type="button" class="btn btn-sm" id="btnClear" title="Apagar todo o laudo">Limpar</button>
-          <button type="button" class="ib" id="btnSettings" title="Configurações" aria-label="Configurações">&#9881;</button>
+          <span class="hgrp" id="repActs">
+            <button type="button" class="btn btn-sm" id="btnCopy" title="Copiar o laudo (com revisão)">Copiar</button>
+            <button type="button" class="btn btn-sm" id="btnPrint" title="Imprimir (Ctrl+P)">Imprimir</button>
+            <button type="button" class="btn btn-sm btn-primary" id="btnGen" title="Gerar arquivo .txt">Gerar</button>
+          </span>
+          <span class="hgrp" id="repTools">
+            <button type="button" class="btn btn-sm" id="btnSess" title="Sessões de abas: salvar as abas abertas ou abrir uma sessão salva">Sessões</button>
+            <button type="button" class="btn btn-sm" id="btnClear" title="Apagar todo o laudo">Limpar</button>
+            <button type="button" class="ib" id="btnSettings" title="Configurações" aria-label="Configurações">&#9881;</button>
+          </span>
         </div>
         <div id="fmtBar" class="toolbar fmtbar" aria-label="Formatação">
           <button type="button" class="tb" data-cmd="bold" title="Negrito (Ctrl+B)"><b>N</b></button>
@@ -71,15 +77,10 @@
       <div id="editorWrap">
         <div id="editor" contenteditable="true" spellcheck="false" aria-label="Laudo" data-ph="Selecione um modelo ou comece a digitar..."></div>
       </div>
-      <div id="centerFoot" class="pfoot">
+      <div id="centerFoot" class="pfoot" hidden>
         <span class="pend">
           <button type="button" class="pill pill-warn" id="btnCritCount" hidden></button>
           <button type="button" class="pill" id="btnFieldCount" hidden></button>
-        </span>
-        <span class="acts">
-          <button type="button" class="btn btn-sm" id="btnCopy" title="Copiar o laudo (com revisão)">Copiar</button>
-          <button type="button" class="btn btn-sm" id="btnPrint" title="Imprimir (Ctrl+P)">Imprimir</button>
-          <button type="button" class="btn btn-sm btn-primary" id="btnGen" title="Gerar arquivo .txt">Gerar</button>
         </span>
       </div>
     </section>
