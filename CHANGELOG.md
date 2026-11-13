@@ -11,6 +11,13 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C9b] Caixa do exame recarrega o modelo; Limpar volta ao modelo — testado só em Chromium automatizado, NÃO testado pelo usuário
+- A caixa do nome, no cabeçalho da esquerda, mostra o modelo carregado (antes só o exame, cortado numa linha). O nome quebra em até 2 linhas e o nome inteiro fica na dica. Clicar na caixa — menos no botão "trocar ▾" — recarrega esse modelo do zero, como clicar no modelo marcado na aba Modelos. A dica diz "Recarregar o modelo do zero". "trocar ▾" continua um botão à parte e volta à lista de exames.
+- Com modelo carregado, a caixa é um link `#ufmodel=`. Clique esquerdo recarrega nesta guia. Botão direito, clique do meio e Ctrl+clique abrem o mesmo modelo noutra guia.
+- Sem modelo carregado, a caixa mostra o nome do exame (também em até 2 linhas) e o clique não apaga o laudo.
+- O botão "Limpar" do laudo, com modelo carregado, não deixa a página em branco: pede confirmação e volta ao modelo do zero (Ctrl+Z desfaz). Cancelar não mexe no texto. Sem modelo, continua apagando o laudo, também com confirmação. O "Limpar" das calculadoras não mudou.
+- Testes: `test/c9_test.py` (trecho C9b).
+
 ## [etapa-C9] Layout Opção B — cada painel com o seu cabeçalho — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Saiu a barra de cima, de ponta a ponta. Cada painel (modelos/frases, laudo, calculadoras) tem o próprio cabeçalho, no mesmo cinza. Nenhum elemento de um painel fica por cima do outro.
 - Entre os painéis: uma divisória cinza de 8 px, com pegada para arrastar. Arrastar para mudar a largura continua igual.

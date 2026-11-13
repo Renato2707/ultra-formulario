@@ -1069,16 +1069,27 @@ var UFMain = function () {
     if (S.level === 3) { return b('tPAdd', '+ Nova frase', 'Adicionar frase') + b('tPImp', '&#8681; Importar', 'Importar frases') + b('tPEdit', '&#9998; Editar', 'Editar frase selecionada'); }
     return '';
   }
+  function loadedModel() { return S.activeModelId ? getModel(S.activeModelId) : null; }
   function syncExamChrome() {
-    var inExam = S.level > 1 && !!S.navExam, lab, modelos;
+    var inExam = S.level > 1 && !!S.navExam, lab, modelos, m, nameEl, here;
+    m = loadedModel();
+    if ($('btnClear')) { $('btnClear').title = m ? ('Voltar ao modelo do zero: ' + m.name) : 'Apagar todo o laudo'; }
     $('examBox').hidden = !inExam;
     $('listHead').hidden = inExam;
     $('navFoot').hidden = !inExam;
     $('navBack').disabled = !inExam;
     if (!inExam) { return; }
     lab = S.navExam === UltraParser.GLOBAL_EXAM ? 'TODOS (comuns a todos)' : S.navExam;
-    $('examName').textContent = lab;
-    $('examName').title = lab;
+    nameEl = $('examName');
+    here = m && m.exam === S.navExam;
+    nameEl.textContent = here ? m.name : lab;
+    if (here) {
+      nameEl.setAttribute('href', modelHref(m.id));
+      nameEl.title = m.name + ' — Recarregar o modelo do zero';
+    } else {
+      nameEl.removeAttribute('href');
+      nameEl.title = lab;
+    }
     modelos = S.level === 2;
     $('tabModelos').setAttribute('aria-selected', modelos ? 'true' : 'false');
     $('tabFrases').setAttribute('aria-selected', modelos ? 'false' : 'true');
@@ -2412,6 +2423,23 @@ var UFMain = function () {
   var navList = $('navList');
   function navCard(t) { return closest(t, function (n) { return hasCls(n, 'card'); }, navList); }
   on($('navBack'), 'click', navBack);
+  /* the name fills the box; trocar is a separate button and is ignored here */
+  var reloadAt = 0;
+  on($('examReload'), 'click', function (e) {
+    var m, a;
+    if (closest(e.target, function (n) { return n.id === 'navBack'; })) { return; }
+    a = $('examName');
+    m = loadedModel();
+    if (a.getAttribute('href') && !sameTabClick(e)) { return; }   /* C8: Ctrl/meio/botão direito seguem o href */
+    if (a.getAttribute('href')) {
+      if (e.preventDefault) { e.preventDefault(); }
+      e.returnValue = false;
+    }
+    if (!m || m.exam !== S.navExam) { return; }
+    if ((e.detail || 1) > 1 && now() - reloadAt < 800) { return; }
+    reloadAt = now();
+    useModel(m, true);
+  });
   on($('tabModelos'), 'click', function () { if (S.navExam) { goLevel(2); } });
   on($('tabFrases'), 'click', function () { if (!S.navExam) { return; } S.activeExam = S.navExam; goLevel(3); });
   on($('examBox'), 'keydown', function (e) {
@@ -3078,6 +3106,13 @@ var UFMain = function () {
   on($('btnCritCount'), 'click', jumpNextCrit);
   on($('btnFieldCount'), 'click', function () { editor.focus(); nextField(false); });
   on($('btnClear'), 'click', function () {
+    var m = loadedModel();
+    if (m) {
+      confirmModal('Limpar laudo', 'Voltar ao modelo "' + m.name + '" do zero? O texto digitado sai. (Ctrl+Z desfaz)', 'Limpar', function () {
+        useModel(m, true);
+      }, true);
+      return;
+    }
     confirmModal('Limpar laudo', 'Apagar todo o texto do laudo? (Ctrl+Z desfaz)', 'Limpar', function () {
       clearRepMarks(); editor.focus(); exec('selectAll'); exec('delete');
       if (trim(lineText(editor)) !== '') { editor.innerHTML = ''; }
