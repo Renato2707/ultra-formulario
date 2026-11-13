@@ -17,6 +17,10 @@ Linha alfa do modelo.
 @@TEMPLATE Alfa variante
 TEXTO-ALFA-VAR
 
+@@TEMPLATE Doppler de Fluxo Obstétrico (padrão)
+TEXTO-DOPPLER-PADRAO
+Linha do doppler.
+
 ##SECTION COM FRASES
 Frase alfa:
 FRASE-ALFA unica-alfa no corpo.
@@ -107,7 +111,7 @@ with sync_playwright() as p:
     pg.click('[data-exam="Alfa"]'); pg.wait_for_timeout(250)
     ck('1 entrou no exame, aba Modelos', pg.evaluate('UFTest.S.level') == 2 and pg.evaluate('UFTest.S.navExam') == 'Alfa' and pg.get_attribute('#tabModelos', 'aria-selected') == 'true')
     ck('1 EXAME com o nome e trocar', pg.inner_text('#examName').strip() == 'Alfa' and 'trocar' in pg.inner_text('#navBack').lower())
-    ck('1 modelos do exame, (padrão) destacado', pg.locator('#navList [data-model]').count() == 2 and 'pad' in (pg.locator('#navList [data-model]', has_text='(padrão)').get_attribute('class') or ''))
+    ck('1 modelos do exame, (padrão) destacado', pg.locator('#navList [data-model]').count() == 3 and 'pad' in (pg.locator('#navList [data-model]', has_text='Alfa (padrão)').get_attribute('class') or ''))
     foot = pg.inner_text('#navFoot')
     ck('1 rodapé Modelos: Novo modelo, Editar, Clonar', '+ Novo modelo' in foot and 'Editar' in foot and 'Clonar' in foot, foot)
     ck('1 sem Inserir e sem Ver frases', pg.locator('#tPIns').count() == 0 and 'Ver frases sem carregar modelo' not in pg.inner_text('#left') and 'Inserir' not in foot)
@@ -116,7 +120,7 @@ with sync_playwright() as p:
       for (i = 0; i < a.length; i++) { o.push({ tag: a[i].nodeName, href: a[i].getAttribute('href') || '' }); }
       return o;
     })()""")
-    ck('1 links C8 #ufmodel= nos modelos', len(hrefs) == 2 and all(x['tag'] == 'A' and x['href'].startswith('#ufmodel=') for x in hrefs), hrefs)
+    ck('1 links C8 #ufmodel= nos modelos', len(hrefs) == 3 and all(x['tag'] == 'A' and x['href'].startswith('#ufmodel=') for x in hrefs), hrefs)
     pg.click('#tabFrases'); pg.wait_for_timeout(200)
     ck('1 aba Frases sem modelo carregado mostra as frases do exame', pg.evaluate('UFTest.S.level') == 3 and pg.get_attribute('#tabFrases', 'aria-selected') == 'true' and pg.locator('#navList [data-model]').count() == 0 and pg.locator('#navList [data-sec]').count() >= 3)
     ck('1 pesquisa de frases', pg.get_attribute('#navSearch', 'placeholder') == 'Pesquisar frases...')
@@ -179,6 +183,50 @@ with sync_playwright() as p:
     ck('5 laudo: buscar, sessões, limpar, formatação, copiar/imprimir/gerar',
        pg.get_attribute('#repSearch', 'placeholder') == 'Buscar no laudo...' and pg.locator('#btnSess').count() == 1 and pg.locator('#btnClear').count() == 1 and pg.locator('#fmtBar .tb').count() >= 9 and 'Copiar' in pg.inner_text('#centerFoot') and 'Imprimir' in pg.inner_text('#centerFoot') and 'Gerar' in pg.inner_text('#centerFoot') and 'btn-primary' in (pg.get_attribute('#btnGen', 'class') or ''))
     ck('5 calculadoras: título e Limpar', 'Calculadoras' in pg.inner_text('#right .rhead') and pg.inner_text('#ucReset').strip() == 'Limpar')
+    # ---------- 7) nome recarrega o modelo; trocar continua à parte; Limpar volta ao modelo ----------
+    LONGM = 'Doppler de Fluxo Obstétrico (padrão)'
+    pg.click('#tabModelos'); pg.wait_for_timeout(200)
+    pg.locator('#navList [data-model]', has_text=LONGM).click(); pg.wait_for_timeout(300)
+    box = pg.evaluate("""(function () {
+      var a = document.getElementById('examName'), cs = getComputedStyle(a), left = document.getElementById('left').getBoundingClientRect(), r = a.getBoundingClientRect();
+      return { text: a.textContent, title: a.title || '', href: a.getAttribute('href') || '', tag: a.nodeName,
+        ws: cs.whiteSpace, h: a.offsetHeight, sh: a.scrollHeight,
+        inside: r.left >= left.left - 1 && r.right <= left.right + 1 && r.bottom <= left.bottom + 1 };
+    })()""")
+    ck('7 caixa mostra o modelo inteiro, em até 2 linhas', box['text'] == LONGM and box['h'] >= 36 and box['h'] <= 52 and box['sh'] <= box['h'] + 2 and box['ws'] != 'nowrap' and box['inside'], box)
+    ck('7 dica de recarregar e link do modelo', 'Recarregar o modelo do zero' in box['title'] and LONGM in box['title'] and box['tag'] == 'A' and box['href'].startswith('#ufmodel='), box)
+    kept = pg.evaluate("""(function () {
+      var a = document.getElementById('examName');
+      var ev = document.createEvent('MouseEvents');
+      ev.initMouseEvent('contextmenu', true, true, window, 1, 0, 0, 0, 0, false, false, false, false, 2, null);
+      return a.dispatchEvent(ev);
+    })()""")
+    ck('7 menu de contexto do nome não é cancelado', kept is True, kept)
+    pg.evaluate("""(function () { var d = document.createElement('div'); d.textContent = 'RASCUNHO-C9B'; document.getElementById('editor').appendChild(d); })()""")
+    pg.click('#examName'); pg.wait_for_timeout(300)
+    repb = pg.evaluate('UFTest.reportText()')
+    ck('7 clique no nome recarrega o modelo nesta guia', 'TEXTO-DOPPLER-PADRAO' in repb and 'RASCUNHO-C9B' not in repb and 'ufmodel' not in pg.url and pg.evaluate('UFTest.S.level') > 1, repb[:160])
+    pg.evaluate("""(function () { var d = document.createElement('div'); d.textContent = 'RASCUNHO-LIMPAR'; document.getElementById('editor').appendChild(d); })()""")
+    pg.click('#btnClear'); pg.wait_for_timeout(200)
+    ck('7 Limpar pede confirmação e cita o modelo', 'Limpar laudo' in pg.inner_text('#modalTitle') and LONGM in pg.inner_text('#modalBody') and 'Ctrl+Z' in pg.inner_text('#modalBody'))
+    pg.locator('#modalFoot button', has_text='Cancelar').click(); pg.wait_for_timeout(200)
+    ck('7 cancelar Limpar não apaga o texto', 'RASCUNHO-LIMPAR' in pg.evaluate('UFTest.reportText()'))
+    pg.click('#btnClear'); pg.wait_for_timeout(150)
+    pg.locator('#modalFoot button', has_text='Limpar').click(); pg.wait_for_timeout(350)
+    repb = pg.evaluate('UFTest.reportText()')
+    mid = pg.evaluate('UFTest.S.activeModelId')
+    ck('7 Limpar volta ao modelo carregado', 'TEXTO-DOPPLER-PADRAO' in repb and 'RASCUNHO-LIMPAR' not in repb and mid and 'Doppler' in mid, (repb[:120], mid))
+    antes = pg.evaluate('UFTest.reportText()')
+    pg.click('#ucReset'); pg.wait_for_timeout(150)
+    ck('7 Limpar das calculadoras não mexe no laudo', pg.evaluate('UFTest.reportText()') == antes)
+    pg.evaluate("UFTest.S.activeModelId = null; document.getElementById('btnClear').title = 'Apagar todo o laudo'")
+    pg.evaluate("""(function () { var d = document.createElement('div'); d.id = 'solto'; d.textContent = 'TEXTO-SEM-MODELO'; document.getElementById('editor').appendChild(d); })()""")
+    pg.click('#btnClear'); pg.wait_for_timeout(150)
+    ck('7 sem modelo, Limpar ainda confirma que apaga', 'Apagar todo o texto' in pg.inner_text('#modalBody'))
+    pg.locator('#modalFoot button', has_text='Limpar').click(); pg.wait_for_timeout(300)
+    ck('7 sem modelo, Limpar deixa o laudo em branco', pg.evaluate('UFTest.reportText()').strip() == '' and 'TEXTO-SEM-MODELO' not in pg.evaluate('UFTest.reportText()') and 'TEXTO-DOPPLER-PADRAO' not in pg.evaluate('UFTest.reportText()'))
+    pg.click('#navBack'); pg.wait_for_timeout(200)
+    ck('7 trocar continua voltando à lista', pg.evaluate('UFTest.S.level') == 1 and pg.locator('[data-exam="Alfa"]').count() == 1)
     ck('5 sem erro de página', not ERR, ERR[:3])
     c.close(); b.close()
 # ---------- 6) fonte: ES5, sem gap, menos de 1 MB ----------
