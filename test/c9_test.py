@@ -21,6 +21,12 @@ TEXTO-ALFA-VAR
 TEXTO-DOPPLER-PADRAO
 Linha do doppler.
 
+@@TEMPLATE Transvaginal (padrão)
+TEXTO-TV-PADRAO
+
+@@TEMPLATE Ultrassonografia Doppler colorido e pulsado do membro inferior esquerdo completo
+TEXTO-NOME-LONGO
+
 ##SECTION COM FRASES
 Frase alfa:
 FRASE-ALFA unica-alfa no corpo.
@@ -111,7 +117,7 @@ with sync_playwright() as p:
     pg.click('[data-exam="Alfa"]'); pg.wait_for_timeout(250)
     ck('1 entrou no exame, aba Modelos', pg.evaluate('UFTest.S.level') == 2 and pg.evaluate('UFTest.S.navExam') == 'Alfa' and pg.get_attribute('#tabModelos', 'aria-selected') == 'true')
     ck('1 EXAME com o nome e trocar', pg.inner_text('#examName').strip() == 'Alfa' and 'trocar' in pg.inner_text('#navBack').lower())
-    ck('1 modelos do exame, (padrão) destacado', pg.locator('#navList [data-model]').count() == 3 and 'pad' in (pg.locator('#navList [data-model]', has_text='Alfa (padrão)').get_attribute('class') or ''))
+    ck('1 modelos do exame, (padrão) destacado', pg.locator('#navList [data-model]').count() == 5 and 'pad' in (pg.locator('#navList [data-model]', has_text='Alfa (padrão)').get_attribute('class') or ''))
     foot = pg.inner_text('#navFoot')
     ck('1 rodapé Modelos: Novo modelo, Editar, Clonar', '+ Novo modelo' in foot and 'Editar' in foot and 'Clonar' in foot, foot)
     ck('1 sem Inserir e sem Ver frases', pg.locator('#tPIns').count() == 0 and 'Ver frases sem carregar modelo' not in pg.inner_text('#left') and 'Inserir' not in foot)
@@ -120,7 +126,7 @@ with sync_playwright() as p:
       for (i = 0; i < a.length; i++) { o.push({ tag: a[i].nodeName, href: a[i].getAttribute('href') || '' }); }
       return o;
     })()""")
-    ck('1 links C8 #ufmodel= nos modelos', len(hrefs) == 3 and all(x['tag'] == 'A' and x['href'].startswith('#ufmodel=') for x in hrefs), hrefs)
+    ck('1 links C8 #ufmodel= nos modelos', len(hrefs) == 5 and all(x['tag'] == 'A' and x['href'].startswith('#ufmodel=') for x in hrefs), hrefs)
     pg.click('#tabFrases'); pg.wait_for_timeout(200)
     ck('1 aba Frases sem modelo carregado mostra as frases do exame', pg.evaluate('UFTest.S.level') == 3 and pg.get_attribute('#tabFrases', 'aria-selected') == 'true' and pg.locator('#navList [data-model]').count() == 0 and pg.locator('#navList [data-sec]').count() >= 3)
     ck('1 pesquisa de frases', pg.get_attribute('#navSearch', 'placeholder') == 'Pesquisar frases...')
@@ -214,10 +220,10 @@ with sync_playwright() as p:
     box = pg.evaluate("""(function () {
       var a = document.getElementById('examName'), cs = getComputedStyle(a), left = document.getElementById('left').getBoundingClientRect(), r = a.getBoundingClientRect();
       return { text: a.textContent, title: a.title || '', href: a.getAttribute('href') || '', tag: a.nodeName,
-        ws: cs.whiteSpace, h: a.offsetHeight, sh: a.scrollHeight,
+        ws: cs.whiteSpace, h: a.clientHeight, sh: a.scrollHeight,
         inside: r.left >= left.left - 1 && r.right <= left.right + 1 && r.bottom <= left.bottom + 1 };
     })()""")
-    ck('7 caixa mostra o modelo inteiro, em até 2 linhas', box['text'] == LONGM and box['h'] >= 36 and box['h'] <= 52 and box['sh'] <= box['h'] + 2 and box['ws'] != 'nowrap' and box['inside'], box)
+    ck('7 caixa mostra o modelo inteiro, sem cortar', box['text'] == LONGM and box['sh'] <= box['h'] + 1 and box['ws'] != 'nowrap' and box['inside'], box)
     ck('7 dica de recarregar e link do modelo', 'Recarregar o modelo do zero' in box['title'] and LONGM in box['title'] and box['tag'] == 'A' and box['href'].startswith('#ufmodel='), box)
     kept = pg.evaluate("""(function () {
       var a = document.getElementById('examName');
@@ -249,6 +255,48 @@ with sync_playwright() as p:
     ck('7 sem modelo, Limpar ainda confirma que apaga', 'Apagar todo o texto' in pg.inner_text('#modalBody'))
     pg.locator('#modalFoot button', has_text='Limpar').click(); pg.wait_for_timeout(300)
     ck('7 sem modelo, Limpar deixa o laudo em branco', pg.evaluate('UFTest.reportText()').strip() == '' and 'TEXTO-SEM-MODELO' not in pg.evaluate('UFTest.reportText()') and 'TEXTO-DOPPLER-PADRAO' not in pg.evaluate('UFTest.reportText()'))
+    # ---------- 8) nome inteiro em qualquer largura; trocar na linha do rótulo ----------
+    NAMES = [LONGM, 'Transvaginal (padrão)', 'Ultrassonografia Doppler colorido e pulsado do membro inferior esquerdo completo']
+    ck('8 o terceiro nome passa de 60 caracteres', len(NAMES[2]) >= 60, len(NAMES[2]))
+    GEOM = """(function () {
+      function rect(el) { var r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }
+      function hit(a, b) {
+        var top = Math.max(a.top, b.top), bot = Math.min(a.bottom, b.bottom);
+        var left = Math.max(a.left, b.left), right = Math.min(a.right, b.right);
+        return (bot - top) > 1 && (right - left) > 1;
+      }
+      var name = document.getElementById('examName'), lab = document.getElementById('examLabelRow');
+      var tabs = document.querySelector('#examBox .tabs'), back = document.getElementById('navBack');
+      var nr = rect(name), lr = rect(lab), tr = rect(tabs), br = rect(back), cs = getComputedStyle(name);
+      var panel = document.getElementById('left').getBoundingClientRect();
+      return {
+        text: name.textContent, sh: name.scrollHeight, ch: name.clientHeight,
+        overflow: cs.overflow, maxH: cs.maxHeight, clamp: cs.webkitLineClamp || 'none', ellipsis: cs.textOverflow,
+        hitLab: hit(nr, lr), hitTabs: hit(nr, tr),
+        trocarInLabel: lab.contains(back) && br.top >= lr.top - 1 && br.bottom <= lr.bottom + 1,
+        fullW: (nr.right - nr.left) >= (lr.right - lr.left) - 2,
+        inPanel: nr.left >= panel.left - 1 && nr.right <= panel.right + 1 && nr.top >= panel.top - 1,
+        href: name.getAttribute('href') || ''
+      };
+    })()"""
+    def fit_name(nm, where):
+        g = pg.evaluate(GEOM)
+        ok = (g['text'] == nm and g['sh'] <= g['ch'] and not g['hitLab'] and not g['hitTabs']
+              and g['trocarInLabel'] and g['fullW'] and g['inPanel'] and g['overflow'] == 'visible'
+              and g['maxH'] in ('none', '0px') and str(g['clamp']) in ('none', 'unset', '') and g['ellipsis'] != 'ellipsis'
+              and g['href'].startswith('#ufmodel='))
+        ck('8 %s @ %s' % (nm[:22], where), ok, g)
+    for vw in ({'width': 1024, 'height': 600}, {'width': 1366, 'height': 768}):
+        pg.set_viewport_size(vw); pg.wait_for_timeout(150)
+        for pw in (220, 300):
+            pg.evaluate("(function (w) { document.getElementById('left').style.width = w + 'px'; })()", pw)
+            pg.wait_for_timeout(50)
+            for nm in NAMES:
+                pg.click('#tabModelos'); pg.wait_for_timeout(80)
+                pg.locator('#navList [data-model]', has_text=nm).click(); pg.wait_for_timeout(120)
+                fit_name(nm, '%sx%s/%spx' % (vw['width'], vw['height'], pw))
+    pg.set_viewport_size({'width': 1024, 'height': 600}); pg.wait_for_timeout(100)
+    pg.evaluate("document.getElementById('left').style.width = '300px'")
     pg.click('#navBack'); pg.wait_for_timeout(200)
     ck('7 trocar continua voltando à lista', pg.evaluate('UFTest.S.level') == 1 and pg.locator('[data-exam="Alfa"]').count() == 1)
     ck('5 sem erro de página', not ERR, ERR[:3])
