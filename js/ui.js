@@ -636,8 +636,19 @@ var UFMain = function () {
   function ssGet() { try { return window.sessionStorage.getItem('uf.tab'); } catch (e) { return null; } }
   function ssSet(v) { try { window.sessionStorage.setItem('uf.tab', v); } catch (e) {} try { window.name = 'uf.tab=' + v; } catch (e2) {} }
   function tabsMap() { var m = UStore.get('tabs', {}); return (m && typeof m === 'object') ? m : {}; }
+  /* C10: "ainda aberta" independente do intervalo de 15 s (o Edge/Chrome atrasam o timer
+     nas abas de fundo). Só some no pagehide/beforeunload (aba de verdade fechada). */
+  var TAB_STAY_MAX = 7 * 24 * 3600 * 1000;
+  function stayMap() { var m = UStore.get('tabStay', {}); return (m && typeof m === 'object') ? m : {}; }
+  function markStay(on) {
+    var s = stayMap(), k, t = now();
+    if (on) { s[TAB] = t; } else { delete s[TAB]; }
+    for (k in s) { if (s.hasOwnProperty(k) && t - s[k] > TAB_STAY_MAX) { delete s[k]; } }
+    UStore.set('tabStay', s);
+  }
   function markAlive(on) {
     var m = tabsMap(); if (on) { m[TAB] = now(); } else { delete m[TAB]; } UStore.set('tabs', m);
+    markStay(on);
   }
   /* C6n: aba aberta por "Sessões" (index.html#ufopen=<nome do modelo>)
      C8: cartão de modelo é um link (index.html#ufmodel=<id>): botão direito, Ctrl+clique e clique do meio
@@ -662,9 +673,53 @@ var UFMain = function () {
     if (cut >= 0) { rest = rest.slice(0, cut); }
     try { return decodeURIComponent(rest); } catch (eD) { return rest; }
   }
-  try { var hm = /[#&]ufopen=([^&]*)/.exec(String(window.location.hash || '')), ho = /[#&]uford=(\d+)/.exec(String(window.location.hash || ''));
-    if (hm) { OPEN_TPL = decodeURIComponent(hm[1]); OPEN_ORD = ho ? +ho[1] : 0; } } catch (eH) { OPEN_TPL = null; }
+  /* C10: ler o hash pelo href (rawHash), não por location.hash — em file:// o Edge
+     às vezes deixa location.hash vazio. Se o hash sumir no window.open, a fila sessOpen.*
+     (localStorage) ainda entrega o modelo. */
+  function takeSessOpen() {
+    var ks, cand, i, k, item, t = now(), claim, got;
+    try { ks = UStore.keys(); } catch (eK) { return null; }
+    cand = [];
+    for (i = 0; i < ks.length; i++) {
+      k = ks[i];
+      if (String(k).indexOf('sessOpen.') !== 0) { continue; }
+      item = UStore.get(k, null);
+      if (!item || t - item.t > 60000) { UStore.remove(k); continue; }
+      if (item.claim) { continue; }
+      cand.push({ k: k, item: item });
+    }
+    cand.sort(function (a, b) { return (a.item.ord - b.item.ord) || (a.item.t - b.item.t); });
+    for (i = 0; i < cand.length; i++) {
+      claim = 'c' + t + '-' + Math.floor(Math.random() * 1e9);
+      cand[i].item.claim = claim;
+      UStore.set(cand[i].k, cand[i].item);
+      got = UStore.get(cand[i].k, null);
+      if (got && got.claim === claim) {
+        UStore.remove(cand[i].k);
+        return got;
+      }
+    }
+    return null;
+  }
+  function enqueueSessOpen(item) {
+    var id = 'sessOpen.' + (item.ord || now()) + '.' + now() + '.' + Math.floor(Math.random() * 1e6);
+    item.t = now();
+    UStore.set(id, item);
+    return id;
+  }
+  try { OPEN_TPL = hashParam('ufopen'); } catch (eH) { OPEN_TPL = null; }
+  try { var oOrd = hashParam('uford'); OPEN_ORD = oOrd ? (parseInt(oOrd, 10) || 0) : 0; } catch (eO) { OPEN_ORD = 0; }
   try { OPEN_MODEL = hashParam('ufmodel'); } catch (eM) { OPEN_MODEL = null; }
+  if (OPEN_TPL === null && OPEN_MODEL === null) {
+    try {
+      var queued = takeSessOpen();
+      if (queued) {
+        OPEN_TPL = queued.name || null;
+        OPEN_MODEL = queued.id || null;
+        OPEN_ORD = queued.ord || 0;
+      }
+    } catch (eQ) {}
+  }
   function draftIndex() { var m = UStore.get('drafts', {}); return (m && typeof m === 'object') ? m : {}; }
   function pickTab() {
     var id = ssGet(), m = tabsMap(), idx = draftIndex(), t = now(), k, best = null, legacy;
@@ -3312,7 +3367,15 @@ var UFMain = function () {
     }
   }
   if (window.addEventListener) { window.addEventListener('storage', onStorage, false);
-    window.addEventListener('pagehide', function () { saveDraft(); markAlive(false); }, false); }
+    window.addEventListener('pagehide', function () { saveDraft(); markAlive(false); }, false);
+    window.addEventListener('beforeunload', function () { saveDraft(); markAlive(false); }, false);
+    document.addEventListener('visibilitychange', function () {
+      try {
+        if (document.hidden || document.msHidden || document.visibilityState === 'hidden') { saveDraft(); markAlive(true); }
+        else { markAlive(true); }
+      } catch (eVis) {}
+    }, false);
+  }
 
   /* ================= C6n: título da aba = modelo aberto; sessões de abas ================= */
   function updTitle() {
@@ -3325,34 +3388,56 @@ var UFMain = function () {
     return null;
   }
   function sessList() { var a = UStore.get('tabSessions', []); return (a && a.length !== undefined) ? a : []; }
-  /* abas abertas agora (vivas), na ordem em que foram abertas; cada uma com o nome do seu modelo */
-  function openTabsModels() {
+  /* abas abertas agora, na ordem em que foram abertas; cada uma com o nome e o id do modelo.
+     C10: inclui abas de fundo mesmo se o heartbeat de 15 s tiver vencido (tabStay). */
+  function openTabsRecords() {
     saveDraft();
-    var m = tabsMap(), od = {}, t = now(), ids = [], k, out = [], i, d, md, dr = {};
-    for (k in m) { if (m.hasOwnProperty(k) && (k === TAB || t - m[k] < TAB_ALIVE_MS)) { ids.push(k); } }
-    if (ids.indexOf(TAB) < 0) { ids.push(TAB); }
+    var m = tabsMap(), stay = stayMap(), od = {}, t = now(), ids = [], seen = {}, k, out = [], i, d, md, dr = {};
+    function addId(id) { if (id && !seen[id]) { seen[id] = true; ids.push(id); } }
+    addId(TAB);
+    for (k in m) { if (m.hasOwnProperty(k) && (k === TAB || t - m[k] < TAB_ALIVE_MS || stay[k])) { addId(k); } }
+    for (k in stay) { if (stay.hasOwnProperty(k) && stay[k] && t - stay[k] <= TAB_STAY_MAX) { addId(k); } }
     for (i = 0; i < ids.length; i++) { dr[ids[i]] = UStore.get('draft.' + ids[i], null); od[ids[i]] = ids[i] === TAB ? TAB_ORD : (dr[ids[i]] && dr[ids[i]].ord) || 0; }
     ids.sort(function (a, b) { return (od[a] || t) - (od[b] || t) || (a < b ? -1 : 1); });
     for (i = 0; i < ids.length; i++) {
       d = ids[i] === TAB ? { model: S.activeModelId } : dr[ids[i]];
       md = d && d.model ? getModel(d.model) : null;
-      if (md) { out.push(md.name); }
+      if (md) { out.push({ name: md.name, id: md.id }); }
     }
     return out;
   }
-  function tabUrl(nm, ord) { var u = String(window.location.href).replace(/#.*$/, ''); return u + '#ufopen=' + encodeURIComponent(nm) + '&uford=' + ord; }
+  function openTabsModels() {
+    var a = openTabsRecords(), i, out = [];
+    for (i = 0; i < a.length; i++) { out.push(a[i].name); }
+    return out;
+  }
+  function tabUrl(nm, ord, mid) {
+    var u = String(window.location.href).replace(/#.*$/, ''), h;
+    h = '#ufopen=' + encodeURIComponent(nm) + '&uford=' + ord;
+    if (mid) { h += '&ufmodel=' + encodeURIComponent(mid); }
+    return u + h;
+  }
+  function resolveSessModel(id, nm) {
+    var m = id ? getModel(id) : null;
+    return m || findModelByName(nm);
+  }
   function openSession(se) {
-    var names = se.models || [], list = [], i, w, blocked = 0, here;
-    for (i = 0; i < names.length; i++) { if (findModelByName(names[i])) { list.push(names[i]); } }   /* modelo que não existe mais: pulado */
+    var names = se.models || [], ids = se.ids || [], list = [], listIds = [], i, w, blocked = 0, here, md, n;
+    n = names.length > ids.length ? names.length : ids.length;
+    for (i = 0; i < n; i++) {
+      md = resolveSessModel(ids[i], names[i]);
+      if (md) { list.push(md.name); listIds.push(md.id); }
+    }   /* modelo que não existe mais: pulado */
     if (!list.length) { toast('Nenhum modelo desta sessão existe no banco atual.'); return; }
     here = trim(lineText(editor)) === '';   /* aba atual vazia: recebe o 1º modelo; com conteúdo, nada é apagado */
     var base = now();
     if (here) { TAB_ORD = base; }
     for (i = here ? 1 : 0; i < list.length; i++) {
-      w = null; try { w = window.open(tabUrl(list[i], base + i), '_blank'); } catch (eW) { w = null; }
+      enqueueSessOpen({ id: listIds[i], name: list[i], ord: base + i });
+      w = null; try { w = window.open(tabUrl(list[i], base + i, listIds[i]), '_blank'); } catch (eW) { w = null; }
       if (!w) { blocked++; }
     }
-    if (here) { useModel(findModelByName(list[0]), true); }
+    if (here) { useModel(resolveSessModel(listIds[0], list[0]), true); }
     if (blocked) { toast('O navegador bloqueou ' + blocked + ' aba(s): permita janelas pop-up para este arquivo.'); }
   }
   function saveSessionDialog() {
@@ -3363,9 +3448,12 @@ var UFMain = function () {
       { label: 'Cancelar' },
       { label: 'Salvar', cls: 'btn-primary', id: 'sessSave', click: function () {
         var nm = trim($('sessName').value); if (!nm) { $('sessName').focus(); return false; }
+        var recs = openTabsRecords(), names2 = [], ids2 = [], r;
+        for (r = 0; r < recs.length; r++) { names2.push(recs[r].name); ids2.push(recs[r].id); }
+        if (!names2.length) { return false; }
         var a = sessList().slice(0), j, put = false;
-        for (j = 0; j < a.length; j++) { if (a[j] && a[j].name === nm) { a[j] = { name: nm, models: names }; put = true; } }
-        if (!put) { a.push({ name: nm, models: names }); }
+        for (j = 0; j < a.length; j++) { if (a[j] && a[j].name === nm) { a[j] = { name: nm, models: names2, ids: ids2 }; put = true; } }
+        if (!put) { a.push({ name: nm, models: names2, ids: ids2 }); }
         UStore.set('tabSessions', a); toast('Sessão salva: ' + nm);
       } }
     ]);
@@ -3405,7 +3493,7 @@ var UFMain = function () {
   on(document, 'mousedown', function (e) { if (sessMenu && !closest(e.target, function (n) { return n === sessMenu || n.id === 'btnSess'; })) { closeSessMenu(); } });
   on(document, 'keydown', function (e) { if (sessMenu && e.keyCode === 27) { closeSessMenu(); } });
   setInterval(updTitle, 1000);
-  window.UFSess = { list: sessList, open: openSession, openTabsModels: openTabsModels, findModelByName: findModelByName, updTitle: updTitle };
+  window.UFSess = { list: sessList, open: openSession, openTabsModels: openTabsModels, openTabsRecords: openTabsRecords, findModelByName: findModelByName, updTitle: updTitle, enqueueSessOpen: enqueueSessOpen, tabUrl: tabUrl };
 
   /* ================= start ================= */
   applyTheme(); applyLayout();

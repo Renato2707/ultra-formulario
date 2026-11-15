@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C10] Sessões: cada aba da sessão abre o modelo certo; salvar inclui as abas de fundo — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Abrir uma sessão abre uma aba por modelo salvo, com esse modelo carregado. Se a aba atual já tem texto, nada nela é apagado; se está vazia, ela recebe o primeiro modelo.
+- O endereço da aba nova usa o href inteiro (`#ufopen=` e `#ufmodel=`), não só `location.hash` (em file:// o Edge às vezes deixa o hash vazio). Se o hash se perder no `window.open`, uma fila em localStorage ainda entrega o modelo — a aba nova não vira cópia da aba de onde se clicou (o Chromium/Edge copiam o sessionStorage no `window.open`).
+- Salvar "abas abertas" inclui as abas de fundo mesmo quando o navegador atrasa o timer de 15 s nessas abas. A sessão guarda o nome e o id de cada modelo. Sessões antigas, só com o nome, continuam abrindo.
+- Testes: `test/c10_test.py`, `test/c6n_test.py`.
+
 ## [etapa-C9d] Nome do modelo inteiro; "trocar" na linha do rótulo EXAME — testado só em Chromium automatizado, NÃO testado pelo usuário
 - O botão "trocar ▾" saiu da caixa do nome e foi para a direita da linha do rótulo EXAME (rótulo à esquerda, botão pequeno à direita). A caixa do nome ocupa a largura do painel.
 - O nome do modelo (ou do exame, se não houver modelo) aparece inteiro, em quantas linhas precisar. Sem corte, sem reticências e sem altura fixa. Palavra muito longa quebra. A caixa não cobre o rótulo EXAME nem as abas.
