@@ -3486,24 +3486,115 @@ var UFMain = function () {
     var m = id ? getModel(id) : null;
     return m || findModelByName(nm);
   }
+  function isNewWin(w) {
+    if (!w) { return false; }
+    if (w === window) { return false; }
+    try { if (w.closed) { return false; } } catch (eC) { return false; }
+    return true;
+  }
+  /* abre uma aba no clique (gesto do usuário). Se o navegador bloquear, tira o item da fila
+     para uma aba nova depois não "engolir" o modelo. */
+  function tryOpenTab(name, mid, ord) {
+    var qk = null, w = null;
+    try { qk = enqueueSessOpen({ id: mid, name: name, ord: ord }); } catch (eQ) { qk = null; }
+    try { w = window.open(tabUrl(name, ord, mid), '_blank'); } catch (eW) { w = null; }
+    if (!isNewWin(w) && qk) { try { UStore.remove(qk); } catch (eR) {} }
+    return w;
+  }
+  function sessMsg(title, bodyHtml) {
+    modal(title, bodyHtml, [{ label: 'OK', cls: 'btn-primary', focus: true }]);
+  }
+  var pendingSessOpen = null;
+  function showSessOpenRemainder(pending, opened, loadedHere) {
+    var i, html = '', box, note;
+    if (loadedHere) { html += '<p>O modelo <b>' + esc(loadedHere) + '</b> foi aberto nesta aba.</p>'; }
+    if (opened) { html += '<p>' + opened + ' aba(s) foram abertas. O navegador impediu as outras.</p>'; }
+    else { html += '<p>O navegador impediu a abertura das abas.</p>'; }
+    html += '<p>Clique em cada botão abaixo para abrir o modelo. Para abrir todas de uma vez da próxima vez, permita pop-ups para este arquivo.</p>';
+    html += '<div class="sess-open-list">';
+    for (i = 0; i < pending.length; i++) {
+      html += '<button type="button" class="btn btn-primary sess-open-one" data-so="' + i + '">Abrir ' + esc(pending[i].name) + '</button>';
+    }
+    html += '</div><p id="sessOpenNote" class="sess-open-note" hidden></p>';
+    pendingSessOpen = pending;
+    modal('Abrir sessão', html, [{ label: 'Fechar' }]);
+    box = document.querySelector('#modal .sess-open-list');
+    if (!box) { return; }
+    on(box, 'click', function (e) {
+      var b = closest(e.target, function (n) { return n.getAttribute && n.getAttribute('data-so') !== null; });
+      var i2, item, w2;
+      if (!b || b.disabled) { return; }
+      i2 = +b.getAttribute('data-so');
+      item = pendingSessOpen && pendingSessOpen[i2];
+      if (!item) { return; }
+      w2 = tryOpenTab(item.name, item.id, item.ord || now());
+      note = $('sessOpenNote');
+      if (isNewWin(w2)) {
+        b.disabled = true;
+        b.innerHTML = 'Aberto: ' + esc(item.name);
+        if (note) { note.hidden = true; note.innerHTML = ''; }
+      } else if (note) {
+        note.hidden = false;
+        note.innerHTML = 'Esta aba ainda não abriu. Clique de novo no botão, ou permita pop-ups para este arquivo.';
+      }
+    });
+  }
   function openSession(se) {
-    var names = se.models || [], ids = se.ids || [], list = [], listIds = [], i, w, blocked = 0, here, md, n;
+    try { openSessionInner(se); }
+    catch (eS) {
+      sessMsg('Não foi possível abrir a sessão', '<p>Algo falhou ao abrir as abas. Tente de novo. Se o navegador pedir, permita pop-ups para este arquivo.</p>');
+    }
+  }
+  function openSessionInner(se) {
+    var names = (se && se.models) || [], ids = (se && se.ids) || [], list = [], listIds = [], i, md, n, seen = {};
+    var hereName = '', cur, empty = false, base, start, pending, w, opened, ord, loadedHere;
+    if (!names || names.length === undefined) { names = []; }
+    if (!ids || ids.length === undefined) { ids = []; }
     n = names.length > ids.length ? names.length : ids.length;
     for (i = 0; i < n; i++) {
       md = resolveSessModel(ids[i], names[i]);
-      if (md) { list.push(md.name); listIds.push(md.id); }
-    }   /* modelo que não existe mais: pulado */
-    if (!list.length) { toast('Nenhum modelo desta sessão existe no banco atual.'); return; }
-    here = trim(lineText(editor)) === '';   /* aba atual vazia: recebe o 1º modelo; com conteúdo, nada é apagado */
-    var base = now();
-    if (here) { TAB_ORD = base; }
-    for (i = here ? 1 : 0; i < list.length; i++) {
-      enqueueSessOpen({ id: listIds[i], name: list[i], ord: base + i });
-      w = null; try { w = window.open(tabUrl(list[i], base + i, listIds[i]), '_blank'); } catch (eW) { w = null; }
-      if (!w) { blocked++; }
+      if (!md || seen[md.name]) { continue; }
+      seen[md.name] = true;
+      list.push(md.name); listIds.push(md.id);
     }
-    if (here) { useModel(resolveSessModel(listIds[0], list[0]), true); }
-    if (blocked) { toast('O navegador bloqueou ' + blocked + ' aba(s): permita janelas pop-up para este arquivo.'); }
+    if (!list.length) {
+      sessMsg('Não foi possível abrir a sessão', '<p>Nenhum modelo desta sessão existe no banco atual.</p>');
+      return;
+    }
+    cur = S.activeModelId ? getModel(S.activeModelId) : null;
+    if (cur) { hereName = cur.name; }
+    try { empty = trim(lineText(editor)) === ''; } catch (eE) { empty = false; }
+    /* sessão antiga com um só modelo, que já é o desta aba: antes não aparecia nada */
+    if (!empty && list.length === 1 && hereName && list[0] === hereName) {
+      sessMsg('Sessão já aberta', '<p>Essa sessão só tem este modelo, que já está nesta aba: <b>' + esc(list[0]) + '</b>.</p>');
+      return;
+    }
+    base = now();
+    start = 0;
+    loadedHere = null;
+    if (empty) {
+      TAB_ORD = base;
+      useModel(resolveSessModel(listIds[0], list[0]), true);
+      loadedHere = list[0];
+      start = 1;
+    } else if (hereName && list[0] === hereName) {
+      start = 1;   /* já está nesta aba com conteúdo: não abre cópia; abre o resto */
+    }
+    if (start >= list.length) {
+      sessMsg('Sessão aberta', '<p>O modelo <b>' + esc(list[0]) + '</b> foi aberto nesta aba.</p>');
+      return;
+    }
+    pending = []; opened = 0;
+    for (i = start; i < list.length; i++) {
+      ord = base + i;
+      w = tryOpenTab(list[i], listIds[i], ord);
+      if (isNewWin(w)) { opened += 1; }
+      else { pending.push({ name: list[i], id: listIds[i], ord: ord }); }
+    }
+    if (pending.length) { showSessOpenRemainder(pending, opened, loadedHere); }
+    else if (loadedHere && !opened) {
+      sessMsg('Sessão aberta', '<p>O modelo <b>' + esc(loadedHere) + '</b> foi aberto nesta aba.</p>');
+    }
   }
   function saveSessionDialog() {
     modal('Salvar sessão de abas', '<p id="sessWait">Detectando abas abertas&#8230;</p>', [
@@ -3563,13 +3654,18 @@ var UFMain = function () {
           var c = sessList().slice(0), q; for (q = 0; q < c.length; q++) { if (c[q] && c[q].name === se.name) { c.splice(q, 1); break; } }
           UStore.set('tabSessions', c); }, true); return; }
       if (!it) { return; }
+      if (it.getAttribute('data-ssave') !== null) { closeSessMenu(); saveSessionDialog(); return; }
+      var s2 = all[+it.getAttribute('data-si')];
+      /* abre a 1ª aba ainda neste clique (gesto); só então fecha o menu — se fechar antes,
+         o Edge/Chrome podem anular o window.open e não mostrar nem o ícone de pop-up */
+      if (s2) { openSession(s2); }
+      else { sessMsg('Não foi possível abrir a sessão', '<p>Essa sessão não foi encontrada.</p>'); }
       closeSessMenu();
-      if (it.getAttribute('data-ssave') !== null) { saveSessionDialog(); return; }
-      var s2 = all[+it.getAttribute('data-si')]; if (s2) { openSession(s2); }
     });
   }
   on($('btnSess'), 'click', function (e) { if (e && e.stopPropagation) { e.stopPropagation(); } showSessMenu(); });
-  on(document, 'mousedown', function (e) { if (sessMenu && !closest(e.target, function (n) { return n === sessMenu || n.id === 'btnSess'; })) { closeSessMenu(); } });
+  /* fecha o menu no clique fora (não no mousedown: remover o item antes do click cancela o clique) */
+  on(document, 'click', function (e) { if (sessMenu && !closest(e.target, function (n) { return n === sessMenu || n.id === 'btnSess'; })) { closeSessMenu(); } });
   on(document, 'keydown', function (e) { if (sessMenu && e.keyCode === 27) { closeSessMenu(); } });
   setInterval(updTitle, 1000);
   window.UFSess = { list: sessList, open: openSession, openTabsModels: openTabsModels, openTabsRecords: openTabsRecords, probeLiveTabs: probeLiveTabs, findModelByName: findModelByName, updTitle: updTitle, enqueueSessOpen: enqueueSessOpen, tabUrl: tabUrl };

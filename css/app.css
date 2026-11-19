@@ -471,6 +471,10 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 #modal .sess-ol li{margin:0;padding:0}
 #modal .sess-ol label.chk{display:block;margin:2px 0;padding:6px 4px;font-size:14px;cursor:pointer}
 #modal .sess-ol input{margin-right:8px;vertical-align:middle}
+#modal .sess-open-list{margin:10px 0 4px}
+#modal .sess-open-one{display:block;width:100%;box-sizing:border-box;text-align:left;min-height:44px;font-size:16px;padding:10px 12px;margin:0 0 8px;white-space:normal}
+#modal .sess-open-one:disabled{opacity:.7}
+#modal .sess-open-note{color:#8a1f1f;font-size:14px;margin:8px 0 0}
 /* C7: BI-RADS US: cartões por achado (mesmo padrão do TI-RADS) */
 .br-card{border:1px solid #ddd;border:1px solid var(--line2);border-radius:4px;margin:0 0 5px}
 .br-h{display:flex;align-items:center;width:100%;border:0;background:none;color:inherit;font:inherit;font-size:12px;padding:4px 6px;cursor:pointer;text-align:left}
