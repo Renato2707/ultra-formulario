@@ -547,6 +547,52 @@ var UFMain = function () {
     var l = qsa(editor, '.crit'), i;
     for (i = 0; i < l.length; i++) { if (l[i].getAttribute('data-orig') === null) { l[i].setAttribute('data-orig', lineText(l[i])); } }
   }
+  /* C11b: the critical mark lives on the line <div>. Deleting across lines makes the browser keep the FIRST line's
+     <div> and pull the rest of the last line into it, so the mark went to the line below (or a critical line's text
+     lost it when pulled into a plain line). After each edit the merged line takes the mark only from the line(s) whose
+     text actually survived in it: start of the first old line and/or end of the last old line. */
+  var CRIT_A = ['data-orig', 'data-res', 'data-conf'], critSnap = [];
+  function critSnapTake() {
+    var l = editorLines(), i, a = [];
+    for (i = 0; i < l.length; i++) { a.push({ el: l[i], t: lineText(l[i]), c: hasCls(l[i], 'crit') ? 'crit' : (hasCls(l[i], 'crit-instr') ? 'crit-instr' : ''), ok: hasCls(l[i], 'crit-ok'), at: critAttrs(l[i]) }); }
+    critSnap = a;
+  }
+  function critAttrs(el) { var o = {}, i; for (i = 0; i < CRIT_A.length; i++) { o[CRIT_A[i]] = el.getAttribute(CRIT_A[i]); } return o; }
+  function critSet(el, src) {
+    rmCls(el, 'crit'); rmCls(el, 'crit-instr'); rmCls(el, 'crit-ok');
+    var i, v;
+    for (i = 0; i < CRIT_A.length; i++) {
+      v = src && src.c ? src.at[CRIT_A[i]] : null;
+      if (v === null) { el.removeAttribute(CRIT_A[i]); } else { el.setAttribute(CRIT_A[i], v); }
+    }
+    if (src && src.c) { addCls(el, src.c); if (src.ok) { addCls(el, 'crit-ok'); } }
+    if (el.getAttribute('class') === '') { el.removeAttribute('class'); }
+  }
+  function critWord(t) { return /[0-9A-Za-z\u00c0-\u024f]/.test(t); }
+  var critGone = [];   /* critical lines removed by a merge, so Ctrl+Z (which brings the text back) brings the mark back */
+  function critFix(ev) {
+    var old = critSnap, now = editorLines(), h = 0, e = 0, i, j, d, t, o0, o1, s, p, src = null;
+    if (ev && /^history(Undo|Redo)$/.test(ev.inputType || '') && critGone.length) {
+      for (i = 0; i < now.length; i++) {
+        if (hasCls(now[i], 'crit') || hasCls(now[i], 'crit-instr')) { continue; }
+        t = lineText(now[i]);
+        for (j = critGone.length - 1; j >= 0; j--) { if (critGone[j].t === t) { critSet(now[i], critGone[j]); critGone.splice(j, 1); break; } }
+      }
+    }
+    if (!old.length) { return; }
+    while (h < old.length && h < now.length && old[h].el === now[h] && old[h].t === lineText(now[h])) { h++; }
+    while (e < old.length - h && e < now.length - h && old[old.length - 1 - e].el === now[now.length - 1 - e] && old[old.length - 1 - e].t === lineText(now[now.length - 1 - e])) { e++; }
+    if (old.length - h - e < 2 || now.length - h - e !== 1) { return; }   /* only a merge of 2+ old lines into one */
+    d = now[h]; t = lineText(d); o0 = old[h]; o1 = old[old.length - 1 - e];
+    for (s = 0; s < t.length && s < o1.t.length && t.charAt(t.length - 1 - s) === o1.t.charAt(o1.t.length - 1 - s); s++) {}
+    for (p = 0; p < t.length - s && p < o0.t.length && t.charAt(p) === o0.t.charAt(p); p++) {}
+    if (p && o0.c && critWord(o0.t.substring(0, p))) { src = o0; }
+    else if (s && o1.c && critWord(o1.t.substring(o1.t.length - s))) { src = o1; }
+    for (i = h; i < old.length - e; i++) { if (old[i].c && old[i] !== src) { critGone.push(old[i]); } }
+    if (critGone.length > 30) { critGone.splice(0, critGone.length - 30); }
+    if ((src ? src.c : '') === (hasCls(d, 'crit') ? 'crit' : (hasCls(d, 'crit-instr') ? 'crit-instr' : '')) && (!src || d.getAttribute('data-orig') === src.at['data-orig'])) { return; }
+    critSet(d, src);
+  }
   function critState() {
     var pend = [], instr = [], l = qsa(editor, '.crit'), i, el;
     for (i = 0; i < l.length; i++) {
@@ -625,6 +671,7 @@ var UFMain = function () {
     markHypUnderline();
     markCritOrig();
     updateCounters();
+    critSnapTake();
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveDraft, fast ? 50 : 700);
   }
@@ -2743,6 +2790,7 @@ var UFMain = function () {
     if (!isTxtFld(f) || !fieldFilled(f)) { return; }
     var r = document.createRange(); r.selectNodeContents(f); setRange(r); saveRange();
   });
+  on(editor, 'input', critFix);   /* C11b: before afterChange counts the critical lines */
   on(editor, 'input', function () { afterChange(false); });
   (function () { var ev = ['keydown', 'mousedown', 'paste', 'cut', 'dragstart', 'drop'], i; for (i = 0; i < ev.length; i++) { if (editor.addEventListener) { editor.addEventListener(ev[i], selMark, true); } } })();   /* C11 */
   on(editor, 'blur', saveRange);
