@@ -11,6 +11,15 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C11] Backspace numa frase escolhida apaga uma letra, não a frase inteira — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Causa: a escolha já feita (opção de um "escolher ▾", que pode ser uma palavra, um trecho ou a linha inteira) ficava no laudo como um bloco não editável (`contenteditable="false"`). Backspace logo depois dela, ou Delete logo antes, apagava o bloco todo. Também não dava para pôr o cursor no meio dela.
+- Agora a escolha feita é texto editável. Backspace e Delete apagam um caractere, Ctrl+Backspace e Ctrl+Delete uma palavra, e selecionar um trecho e digitar troca só o trecho. Enter no meio da frase quebra a linha. Ctrl+Z desfaz.
+- Clicar na escolha continua abrindo a lista (setas, Enter ou número trocam a opção). Backspace, Delete, Espaço ou uma letra fecham a lista e editam o texto no ponto do clique.
+- Depois de editada à mão, a frase vira texto comum (sai o sublinhado pontilhado e a lista). O texto não é alterado pelo app.
+- O "escolher" ainda não preenchido e os campos "___" funcionam como antes. Escolhas gravadas como bloco em rascunhos antigos ou pelas calculadoras também passam a apagar uma letra por vez (os arquivos das calculadoras não foram mexidos).
+- Sessões não mudaram.
+- Testes: `test/c11_test.py` (1024×600 e 1366×768).
+
 ## [etapa-C10c] Abrir sessão nunca fica em silêncio; se o navegador bloquear, um botão por modelo — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Clicar numa sessão sempre mostra um resultado: abre as abas, ou um aviso claro. Se a sessão só tem o modelo que já está nesta aba, o aviso diz isso. Se nenhum modelo existe no banco, o aviso diz isso. Nada acontece em silêncio.
 - A primeira aba nova abre ainda no clique (o menu só fecha depois). Se o navegador bloquear as outras, aparece um diálogo com um botão grande por modelo ("Abrir …"); cada clique abre uma aba. O texto pede para permitir pop-ups para este arquivo.
