@@ -132,12 +132,12 @@ with sync_playwright() as p:
     pg.click('#btnSess'); pg.wait_for_timeout(150)
     ck('4 menu lista a sessão', pg.locator('#sessMenu .sm-i[data-si]').count() == 1)
     pg.locator('#sessMenu .sm-i[data-si] .sm-n').click(); pg.wait_for_timeout(2500)
-    ck('4 5 abas novas (modelo inexistente pulado)', len(pages) == 5, len(pages))
+    ck('4 4 abas novas (o 1º modelo já está nesta aba; inexistente pulado)', len(pages) == 4, len(pages))
     for np in pages: np.wait_for_load_state(); 
     pg.wait_for_timeout(800)
     tit = [np.title() for np in pages]
-    ck('4 abas na ordem com o modelo carregado', tit == names, tit)
-    ck('4 aba nova tem o texto do modelo', 'DOPPLER OBSTETRICO' in pages[4].evaluate('UFTest.reportText()'))
+    ck('4 abas na ordem com o modelo carregado', tit == names[1:], tit)
+    ck('4 aba nova tem o texto do modelo', 'DOPPLER OBSTETRICO' in pages[3].evaluate('UFTest.reportText()'))
     ck('4 aba atual não foi apagada', pg.title() == 'Transvaginal padrão' and 'ULTRASSONOGRAFIA TRANSVAGINAL' in pg.evaluate('UFTest.reportText()'))
     ck('4 endereço limpo (sem #ufopen)', '#ufopen' not in pages[0].url, pages[0].url)
     # salvar as abas abertas (atual + 5, mas o 1º modelo está duas vezes: entra uma só, C10b)
