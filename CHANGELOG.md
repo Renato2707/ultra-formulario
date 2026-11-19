@@ -11,6 +11,13 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C11b] Apagar uma linha crítica leva a marca junto; a marca não passa para a linha vizinha — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Causa: a marca de linha crítica (sublinhado vermelho ondulado, contada em "N críticas") fica na linha do laudo. Ao apagar um trecho que vai de uma linha até a seguinte, o navegador mantém a primeira linha e puxa para dentro dela o resto da última. Assim a marca passava para a frase de baixo, que nunca foi crítica. No caso inverso, o texto de uma linha crítica puxado para uma linha comum perdia a marca.
+- Agora, depois de cada edição que junta linhas, a linha que sobrou só fica crítica se ainda tem texto da linha crítica (o começo dela, ou o fim). Apagar a linha crítica inteira apaga a marca. A linha de baixo continua comum. Uma linha comum apagada acima de uma crítica não tira nem move a marca. O contador "N críticas" acompanha.
+- Vale para Backspace do fim, Delete do início, seleção + Backspace/Delete, Shift+seta + Backspace e seleção + digitar. Ctrl+Z traz a linha de volta já com a marca.
+- Editar dentro da linha crítica (preencher campo, apagar parte) continua crítica como antes. Sessões não mudaram.
+- Testes: `test/c11b_test.py` (1024×600 e 1366×768).
+
 ## [etapa-C11] Backspace numa frase escolhida apaga uma letra, não a frase inteira — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Causa: a escolha já feita (opção de um "escolher ▾", que pode ser uma palavra, um trecho ou a linha inteira) ficava no laudo como um bloco não editável (`contenteditable="false"`). Backspace logo depois dela, ou Delete logo antes, apagava o bloco todo. Também não dava para pôr o cursor no meio dela.
 - Agora a escolha feita é texto editável. Backspace e Delete apagam um caractere, Ctrl+Backspace e Ctrl+Delete uma palavra, e selecionar um trecho e digitar troca só o trecho. Enter no meio da frase quebra a linha. Ctrl+Z desfaz.
