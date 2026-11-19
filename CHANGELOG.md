@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C10c] Abrir sessão nunca fica em silêncio; se o navegador bloquear, um botão por modelo — testado só em Chromium automatizado, NÃO testado pelo usuário
+- Clicar numa sessão sempre mostra um resultado: abre as abas, ou um aviso claro. Se a sessão só tem o modelo que já está nesta aba, o aviso diz isso. Se nenhum modelo existe no banco, o aviso diz isso. Nada acontece em silêncio.
+- A primeira aba nova abre ainda no clique (o menu só fecha depois). Se o navegador bloquear as outras, aparece um diálogo com um botão grande por modelo ("Abrir …"); cada clique abre uma aba. O texto pede para permitir pop-ups para este arquivo.
+- O mesmo modelo entra uma vez só ao abrir. Um item enfileirado cujo pop-up foi bloqueado é retirado da fila, para uma aba nova depois não carregar o modelo errado.
+- Testes: `test/c10_test.py`, `test/c6n_test.py`.
+
 ## [etapa-C10b] Salvar sessão: só as abas realmente abertas, sem nomes repetidos — testado só em Chromium automatizado, NÃO testado pelo usuário
 - O diálogo "Salvar sessão de abas" pergunta às abas abertas (via localStorage) e espera a resposta uns 0,65 s. Abas já fechadas, cujos rastros tinham ficado em tabStay, não entram mais na lista. Abas de fundo com o timer atrasado continuam entrando, porque o evento storage chega mesmo nelas.
 - O mesmo nome de modelo aparece uma vez só, na ordem em que as abas foram abertas.

@@ -1,4 +1,4 @@
-"""C10/C10b: sessões de abas — abrir um modelo por aba; salvar só as abas realmente abertas.
+"""C10/C10b/C10c: sessões de abas — abrir com mensagem visível; salvar só as abas realmente abertas.
 Uso: UF_BANCO=<banco> /workspace/.pwenv/bin/python test/c10_test.py
      (sem UF_BANCO usa /workspace/banco-renato/banco-teste-birads.txt se existir)
 """
@@ -91,17 +91,17 @@ with sync_playwright() as p:
     ck('1 menu lista a sessão', pg.locator('#sessMenu .sm-i[data-si]').count() == 1)
     pg.locator('#sessMenu .sm-i[data-si] .sm-n').click()
     pg.wait_for_timeout(2800)
-    ck('1 4 abas novas', len(pages) == 4, len(pages))
+    ck('1 3 abas novas (o 1º modelo já está nesta aba)', len(pages) == 3, len(pages))
     for np in pages:
         np.wait_for_load_state()
         np.wait_for_timeout(250)
     tit = [title_of(np) for np in pages]
-    ck('1 cada aba nova tem o modelo da sessão, na ordem', tit == NAMES, tit)
+    ck('1 cada aba nova tem o restante da sessão, na ordem', tit == NAMES[1:], tit)
     ck('1 nenhuma aba nova é só cópia vazia/default', all(title_of(np) in NAMES and len(text_of(np)) > 40 for np in pages), tit)
     ck('1 a aba atual não foi apagada', pg.title() == NAMES[0] and text_of(pg) == before)
     ck('1 endereço das abas novas sem hash', all('#ufopen' not in (np.url or '') and '#ufmodel' not in (np.url or '') for np in pages), [np.url for np in pages])
     # accents / parentheses in Obstétrica
-    ck('1 modelo com acento e parênteses carregou', 'OBSTÉTRICA' in text_of(pages[2]).upper() or 'OBSTETRICA' in text_of(pages[2]).upper(), text_of(pages[2])[:80])
+    ck('1 modelo com acento e parênteses carregou', 'OBSTÉTRICA' in text_of(pages[1]).upper() or 'OBSTETRICA' in text_of(pages[1]).upper(), text_of(pages[1])[:80])
     ctx.close()
 
     # ---------- 2) sessão só com nomes (formato antigo) e aba vazia ----------
@@ -286,6 +286,111 @@ with sync_playwright() as p:
     ss = pg.evaluate("UStore.get('tabSessions')")
     want = [NAMES[0], NAMES[2]]
     ck('8 sessão salva sem o modelo desmarcado', ss and ss[0]['name'] == 'sem o do meio' and ss[0]['models'] == want and len(ss[0].get('ids') or []) == 2, ss)
+    ctx.close()
+
+    # ---------- 9) C10c: sessão só com o modelo já aberto nesta aba — mensagem, não silêncio ----------
+    ctx = b.new_context(viewport={'width': 1200, 'height': 800})
+    pg = ctx.new_page()
+    pg.on('pageerror', lambda e: ERR.append('p9:' + str(e)))
+    load(pg)
+    use(pg, NAMES[0])
+    pg.evaluate("UStore.set('tabSessions', [{name:'Plantão maternidade', models: %s}])" % json.dumps([NAMES[0]], ensure_ascii=False))
+    pages = []
+    ctx.on('page', lambda np: pages.append(np))
+    pg.click('#btnSess')
+    pg.locator('#sessMenu .sm-i[data-si] .sm-n').click()
+    pg.wait_for_selector('#modalBack:not([hidden])', timeout=3000)
+    body = pg.evaluate("document.getElementById('modalBody') && document.getElementById('modalBody').innerText")
+    ck('9 nenhuma aba nova', len(pages) == 0, len(pages))
+    ck('9 avisa que o modelo já está nesta aba', body and 'já está nesta aba' in body and NAMES[0] in body, body)
+    pg.click('#modalFoot .btn-primary')
+    ctx.close()
+
+    # ---------- 10) C10c: modelos que não existem — mensagem, não silêncio ----------
+    ctx = b.new_context(viewport={'width': 1200, 'height': 800})
+    pg = ctx.new_page()
+    pg.on('pageerror', lambda e: ERR.append('p10:' + str(e)))
+    load(pg)
+    use(pg, NAMES[0])
+    pg.evaluate("UStore.set('tabSessions', [{name:'vazia', models: ['Modelo que não existe']}])")
+    pages = []
+    ctx.on('page', lambda np: pages.append(np))
+    pg.evaluate("UFSess.open(UFSess.list()[0])")
+    pg.wait_for_selector('#modalBack:not([hidden])', timeout=3000)
+    body = pg.evaluate("document.getElementById('modalBody') && document.getElementById('modalBody').innerText")
+    ck('10 nenhuma aba nova', len(pages) == 0, len(pages))
+    ck('10 avisa que o modelo não existe no banco', body and 'Nenhum modelo desta sessão existe' in body, body)
+    pg.click('#modalFoot .btn-primary')
+    ctx.close()
+
+    # ---------- 11) C10c: pop-ups bloqueados após o 1º — modal com um botão por modelo ----------
+    ctx = b.new_context(viewport={'width': 1200, 'height': 800})
+    pg = ctx.new_page()
+    pg.on('pageerror', lambda e: ERR.append('p11:' + str(e)))
+    load(pg)
+    use(pg, NAMES[0])
+    pg.evaluate("UStore.set('tabSessions', [{name:'Plantão maternidade', models: %s}])" % json.dumps(NAMES, ensure_ascii=False))
+    pages = []
+    ctx.on('page', lambda np: pages.append(np))
+    # 1º window.open do gesto passa; os seguintes voltam null (como o bloqueio do Edge)
+    pg.evaluate("""() => {
+      var orig = window.open, n = 0;
+      window.__allowOpen = 1;
+      window.open = function () {
+        n += 1;
+        if (n > window.__allowOpen) { return null; }
+        return orig.apply(this, arguments);
+      };
+      window.__origOpen = orig;
+    }""")
+    pg.click('#btnSess')
+    pg.locator('#sessMenu .sm-i[data-si] .sm-n').click()
+    pg.wait_for_selector('#modal .sess-open-list', timeout=4000)
+    pg.wait_for_timeout(800)
+    ck('11 uma aba nova (a primeira do restante)', len(pages) == 1, len(pages))
+    if pages:
+        pages[0].wait_for_load_state(); pages[0].wait_for_timeout(200)
+        ck('11 a aba nova é o 2º modelo', title_of(pages[0]) == NAMES[1], title_of(pages[0]))
+    btns = pg.evaluate("""() => {
+      var b = document.querySelectorAll('#modal .sess-open-one'), i, a = [];
+      for (i = 0; i < b.length; i++) { a.push(b[i].innerText); }
+      return a;
+    }""")
+    ck('11 modal tem um botão para cada modelo bloqueado', btns == ['Abrir ' + n for n in NAMES[2:]], btns)
+    # cada clique no botão é um gesto: libera mais um window.open
+    pg.evaluate('window.__allowOpen = 100')
+    pg.locator('.sess-open-one').first.click()
+    pg.wait_for_timeout(800)
+    pg.locator('.sess-open-one').nth(1).click()
+    pg.wait_for_timeout(800)
+    ck('11 clicar nos botões abre as abas que faltavam', len(pages) == 3, len(pages))
+    if len(pages) >= 3:
+        for np in pages[1:]:
+            np.wait_for_load_state(); np.wait_for_timeout(150)
+        ck('11 as abas dos botões têm os modelos certos', [title_of(np) for np in pages[1:]] == NAMES[2:], [title_of(np) for np in pages[1:]])
+    done = pg.evaluate("""() => {
+      var b = document.querySelectorAll('#modal .sess-open-one'), i, n = 0;
+      for (i = 0; i < b.length; i++) { if (b[i].disabled) { n++; } }
+      return n;
+    }""")
+    ck('11 os botões usados ficam como Aberto', done == 2, done)
+    ctx.close()
+
+    # ---------- 12) C10c: aba vazia + um modelo — avisa que abriu nesta aba ----------
+    ctx = b.new_context(viewport={'width': 1200, 'height': 800})
+    pg = ctx.new_page()
+    pg.on('pageerror', lambda e: ERR.append('p12:' + str(e)))
+    load(pg)
+    pg.evaluate("document.getElementById('editor').innerHTML='<div><br></div>'")
+    pg.evaluate("UStore.set('tabSessions', [{name:'so um', models: %s}])" % json.dumps([NAMES[1]], ensure_ascii=False))
+    pages = []
+    ctx.on('page', lambda np: pages.append(np))
+    pg.evaluate("UFSess.open(UFSess.list()[0])")
+    pg.wait_for_selector('#modalBack:not([hidden])', timeout=3000)
+    body = pg.evaluate("document.getElementById('modalBody') && document.getElementById('modalBody').innerText")
+    ck('12 nenhuma aba nova', len(pages) == 0, len(pages))
+    ck('12 a aba atual recebeu o modelo', pg.title() == NAMES[1], pg.title())
+    ck('12 avisa que abriu nesta aba', body and 'foi aberto nesta aba' in body and NAMES[1] in body, body)
     ctx.close()
 
     ck('sem erros de página', not ERR, ERR)
