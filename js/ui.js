@@ -3364,11 +3364,14 @@ var UFMain = function () {
     } else if (k === 'searchHist') { if (histOpen) { histRender(); }
     } else if (k === 'userModels' || k === 'userPhrases' || k === 'order' || k === 'overrides' || k === 'usage' || k === 'usageLast' || k === 'hidden') {
       S[k] = UStore.get(k, S[k]); buildModels(); renderNav();
+    } else if (k === 'tabPing') {
+      replyTabPing();
     }
   }
   if (window.addEventListener) { window.addEventListener('storage', onStorage, false);
     window.addEventListener('pagehide', function () { saveDraft(); markAlive(false); }, false);
     window.addEventListener('beforeunload', function () { saveDraft(); markAlive(false); }, false);
+    window.addEventListener('unload', function () { markAlive(false); }, false);
     document.addEventListener('visibilitychange', function () {
       try {
         if (document.hidden || document.msHidden || document.visibilityState === 'hidden') { saveDraft(); markAlive(true); }
@@ -3404,7 +3407,69 @@ var UFMain = function () {
       md = d && d.model ? getModel(d.model) : null;
       if (md) { out.push({ name: md.name, id: md.id }); }
     }
+    return dedupeTabRecords(out);
+  }
+  /* C10b: o mesmo modelo entra uma vez só, na ordem em que as abas foram abertas. */
+  function dedupeTabRecords(recs) {
+    var out = [], seen = {}, i, n;
+    for (i = 0; i < recs.length; i++) {
+      n = recs[i] && recs[i].name;
+      if (!n || seen[n]) { continue; }
+      seen[n] = true;
+      out.push({ name: recs[i].name, id: recs[i].id });
+    }
     return out;
+  }
+  var TAB_PING_MS = 650;
+  var pendingSessRecs = null;
+  /* Abas de fundo (mesmo com timer atrasado) respondem na hora: o evento storage
+     não espera o intervalo de 15 s. A aba que perguntou inclui a si mesma. */
+  function replyTabPing() {
+    var ping, md, rec;
+    try { ping = UStore.get('tabPing', null); } catch (eP) { return; }
+    if (!ping || !ping.token || ping.from === TAB) { return; }
+    md = S.activeModelId ? getModel(S.activeModelId) : null;
+    rec = { token: ping.token, tab: TAB, id: md ? md.id : null, name: md ? md.name : '', ord: TAB_ORD || 0, t: now() };
+    try { UStore.set('tabPong.' + TAB, rec); } catch (eS) {}
+  }
+  function collectPingRecords(token) {
+    var recs = [], ks, i, k, p, md, live = {}, nPong = 0;
+    live[TAB] = true;
+    md = S.activeModelId ? getModel(S.activeModelId) : null;
+    if (md) { recs.push({ name: md.name, id: md.id, tab: TAB, ord: TAB_ORD || 0 }); }
+    try { ks = UStore.keys(); } catch (eK) { ks = []; }
+    for (i = 0; i < ks.length; i++) {
+      k = ks[i];
+      if (String(k).indexOf('tabPong.') !== 0) { continue; }
+      p = UStore.get(k, null);
+      if (!p || p.token !== token || p.tab === TAB) { continue; }
+      nPong += 1;
+      if (p.tab) { live[p.tab] = true; }
+      md = (p.id && getModel(p.id)) || findModelByName(p.name);
+      if (md) { recs.push({ name: md.name, id: md.id, tab: p.tab, ord: p.ord || 0 }); }
+    }
+    recs.sort(function (a, b) { return (a.ord || 0) - (b.ord || 0) || ((a.tab || '') < (b.tab || '') ? -1 : 1); });
+    return { recs: dedupeTabRecords(recs), nPong: nPong, live: live };
+  }
+  function sweepDeadTabs(live) {
+    var m = tabsMap(), s = stayMap(), k;
+    for (k in m) { if (m.hasOwnProperty(k) && !live[k]) { delete m[k]; } }
+    for (k in s) { if (s.hasOwnProperty(k) && !live[k]) { delete s[k]; } }
+    UStore.set('tabs', m);
+    UStore.set('tabStay', s);
+  }
+  /* Pergunta quais abas estão realmente abertas. Se alguma responder, só essas
+     (e esta) entram; entradas velhas de tabStay/tabs são apagadas. Se ninguém
+     responder (evento storage ausente em algum file://), cai no tabStay + nomes sem repetir. */
+  function probeLiveTabs(done) {
+    var token = 'p' + now() + '-' + Math.floor(Math.random() * 1000000000);
+    try { UStore.set('tabPing', { token: token, t: now(), from: TAB }); } catch (e1) {}
+    setTimeout(function () {
+      var got = collectPingRecords(token), out;
+      if (got.nPong > 0) { sweepDeadTabs(got.live); out = got.recs; }
+      else { out = openTabsRecords(); }
+      if (typeof done === 'function') { done(out); }
+    }, TAB_PING_MS);
   }
   function openTabsModels() {
     var a = openTabsRecords(), i, out = [];
@@ -3441,23 +3506,37 @@ var UFMain = function () {
     if (blocked) { toast('O navegador bloqueou ' + blocked + ' aba(s): permita janelas pop-up para este arquivo.'); }
   }
   function saveSessionDialog() {
-    var names = openTabsModels();
-    if (!names.length) { toast('Nenhuma aba com modelo aberto.'); return; }
-    var li = '', i; for (i = 0; i < names.length; i++) { li += '<li>' + esc(names[i]) + '</li>'; }
-    modal('Salvar sessão de abas', '<label>Nome da sessão<input type="text" id="sessName" autocomplete="off"></label><ol class="sess-ol">' + li + '</ol>', [
-      { label: 'Cancelar' },
-      { label: 'Salvar', cls: 'btn-primary', id: 'sessSave', click: function () {
-        var nm = trim($('sessName').value); if (!nm) { $('sessName').focus(); return false; }
-        var recs = openTabsRecords(), names2 = [], ids2 = [], r;
-        for (r = 0; r < recs.length; r++) { names2.push(recs[r].name); ids2.push(recs[r].id); }
-        if (!names2.length) { return false; }
-        var a = sessList().slice(0), j, put = false;
-        for (j = 0; j < a.length; j++) { if (a[j] && a[j].name === nm) { a[j] = { name: nm, models: names2, ids: ids2 }; put = true; } }
-        if (!put) { a.push({ name: nm, models: names2, ids: ids2 }); }
-        UStore.set('tabSessions', a); toast('Sessão salva: ' + nm);
-      } }
+    modal('Salvar sessão de abas', '<p id="sessWait">Detectando abas abertas&#8230;</p>', [
+      { label: 'Cancelar' }
     ]);
-    on($('sessName'), 'keydown', function (e) { if (e.keyCode === 13) { e.preventDefault(); $('sessSave').click(); } });
+    probeLiveTabs(function (recs) {
+      var li = '', i, body;
+      if ($('modalBack').hidden || !$('sessWait')) { return; }
+      if (!recs.length) { closeModal(); toast('Nenhuma aba com modelo aberto.'); return; }
+      pendingSessRecs = recs;
+      for (i = 0; i < recs.length; i++) {
+        li += '<li><label class="chk"><input type="checkbox" id="sessCb' + i + '" checked> ' + esc(recs[i].name) + '</label></li>';
+      }
+      body = '<label>Nome da sessão<input type="text" id="sessName" autocomplete="off"></label><ol class="sess-ol">' + li + '</ol>';
+      modal('Salvar sessão de abas', body, [
+        { label: 'Cancelar' },
+        { label: 'Salvar', cls: 'btn-primary', id: 'sessSave', click: function () {
+          var nm = trim($('sessName').value); if (!nm) { $('sessName').focus(); return false; }
+          var recs2 = pendingSessRecs || [], names2 = [], ids2 = [], r, cb;
+          for (r = 0; r < recs2.length; r++) {
+            cb = $('sessCb' + r);
+            if (cb && !cb.checked) { continue; }
+            names2.push(recs2[r].name); ids2.push(recs2[r].id);
+          }
+          if (!names2.length) { toast('Marque pelo menos um modelo.'); return false; }
+          var a = sessList().slice(0), j, put = false;
+          for (j = 0; j < a.length; j++) { if (a[j] && a[j].name === nm) { a[j] = { name: nm, models: names2, ids: ids2 }; put = true; } }
+          if (!put) { a.push({ name: nm, models: names2, ids: ids2 }); }
+          UStore.set('tabSessions', a); toast('Sessão salva: ' + nm);
+        } }
+      ]);
+      on($('sessName'), 'keydown', function (e) { if (e.keyCode === 13) { e.preventDefault(); $('sessSave').click(); } });
+    });
   }
   var sessMenu = null;
   function closeSessMenu() { if (sessMenu && sessMenu.parentNode) { sessMenu.parentNode.removeChild(sessMenu); } sessMenu = null; }
@@ -3493,7 +3572,7 @@ var UFMain = function () {
   on(document, 'mousedown', function (e) { if (sessMenu && !closest(e.target, function (n) { return n === sessMenu || n.id === 'btnSess'; })) { closeSessMenu(); } });
   on(document, 'keydown', function (e) { if (sessMenu && e.keyCode === 27) { closeSessMenu(); } });
   setInterval(updTitle, 1000);
-  window.UFSess = { list: sessList, open: openSession, openTabsModels: openTabsModels, openTabsRecords: openTabsRecords, findModelByName: findModelByName, updTitle: updTitle, enqueueSessOpen: enqueueSessOpen, tabUrl: tabUrl };
+  window.UFSess = { list: sessList, open: openSession, openTabsModels: openTabsModels, openTabsRecords: openTabsRecords, probeLiveTabs: probeLiveTabs, findModelByName: findModelByName, updTitle: updTitle, enqueueSessOpen: enqueueSessOpen, tabUrl: tabUrl };
 
   /* ================= start ================= */
   applyTheme(); applyLayout();

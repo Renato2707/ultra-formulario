@@ -11,6 +11,13 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C10b] Salvar sessão: só as abas realmente abertas, sem nomes repetidos — testado só em Chromium automatizado, NÃO testado pelo usuário
+- O diálogo "Salvar sessão de abas" pergunta às abas abertas (via localStorage) e espera a resposta uns 0,65 s. Abas já fechadas, cujos rastros tinham ficado em tabStay, não entram mais na lista. Abas de fundo com o timer atrasado continuam entrando, porque o evento storage chega mesmo nelas.
+- O mesmo nome de modelo aparece uma vez só, na ordem em que as abas foram abertas.
+- Cada item do diálogo tem uma caixa (já marcada). Dá para desmarcar um modelo antes de salvar.
+- Se o evento storage não existir (alguns file://), a lista cai no critério anterior, mas ainda sem nomes repetidos.
+- Testes: `test/c10_test.py`.
+
 ## [etapa-C10] Sessões: cada aba da sessão abre o modelo certo; salvar inclui as abas de fundo — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Abrir uma sessão abre uma aba por modelo salvo, com esse modelo carregado. Se a aba atual já tem texto, nada nela é apagado; se está vazia, ela recebe o primeiro modelo.
 - O endereço da aba nova usa o href inteiro (`#ufopen=` e `#ufmodel=`), não só `location.hash` (em file:// o Edge às vezes deixa o hash vazio). Se o hash se perder no `window.open`, uma fila em localStorage ainda entrega o modelo — a aba nova não vira cópia da aba de onde se clicou (o Chromium/Edge copiam o sessionStorage no `window.open`).

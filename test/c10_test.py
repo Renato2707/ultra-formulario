@@ -1,4 +1,4 @@
-"""C10: sessões de abas — abrir um modelo por aba; salvar inclui abas de fundo.
+"""C10/C10b: sessões de abas — abrir um modelo por aba; salvar só as abas realmente abertas.
 Uso: UF_BANCO=<banco> /workspace/.pwenv/bin/python test/c10_test.py
      (sem UF_BANCO usa /workspace/banco-renato/banco-teste-birads.txt se existir)
 """
@@ -147,9 +147,13 @@ with sync_playwright() as p:
       return UFSess.openTabsModels();
     }""")
     ck('3 depois de 20 s sem heartbeat, as 4 abas ainda entram', aged == NAMES, aged)
-    pg.click('#btnSess'); pg.locator('#sessMenu [data-ssave]').click(); pg.wait_for_timeout(200)
+    pg.click('#btnSess'); pg.locator('#sessMenu [data-ssave]').click()
+    pg.wait_for_selector('.sess-ol', timeout=4000)
     ol = pg.evaluate("document.querySelector('.sess-ol') && document.querySelector('.sess-ol').innerText")
-    ck('3 diálogo lista os 4 modelos', all(n in (ol or '') for n in NAMES), ol)
+    nchk = pg.evaluate("document.querySelectorAll('.sess-ol input[type=checkbox]').length")
+    allck = pg.evaluate("Array.prototype.every.call(document.querySelectorAll('.sess-ol input[type=checkbox]'), function (c) { return c.checked; })")
+    ck('3 diálogo lista os 4 modelos', all(n in (ol or '') for n in NAMES) and (ol or '').count('\n') <= 4, ol)
+    ck('3 diálogo tem 4 caixas marcadas', nchk == 4 and allck, (nchk, allck))
     pg.fill('#sessName', 'Plantão maternidade')
     pg.click('#sessSave'); pg.wait_for_timeout(200)
     ss = pg.evaluate("UStore.get('tabSessions')")
@@ -179,6 +183,109 @@ with sync_playwright() as p:
            title_of(pages[0]) == NAMES[1] and 'TRANSVAGINAL' in text_of(pages[0]).upper() and text_of(pages[0])[:40] != parent_txt[:40],
            {'title': title_of(pages[0]), 'text': text_of(pages[0])[:80]})
         ck('4 a aba atual continua Abdome Total', pg.title() == NAMES[0])
+    ctx.close()
+
+    # ---------- 5+6) entradas velhas e nomes repetidos não entram ----------
+    ctx = b.new_context(viewport={'width': 1200, 'height': 800})
+    pg = ctx.new_page()
+    pg.on('pageerror', lambda e: ERR.append('p5:' + str(e)))
+    load(pg)
+    use(pg, NAMES[0])
+    pages = []
+    ctx.on('page', lambda np: pages.append(np))
+    mid_tv = pg.evaluate("(nm) => UFSess.findModelByName(nm).id", NAMES[1])
+    pg.evaluate("(id) => window.open(location.href.replace(/#.*$/,'') + '#ufmodel=' + encodeURIComponent(id), '_blank')", mid_tv)
+    pg.wait_for_timeout(1200)
+    for np in pages:
+        np.wait_for_load_state(); np.wait_for_timeout(150)
+    stale_ids = [pg.evaluate("(nm) => UFSess.findModelByName(nm).id", n) for n in NAMES]
+    # imita o que o Renato viu: tabStay/drafts de abas já fechadas, com nomes repetidos
+    before = pg.evaluate("""(items) => {
+      var stay = UStore.get('tabStay', {}) || {};
+      var tabs = UStore.get('tabs', {}) || {};
+      var t = Date.now(), i, id;
+      for (i = 0; i < items.length; i++) {
+        id = 'stale-' + i;
+        stay[id] = t - 60000;
+        tabs[id] = t - 20000;
+        UStore.set('draft.' + id, { model: items[i % items.length], text: 'stale', ord: t + i, saved: t });
+      }
+      UStore.set('tabStay', stay);
+      UStore.set('tabs', tabs);
+      return UFSess.openTabsModels();
+    }""", stale_ids + stale_ids)
+    ck('5 o mapa velho teria a mais (antes do ping)', 'Obstétrica de 1º Trimestre (padrão)' in (before or []) or len(before or []) > 2, before)
+    live = pg.evaluate("""() => new Promise(function (resolve) {
+      UFSess.probeLiveTabs(function (recs) { resolve(recs); });
+    })""")
+    live_names = [r['name'] for r in (live or [])]
+    ck('5 o ping só conta as 2 abas realmente abertas', live_names == [NAMES[0], NAMES[1]], live_names)
+    stay_after = pg.evaluate("""() => {
+      var s = UStore.get('tabStay', {}) || {}, k, n = 0;
+      for (k in s) { if (s.hasOwnProperty(k) && String(k).indexOf('stale-') === 0) { n++; } }
+      return n;
+    }""")
+    ck('5 entradas velhas saem do tabStay depois do ping', stay_after == 0, stay_after)
+    sync_after = pg.evaluate('UFSess.openTabsModels()')
+    ck('5 depois do ping, a lista síncrona também fica só com as 2', sync_after == [NAMES[0], NAMES[1]], sync_after)
+    pg.click('#btnSess'); pg.locator('#sessMenu [data-ssave]').click()
+    pg.wait_for_selector('.sess-ol', timeout=4000)
+    ol = pg.evaluate("document.querySelector('.sess-ol') && document.querySelector('.sess-ol').innerText")
+    nchk = pg.evaluate("document.querySelectorAll('.sess-ol input[type=checkbox]').length")
+    ck('5 diálogo lista 2 modelos, sem repetir e sem as fechadas', nchk == 2 and NAMES[0] in (ol or '') and NAMES[1] in (ol or '') and 'Obstétrica' not in (ol or ''), (nchk, ol))
+    pg.click('text=Cancelar')
+    ctx.close()
+
+    # ---------- 7) aba de fundo com timer atrasado ainda responde ao ping ----------
+    ctx = b.new_context(viewport={'width': 1200, 'height': 800})
+    pg = ctx.new_page()
+    pg.on('pageerror', lambda e: ERR.append('p7:' + str(e)))
+    load(pg)
+    use(pg, NAMES[0])
+    pages = []
+    ctx.on('page', lambda np: pages.append(np))
+    ids = [pg.evaluate("(nm) => { var m=UFSess.findModelByName(nm); return m && m.id; }", n) for n in NAMES]
+    for mid in ids[1:]:
+        pg.evaluate("(id) => window.open(location.href.replace(/#.*$/,'') + '#ufmodel=' + encodeURIComponent(id), '_blank')", mid)
+        pg.wait_for_timeout(700)
+    pg.wait_for_timeout(800)
+    for np in pages:
+        np.wait_for_load_state(); np.wait_for_timeout(150)
+    pg.evaluate("""() => {
+      var m = UStore.get('tabs', {}), k, t = Date.now();
+      for (k in m) { if (m.hasOwnProperty(k)) { m[k] = t - 20000; } }
+      UStore.set('tabs', m);
+      UStore.set('tabStay', {});
+    }""")
+    live7 = pg.evaluate("""() => new Promise(function (resolve) {
+      UFSess.probeLiveTabs(function (recs) { resolve(recs.map(function (r) { return r.name; })); });
+    })""")
+    ck('7 ping encontra as 4 abas mesmo sem tabStay e com heartbeat vencido', live7 == NAMES, live7)
+    ctx.close()
+
+    # ---------- 8) desmarcar um modelo no diálogo não o salva ----------
+    ctx = b.new_context(viewport={'width': 1200, 'height': 800})
+    pg = ctx.new_page()
+    pg.on('pageerror', lambda e: ERR.append('p8:' + str(e)))
+    load(pg)
+    use(pg, NAMES[0])
+    pages = []
+    ctx.on('page', lambda np: pages.append(np))
+    ids = [pg.evaluate("(nm) => { var m=UFSess.findModelByName(nm); return m && m.id; }", n) for n in NAMES[:3]]
+    for mid in ids[1:]:
+        pg.evaluate("(id) => window.open(location.href.replace(/#.*$/,'') + '#ufmodel=' + encodeURIComponent(id), '_blank')", mid)
+        pg.wait_for_timeout(700)
+    pg.wait_for_timeout(800)
+    for np in pages:
+        np.wait_for_load_state(); np.wait_for_timeout(150)
+    pg.click('#btnSess'); pg.locator('#sessMenu [data-ssave]').click()
+    pg.wait_for_selector('.sess-ol', timeout=4000)
+    pg.evaluate("document.getElementById('sessCb1').checked = false")
+    pg.fill('#sessName', 'sem o do meio')
+    pg.click('#sessSave'); pg.wait_for_timeout(200)
+    ss = pg.evaluate("UStore.get('tabSessions')")
+    want = [NAMES[0], NAMES[2]]
+    ck('8 sessão salva sem o modelo desmarcado', ss and ss[0]['name'] == 'sem o do meio' and ss[0]['models'] == want and len(ss[0].get('ids') or []) == 2, ss)
     ctx.close()
 
     ck('sem erros de página', not ERR, ERR)
