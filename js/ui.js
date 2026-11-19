@@ -619,6 +619,7 @@ var UFMain = function () {
     }
   }
   function afterChange(fast) {
+    selTidy();
     updTitle();
     syncHypotheses();
     markHypUnderline();
@@ -814,6 +815,30 @@ var UFMain = function () {
     else { r.selectNodeContents(f); setRange(r); saveRange(); }
   }
 
+  /* C11: a CHOSEN choice is plain editable text (never an atomic contenteditable=false block: Backspace at its end
+     used to erase the whole phrase). Its text as chosen is kept in an expando (_ufx); once the text is edited by
+     hand it stops being a choice (a bare <span>, same nodes, so caret and native undo stay). The blank "escolher"
+     chip stays atomic. */
+  function filledSel(n) { return n && n.nodeType === 1 && hasCls(n, 'fld') && hasCls(n, 'f-ok') && n.getAttribute('data-t') === 's' && editor.contains(n); }
+  function selMark() {
+    var l = qsa(editor, '.fld.f-sel.f-ok'), i;
+    for (i = 0; i < l.length; i++) {
+      if (l[i].getAttribute('contenteditable') !== null) { l[i].removeAttribute('contenteditable'); }
+      if (l[i]._ufx === undefined) { l[i]._ufx = l[i].textContent; }
+    }
+  }
+  function selPlain(c) {
+    var a = ['contenteditable', 'data-t', 'data-m', 'data-v', 'data-o', 'title'], i;
+    if (popupFor === c) { closePopup(); }
+    c.className = ''; c.removeAttribute('class');
+    for (i = 0; i < a.length; i++) { c.removeAttribute(a[i]); }
+    c._ufx = undefined;
+  }
+  function selTidy() {
+    var l = qsa(editor, '.fld.f-sel.f-ok'), i;
+    for (i = 0; i < l.length; i++) { if (l[i]._ufx !== undefined && l[i].textContent !== l[i]._ufx) { selPlain(l[i]); } }
+    selMark();
+  }
   /* dropdown popup for ?[a|b] */
   var popupFor = null, popupIdx = 0;
   /* ---- C6h: multiple choice ?+[a|b|c]: ticks in the list, result "a, b e c" ---- */
@@ -824,7 +849,7 @@ var UFMain = function () {
   function multiChipHtml(oj, sel, opts, keep) {   /* keep: the pasted order (otherwise the bank order) */
     var t = [], i; sel = keep ? sel.slice(0) : sel.slice(0).sort(function (a, b) { return a - b; }); for (i = 0; i < sel.length; i++) { t.push(opts[sel[i]]); }
     if (!sel.length) { return '<span class="fld f-sel f-multi" contenteditable="false" data-t="s" data-m="1" data-o="' + esc(oj) + '">' + PH.s + '</span>'; }
-    return '<span class="fld f-sel f-multi f-ok" contenteditable="false" data-t="s" data-m="1" data-v="' + sel.join(',') + '" data-o="' + esc(oj) + '" title="Clique para trocar (várias opções)">' + esc(UltraParser.joinMulti(t)) + '</span>';   /* C6i: common beginning written once */
+    return '<span class="fld f-sel f-multi f-ok" data-t="s" data-m="1" data-v="' + sel.join(',') + '" data-o="' + esc(oj) + '" title="Clique para trocar (várias opções)">' + esc(UltraParser.joinMulti(t)) + '</span>';   /* C6i: common beginning written once */
   }
   function multiPaint() {
     var l = qsa($('popup'), '.opt[data-i]'), i, k;
@@ -896,7 +921,7 @@ var UFMain = function () {
     }
     else {
       var oldHtml = chip.outerHTML, prevSib = chip.previousSibling, par = chip.parentNode;
-      replaceNodeWithHtml(chip, '<span class="fld f-sel f-ok" contenteditable="false" data-t="s" data-v="' + i + '" data-o="' +
+      replaceNodeWithHtml(chip, '<span class="fld f-sel f-ok" data-t="s" data-v="' + i + '" data-o="' +
         esc(chip.getAttribute('data-o')) + '" title="Clique para trocar">' + esc(opt) + '</span>');
       /* own one-step undo for the choice (the DOM replace is not in the browser's undo stack) */
       var ne = null, cs = par.childNodes, q;
@@ -2719,10 +2744,16 @@ var UFMain = function () {
     var r = document.createRange(); r.selectNodeContents(f); setRange(r); saveRange();
   });
   on(editor, 'input', function () { afterChange(false); });
+  (function () { var ev = ['keydown', 'mousedown', 'paste', 'cut', 'dragstart', 'drop'], i; for (i = 0; i < ev.length; i++) { if (editor.addEventListener) { editor.addEventListener(ev[i], selMark, true); } } })();   /* C11 */
   on(editor, 'blur', saveRange);
   on(document, 'selectionchange', function () { if (document.activeElement === editor) { saveRange(); } });
   on(editor, 'click', function (e) {
     var chip = closest(e.target, function (n) { return hasCls(n, 'fld') && n.getAttribute('data-t') === 's'; }, editor);
+    if (chip && filledSel(chip)) {   /* C11: chosen text is editable: keep the caret where clicked */
+      var cs = window.getSelection();
+      if (cs && cs.rangeCount && cs.isCollapsed) { saveRange(); openSelect(chip); }
+      return;
+    }
     if (chip) { var r = document.createRange(); r.selectNode(chip); setRange(r); saveRange(); openSelect(chip); }
   });
   on(editor, 'input', function () { S.lastChoice = null; S.lastRemoval = null; S.noDraft = false; });
@@ -2739,7 +2770,7 @@ var UFMain = function () {
     if (e.keyCode === 13) {
       /* Enter on an empty field just moves on (never replaces the field with a line break) */
       var sel = window.getSelection(), r = sel.rangeCount ? sel.getRangeAt(0) : null;
-      var chip = r ? closest(r.startContainer, function (n) { return hasCls(n, 'fld'); }, editor) : null;
+      var chip = r ? closest(r.startContainer, function (n) { return hasCls(n, 'fld') && n.getAttribute('data-t') !== 's'; }, editor) : null;
       if (chip) {   /* Enter confirms the field and jumps to the next unfilled one */
         e.preventDefault();
         if (!nextField(false, true)) { caretAfterChip(chip); }
@@ -2995,7 +3026,7 @@ var UFMain = function () {
           c = rgCompile(f.options[k], true, 1); m = new RegExp('^' + c.src + '$', 'i').exec(v);
           if (m) { return rgHtml(c, m); }
         } else if (new RegExp('^' + rgLit(f.options[k]) + '$', 'i').test(v)) {
-          return '<span class="fld f-sel f-ok" contenteditable="false" data-t="s" data-v="' + k + '" data-o="' + esc(JSON.stringify(f.options)) + '" title="Clique para trocar">' + esc(f.options[k]) + '</span>';
+          return '<span class="fld f-sel f-ok" data-t="s" data-v="' + k + '" data-o="' + esc(JSON.stringify(f.options)) + '" title="Clique para trocar">' + esc(f.options[k]) + '</span>';
         }
       }
       return esc(v);
@@ -3311,7 +3342,9 @@ var UFMain = function () {
       return;
     }
     if (!$('popup').hidden) {
-      var n = qsa($('popup'), '.opt[data-i]').length;
+      var n = qsa($('popup'), '.opt[data-i]').length, pk = e.keyCode;
+      /* C11: list opened on a CHOSEN choice: Backspace, Delete, Space and letters edit its text (the list closes) */
+      if (popupFor && filledSel(popupFor) && !e.ctrlKey && !e.metaKey && !e.altKey && (pk === 8 || pk === 46 || pk === 32 || (pk >= 65 && pk <= 90) || (pk >= 96 && pk <= 111) || pk >= 186)) { closePopup(); return; }
       if (popupSel) {   /* multi list: Space / number ticks, Enter = done (next field), Tab = done + move, Esc = keep as it was */
         if (e.keyCode === 32 || (e.keyCode >= 49 && e.keyCode <= 57 && e.keyCode - 49 < n)) { e.preventDefault(); e.stopPropagation(); if (e.keyCode !== 32) { popupIdx = e.keyCode - 49; popupKbd(); } multiToggle(popupIdx); return; }
         /* C6j: Enter marks/unmarks the focused option (list stays open); Enter on "Pronto" confirms */
