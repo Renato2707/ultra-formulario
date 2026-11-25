@@ -16,7 +16,7 @@
 | C6o | Templates intermediários (texto puro "___" e "a / b / c") reconhecidos ao colar; cartões "(padrão)" destacados; Tab/Enter na revisão vai a campos preenchidos; Editar banco gravado na pasta mesmo se ela estava desconectada | Entregue; em uso diário pelo usuário |
 | C7 | BI-RADS de US de mama (v2025): cartão por achado, sugestão só com regra escrita do manual (senão "requer julgamento"), 4A/4B/4C obrigatório, categoria na frase, categoria final pela hierarquia 5>4>0>6>3>2>1 e legenda reduzida à linha da final; proposta de texto do banco (seção MAMAS) aguardando aprovação | Entregue; em uso diário pelo usuário |
 | C7b | BI-RADS: descritores e bloco "mais" antes de localização/medidas, na ordem da frase; Enter acompanha o DOM | Entregue; em uso diário pelo usuário |
-| C7a | BI-RADS: nódulo adicionado pela calculadora em parágrafo próprio, com a linha em branco do laudo (só se o laudo separa parágrafos assim); a linha some se o nódulo for apagado | Entregue; em uso pelo usuário. O teste automático `c7a_test.py` falha 11/17 (linha em branco / parágrafo próprio do nódulo): defeito conhecido do app, ainda não corrigido |
+| C7a | BI-RADS: nódulo adicionado pela calculadora em parágrafo próprio, com a linha em branco do laudo (só se o laudo separa parágrafos assim); a linha some se o nódulo for apagado | Corrigido; `c7a_test.py` 17/17. Testado só em Chromium automatizado |
 | C8 | Modelo em nova guia (`#ufmodel=<id>`, link nativo: botão direito / Ctrl+clique / clique do meio; clique esquerdo fica nesta guia). O cartão do exame abre o modelo padrão desse exame (o mesmo do duplo clique) noutra guia; o clique esquerdo só entra no exame. Seções sem frase ocultas no painel (vazias no banco ou zeradas pela pesquisa; recolhida com frases continua) | Entregue; em uso diário pelo usuário |
 | C9 | Layout Opção B: sem a barra de cima; cada painel com o seu cabeçalho (mesmo cinza) e divisória de 8 px; abas Modelos e Frases; "trocar" volta aos exames; nomes de seção em frase (parênteses como no banco); botões no rodapé de cada painel | Entregue; em uso diário pelo usuário |
 | C9b | Caixa do exame mostra o modelo carregado em até 2 linhas; clique nela recarrega o modelo do zero (link para nova guia); "trocar" fica separado; Limpar do laudo volta ao modelo em vez de deixar a página em branco | Entregue; em uso diário pelo usuário |
@@ -49,7 +49,6 @@
 
 ## Próximos passos
 - Testar no Edge as sessões de abas (C6n, C10, C10b, C10c) e a C11/C11b: até agora só testes automáticos em Chromium. O resto do app está em uso diário pelo Renato.
-- Corrigir a C7a: o teste `c7a_test.py` falha 11/17 (o nódulo inserido não fica em parágrafo próprio com a linha em branco).
 - BI-RADS (C7): o Renato aprovar o texto proposto da seção MAMAS antes de ir ao banco (frase de nódulo com "BI-RADS-US *", legenda v2025, papila, LxAPxT).
 - Reconhecimento de laudo colado: só linhas iguais às do banco (com valores no lugar dos campos) viram campos; não há importação de arquivo (.doc/.pdf).
 - RCP: o banco não tem linha; texto sugerido "- Relação cerebroplacentária (RCP): IP cerebral média / IP umbilical = *,* (p5 para * semanas: *,*)." (o médico decide se acrescenta).

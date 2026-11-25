@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-C7a-fix] Nódulo BI-RADS ganha a linha em branco entre parágrafos quando o laudo usa essa convenção — testado só em Chromium automatizado
+- Causa: na inserção de um achado "depois do último", a linha em branco só era criada se o nódulo anterior já tivesse uma linha vazia imediatamente ao lado. No modelo típico o nódulo fica entre duas frases (parênquima e hipótese), e as linhas em branco do laudo estão em outro lugar (p.ex. em volta da legenda), então o nódulo seguinte entrava colado no anterior.
+- Agora o app detecta se o laudo (ou o modelo carregado) separa parágrafos com linha em branco. O achado novo recebe uma linha vazia antes e, se precisar, depois; as duas são marcadas e saem com o achado se ele for apagado, sem deixar linha em branco sobrando. Laudo vazio ou modelo de uma linha por frase continua sem linha em branco.
+- A correção é só de formatação (separação de parágrafos) em `js/ui-layout.js` e `js/ui-fields.js`. Em `js/calc-birads.js` mudou apenas a limpeza dessas linhas marcadas (`tidySep`); nenhuma fórmula, texto clínico ou valor de referência foi alterado.
+- `test/c7a_test.py` passa 17/17. O caso "uma linha por frase" usa uma cópia densa do banco de exemplo (sem linhas em branco), como o próprio teste já descrevia. Suíte completa: 31/31 arquivos.
+
 ## [etapa-R1] `js/ui.js` dividido em arquivos menores por função — refatoração pura, sem mudança de comportamento nem de tela; testado só em Chromium automatizado
 - O antigo `js/ui.js` (~232 KB, 3.783 linhas) virou 14 arquivos, na mesma ordem do código original:
   `ui.js` (início e a "costura" das partes), `ui-base.js` (utilitários, estado, configurações, modal, banco/modelos, frases),
