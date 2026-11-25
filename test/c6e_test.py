@@ -92,7 +92,11 @@ with sync_playwright() as p:
     ck('1 barra do laudo sem botões de formatação', ev(pg, "document.querySelectorAll('#editorToolbar .tb[data-cmd]').length") == 0)
     ck('1 botões das frases no rodapé do painel, sem Inserir', ev(pg, "(function(){var t=document.getElementById('navTools'), s=document.getElementById('navSearch'); return !!t && t.parentNode.id==='navFoot' && !document.getElementById('tPIns') && !!document.getElementById('tPAdd') && !!document.getElementById('tPImp') && !!document.getElementById('tPEdit') && t.getBoundingClientRect().top+1>=s.getBoundingClientRect().bottom})()"))
     ck('1 pesquisa de frases ocupa a largura do painel', ev(pg, "document.getElementById('navSearch').offsetWidth / document.getElementById('left').offsetWidth", 0) > 0.85, ev(pg, "document.getElementById('navSearch').offsetWidth"))
-    ck('1 pesquisa no laudo mais larga (≥ 200 px)', ev(pg, "document.getElementById('repSearch').offsetWidth", 0) >= 200)
+    rw = ev(pg, "document.getElementById('repSearch').offsetWidth", 0) or 0
+    iw = ev(pg, "window.innerWidth", 1400) or 1400
+    # Em 1024 px a busca pode encolher (C9c); ainda precisa aparecer e ser usável.
+    min_w = 200 if iw >= 1300 else 80
+    ck('1 pesquisa no laudo visível e usável (≥ %d px em %d)' % (min_w, iw), rw >= min_w, rw)
     pg.evaluate("(function(){var d=document.querySelector('#editor div'); var r=document.createRange(); r.selectNodeContents(d); var s=getSelection(); s.removeAllRanges(); s.addRange(r);})()")
     T(lambda: pg.click('#fmtBar .tb[data-cmd=bold]', timeout=800)); pg.wait_for_timeout(100)
     ck('1 negrito funciona pela nova barra', ev(pg, "!!document.querySelector('#editor b, #editor strong')"))
