@@ -5,7 +5,10 @@ Usage: python placement_test.py /path/to/bank.txt   (needs playwright + chrome)
 import sys, csv, os, collections
 from playwright.sync_api import sync_playwright
 HERE = os.path.dirname(os.path.abspath(__file__))
-BANK = sys.argv[1] if len(sys.argv) > 1 else '/workspace/bank.txt'
+sys.path.insert(0, HERE)
+import uf_testutil
+uf_testutil.install()
+BANK = sys.argv[1] if len(sys.argv) > 1 else '--diretivas'
 DIR_BANK = '''@@EXAME Exame Teste
 @@TEMPLATE Com alvo
 EXAME TESTE COM ALVO
@@ -102,9 +105,9 @@ def diretivas():
       return { k: k, above: above, all: t, replaced: t.join('\n').indexOf('Linha alvo do modelo') < 0 }; }'''
     ok = 0
     with sync_playwright() as p:
-        b = p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--no-sandbox'])
+        b = uf_testutil.launch_chromium(p)
         pg = b.new_page(viewport={'width': 1400, 'height': 900})
-        pg.goto('file://' + os.path.join(os.path.dirname(HERE), 'index.html')); pg.evaluate("localStorage.clear()"); pg.reload()
+        pg.goto(uf_testutil.index_url()); pg.evaluate("localStorage.clear()"); pg.reload()
         pg.set_input_files('#bankFile0', tf.name); pg.wait_for_timeout(500)
         for tpl, ph, exp in cases:
             r = pg.evaluate(js, [tpl, ph])
@@ -113,13 +116,18 @@ def diretivas():
         b.close()
     os.unlink(tf.name)
     print('TOTAL', ok, '/', len(cases))
-if BANK == '--diretivas':
+if BANK in ('--diretivas', '-d', '--directives'):
     diretivas(); sys.exit(0)
+if not os.path.isfile(BANK):
+    sys.stderr.write('Uso: python test/placement_test.py --diretivas\n')
+    sys.stderr.write('     python test/placement_test.py CAMINHO/banco.txt\n')
+    sys.stderr.write('O banco clínico não está no repositório. Sem caminho, roda só --diretivas.\n')
+    sys.exit(2)
 with sync_playwright() as p:
-    b = p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--no-sandbox'])
+    b = uf_testutil.launch_chromium(p)
     pg = b.new_page(viewport={'width': 1400, 'height': 900})
     errs = []; pg.on('pageerror', lambda e: errs.append(str(e)))
-    pg.goto('file://' + os.path.join(os.path.dirname(HERE), 'index.html'))
+    pg.goto(uf_testutil.index_url())
     pg.evaluate("localStorage.clear()"); pg.reload()
     pg.set_input_files('#bankFile0', BANK); pg.wait_for_timeout(500)
     rows = pg.evaluate(JS)
