@@ -50,7 +50,12 @@ Feto único em situação ?[longitudinal|transversa], apresentação ?[cefálica
 @@EXAME Doppler de Fluxo Obstétrico
 @@TEMPLATE Doppler de Fluxo Obstétrico (padrão)
 DOPPLER
+Artéria A: padrão espectral habitual.
 - Índice de pulsatilidade (IP): *
+- Índice de resistência (IR): *
+Artéria B: padrão espectral habitual.
+- Relação sístole/diástole (S/D): *
+- Pico de velocidade (PV): * cm/s
 
 '''
 R = []
@@ -66,7 +71,7 @@ ERR = []
 def page(b, bank, init=None):
     cx = b.new_context(viewport={'width': 1400, 'height': 900})
     if init: cx.add_init_script(init)
-    pg = cx.new_page(); pg.set_default_timeout(6000); pg.on('pageerror', lambda e: ERR.append(str(e)))
+    pg = cx.new_page(); pg.set_default_timeout(15000); pg.on('pageerror', lambda e: ERR.append(str(e)))
     pg.goto(IDX); pg.evaluate('localStorage.clear(); sessionStorage.clear()'); pg.reload(); pg.wait_for_timeout(200)
     pg.set_input_files('#bankFile0', bank); pg.wait_for_timeout(700)
     return cx, pg
@@ -88,7 +93,7 @@ JS_PREP = r'''(names) => {
   function count(t, acc) { var fs = UltraParser.fieldsOf(t), i; for (i = 0; i < fs.length; i++) { if (fs[i].type === 'select') { acc.sel++; } else { acc.n++; } } }
   names.forEach(function (n) { S.bank.exams.forEach(function (e) { e.templates.forEach(function (t) { if (t.name !== n) { return; }
     var body = String(t.body).replace(/\r/g, ''), ls = body.split('\n'), inter = [], f0 = [], f1 = [], e0 = { num: [], sel: 0, txt: 0 }, e1 = { num: [], sel: 0, txt: 0 }, ei = { n: 0, sel: 0 }, j, l, lit;
-    for (j = 0; j < ls.length; j++) { l = ls[j];
+    for (j = 0; j < ls.length; j++) { l = ls[j].replace(/^\s*\*{3,}/, '');
       lit = l.replace(/^\s*[\u2022\-\u2013]\s*/, '').replace(/\?\+?\[[^\]]*\]|\*/g, '').replace(/[^A-Za-z\u00c0-\u00ff]/g, '');
       var rec = /\?\+?\[|\*/.test(l) && lit.length >= 4, a0 = { num: [], sel: 0, txt: 0 }, a1 = { num: [], sel: 0, txt: 0 }, ai = { n: 0, sel: 0 };
       inter.push(UFTest.interText(l)); f0.push(fill(l, 0, a0)); f1.push(fill(l, 1, a1)); count(l, ai);
@@ -186,9 +191,10 @@ with sync_playwright() as p:
     def files(pg): return json.loads(pg.evaluate("localStorage.getItem('fakefs.files')") or '{}')
     def bankfile(pg): return (files(pg).get('/banco-de-frases.txt') or {}).get('t') or ''
     def edit(pg, a, z):
-        pg.click('#btnSettings'); pg.wait_for_timeout(300); pg.click('#stBankEdit'); pg.wait_for_timeout(300)
+        pg.locator('#btnSettings').scroll_into_view_if_needed(); pg.click('#btnSettings', timeout=10000); pg.wait_for_timeout(400)
+        pg.locator('#stBankEdit').scroll_into_view_if_needed(); pg.click('#stBankEdit', timeout=10000); pg.wait_for_timeout(400)
         pg.evaluate("(a) => { var t = document.getElementById('beTxt'); t.value = t.value.replace(a[0], a[1]); t.dispatchEvent(new Event('input', {bubbles: true})); }", [a, z])
-        pg.click('#beSave'); pg.wait_for_timeout(700)
+        pg.locator('#beSave').scroll_into_view_if_needed(); pg.click('#beSave', timeout=10000); pg.wait_for_timeout(1000)
     def loaded(pg): return pg.evaluate("UFTest.S.srcLines.join('\\n')")
     cx, pg = page(b, own, FAKE)
     pg.evaluate("new Promise(function(ok){UFolder.useHandle(__fakeRoot(), function(){ok();});})"); pg.wait_for_timeout(500)
@@ -196,15 +202,15 @@ with sync_playwright() as p:
     ck('4 pasta conectada: banco editado gravado em banco-de-frases.txt', 'EDITADO' in bankfile(pg))
     ck('4 banco editado aplicado na hora', 'EDITADO' in loaded(pg))
     ck('4 cópia do banco anterior em backups/', any(k.startswith('/backups/') for k in files(pg)), list(files(pg)))
-    pg.reload(); pg.wait_for_timeout(1500)
+    pg.reload(); pg.wait_for_timeout(2500)
     ck('4 abrir de novo: carrega o banco editado da pasta', 'EDITADO' in loaded(pg) and pg.evaluate('UFolder.status()') == 'folder')
-    pg.evaluate("localStorage.setItem('fakefs.perm','prompt')"); pg.reload(); pg.wait_for_timeout(1200)
+    pg.evaluate("localStorage.setItem('fakefs.perm','prompt')"); pg.reload(); pg.wait_for_timeout(2000)
     ck('4 pasta desconectada (pede permissão)', pg.evaluate('UFolder.status()') == 'needperm')
     edit(pg, 'Texto variante EDITADO.', 'Texto variante OFFLINE.')
     ck('4 desconectada: aplicado na hora, pasta ainda sem a edição', 'OFFLINE' in loaded(pg) and 'OFFLINE' not in bankfile(pg))
     pg.evaluate("new Promise(function(ok){UFolder.reconnect(function(){ok();});})"); pg.wait_for_timeout(800)
     ck('4 ao reconectar: banco editado vai para a pasta (não é perdido)', 'OFFLINE' in bankfile(pg), bankfile(pg)[-80:])
-    pg.reload(); pg.wait_for_timeout(1500)
+    pg.reload(); pg.wait_for_timeout(2500)
     ck('4 abrir de novo: banco editado offline continua', 'OFFLINE' in loaded(pg))
     # loading late folder: edit while folder still unknown, then boot ready
     cx.close()

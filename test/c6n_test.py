@@ -12,22 +12,22 @@ Ovários normais.
 '''
 BANK = '''@@EXAME Transvaginal
 @@EXAME_FULL ULTRASSONOGRAFIA TRANSVAGINAL
-@@TEMPLATE Transvaginal padrão
+@@TEMPLATE Transvaginal (padrão)
 ULTRASSONOGRAFIA TRANSVAGINAL
 ''' + TV + '''
-@@TEMPLATE Transvaginal Obstétrica padrão
+@@TEMPLATE Transvaginal Obstétrica (padrão)
 TRANSVAGINAL OBSTETRICA
 Saco gestacional tópico.
 
-@@TEMPLATE Obstétrica de 1º Trimestre padrão
+@@TEMPLATE Obstétrica de 1º Trimestre (padrão)
 OBSTETRICA 1 TRI
 Feto único.
 
-@@TEMPLATE Obstétrica de 2º ou 3º Trimestre padrão
+@@TEMPLATE Obstétrica de 2º ou 3º Trimestre (padrão)
 OBSTETRICA 2 3 TRI
 Feto único, cefálico.
 
-@@TEMPLATE Doppler de Fluxo Obstétrico padrão
+@@TEMPLATE Doppler de Fluxo Obstétrico (padrão)
 DOPPLER OBSTETRICO
 Artéria umbilical normal.
 
@@ -123,8 +123,8 @@ with sync_playwright() as p:
     c.close()
     # ---------- 4) título e sessões ----------
     c, pg = fresh(b, 0)
-    ck('4 título da aba = modelo', pg.title() == 'Transvaginal padrão', pg.title())
-    names = ['Transvaginal padrão', 'Transvaginal Obstétrica padrão', 'Obstétrica de 1º Trimestre padrão', 'Obstétrica de 2º ou 3º Trimestre padrão', 'Doppler de Fluxo Obstétrico padrão']
+    ck('4 título da aba = modelo', pg.title() == 'Transvaginal (padrão)', pg.title())
+    names = ['Transvaginal (padrão)', 'Transvaginal Obstétrica (padrão)', 'Obstétrica de 1º Trimestre (padrão)', 'Obstétrica de 2º ou 3º Trimestre (padrão)', 'Doppler de Fluxo Obstétrico (padrão)']
     pg.evaluate("UStore.set('tabSessions', [{name:'maternidade', models:%s}])" % __import__('json').dumps(names + ['Modelo que não existe']))
     # sessão aberta com conteúdo na aba atual: tudo em abas novas
     pages = []
@@ -138,7 +138,7 @@ with sync_playwright() as p:
     tit = [np.title() for np in pages]
     ck('4 abas na ordem com o modelo carregado', tit == names[1:], tit)
     ck('4 aba nova tem o texto do modelo', 'DOPPLER OBSTETRICO' in pages[3].evaluate('UFTest.reportText()'))
-    ck('4 aba atual não foi apagada', pg.title() == 'Transvaginal padrão' and 'ULTRASSONOGRAFIA TRANSVAGINAL' in pg.evaluate('UFTest.reportText()'))
+    ck('4 aba atual não foi apagada', pg.title() == 'Transvaginal (padrão)' and 'ULTRASSONOGRAFIA TRANSVAGINAL' in pg.evaluate('UFTest.reportText()'))
     ck('4 endereço limpo (sem #ufopen)', '#ufopen' not in pages[0].url, pages[0].url)
     # salvar as abas abertas (atual + 5, mas o 1º modelo está duas vezes: entra uma só, C10b)
     pg.wait_for_timeout(5600)   # batida de 5 s das abas

@@ -11,6 +11,13 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [testes] Um comando roda todos os testes — testado só em Chromium automatizado, NÃO testado pelo usuário
+- `python test/run_all.py` (ou `python run_tests.py`, ou `run_tests.bat` no Windows) roda todos os `test/*_test.py` em sequência e imprime um resumo: passou/falhou por arquivo, totais e tempo. `test/parser-test.html` continua manual.
+- Sem caminhos fixos de máquina (`/usr/bin/google-chrome`, `/workspace/...`): o navegador é o Chromium do Playwright, ou Chrome/Chromium/Edge achado no sistema, ou `--browser` / `UF_BROWSER`. A raiz do repositório é relativa ao script.
+- Viewport opcional: `--viewport 1024x600` ou `UF_VP`. Sem isso, cada teste mantém o tamanho que já usava. Em viewport estreito, os cliques rolam o campo para a área visível; a busca no laudo (C6e) deixa de exigir 200 px; `c6h_test.py` fecha o popup antes do Ctrl+Z e clica fora com coordenada relativa à janela; `d3c_test.py` não clica a 1 px da borda do campo.
+- Testes que dependem de nome de modelo usam o formato atual `X (padrão)`, com banco de exemplo embutido. O banco clínico do usuário só entra se `UF_BANCO` apontar para um arquivo fora do repositório (nada do conteúdo é publicado).
+- Ajustes só nos testes: `placement_test.py` (navegador e `--diretivas` por padrão no runner); `c10_test.py` (banco de exemplo no lugar de um caminho /workspace); `c6n_test.py` (nomes com `(padrão)`); `c6o_test.py` / `c6p_test.py` (Doppler de exemplo com 4 campos; prefixo `***` não conta como campo; item 4 da pasta mais paciente). O app (`js/*.js`) não mudou.
+
 ## [etapa-S1] Sincronização do banco entre pendrive, Google Drive e GitHub privado — testado no PC do Renato (arquivos de teste e uma execução real com o banco); NÃO usado ainda por ele no dia a dia
 - Novos arquivos na pasta do app: `sincronizar-banco.bat`, `sincronizar-banco (so conferir).bat`, `sincronizar-banco.ps1` e `sincronizar-banco-config.ini`. O app (HTML/JS) não mudou.
 - Compara `banco-de-frases.txt` e `templates intermediários.txt` nos 3 lugares por data de modificação e SHA256, copia o mais novo para os outros e confere a cópia. Antes de substituir, backup em `Trampo\Ultra-formulario (backups)\banco\AAAA-MM-DD_HH-MM-SS` (guarda os 20 mais recentes).

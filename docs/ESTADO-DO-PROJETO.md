@@ -33,6 +33,7 @@
 | C6h | Escolha múltipla `?+[ ]` no banco (TI-RADS soma todos os focos) | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6g | TI-RADS: 6 linhas editáveis/apagáveis, sem o veredito de tamanho | Entregue (só Chromium automatizado), **não testada pelo usuário** |
 | C6f | Pasta de dados: repete gravações que falham, religa sozinha, rascunhos a cada 5 s, uma aba grava por vez | Entregue (só Chromium com pasta simulada), **não testada pelo usuário** |
+| Testes | Um comando (`python test/run_all.py` / `run_tests.bat`) roda todos os testes de `test/` e imprime o resumo. Sem caminhos fixos; bancos de exemplo com modelos `X (padrão)` | Entregue (só Chromium automatizado), **não testado pelo usuário** |
 | E, F | — | Não definidas nos registros disponíveis |
 
 ## Regras

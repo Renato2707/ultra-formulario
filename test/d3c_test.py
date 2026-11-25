@@ -35,7 +35,9 @@ def line(pg):
     return ''
 def click(pg, idx, where):
     bb = pg.locator('#editor .fld').nth(idx).bounding_box()
-    x = {'meio': bb['x'] + bb['width'] / 2, 'inicio': bb['x'] + 1, 'fim': bb['x'] + bb['width'] - 1}[where]
+    # Evita 1 px da borda: em viewport estreito o clique caía fora do campo.
+    w = bb['width']
+    x = {'meio': bb['x'] + w / 2, 'inicio': bb['x'] + max(2, min(6, w * 0.2)), 'fim': bb['x'] + w * 0.8}[where]
     pg.mouse.click(x, bb['y'] + bb['height'] / 2); pg.wait_for_timeout(150)
 with sync_playwright() as p:
     b = p.chromium.launch(); c = b
