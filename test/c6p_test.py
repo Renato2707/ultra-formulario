@@ -1,7 +1,7 @@
 """C6p: templates intermediarios com "*" no lugar do campo (antes "___"); colar de volta tolera erros comuns
 das assistentes (espacos, "*" ao lado do valor, unidade repetida/faltando, caixa diferente, duas opcoes deixadas,
 linha apagada) sem perder o resto do laudo. "___" (C6o) continua reconhecido.
-Uso: /workspace/.pwenv/bin/python test/c6p_test.py   (UF_BANCO=<banco fora do repo> faz tambem o banco real; nada e impresso)"""
+Uso: python test/c6p_test.py   (UF_BANCO=<banco fora do repo> faz tambem o banco real; nada e impresso)"""
 import os, sys, re
 sys.argv = sys.argv[:1]
 HERE = os.path.dirname(os.path.abspath(__file__))

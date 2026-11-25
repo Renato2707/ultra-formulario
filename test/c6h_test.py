@@ -57,7 +57,9 @@ with sync_playwright() as p:
     ck('3 opções: "a, b e c" na ordem do banco', L(pg, 'Achados') == 'Achados: alfa, beta e gama.', L(pg, 'Achados'))
     chip(pg, 'Achados').click(); pg.wait_for_timeout(150); opt(pg, 'beta'); ok(pg)
     ck('2 opções: "a e c"', L(pg, 'Achados') == 'Achados: alfa e gama.', L(pg, 'Achados'))
-    pg.click('#editor'); pg.keyboard.press('Control+z'); pg.wait_for_timeout(200)
+    if popup(pg):
+        pg.keyboard.press('Escape'); pg.wait_for_timeout(150)
+    pg.locator('#editor').click(force=True); pg.keyboard.press('Control+z'); pg.wait_for_timeout(200)
     ck('Ctrl+Z desfaz a última mudança', L(pg, 'Achados') == 'Achados: alfa, beta e gama.', L(pg, 'Achados'))
     pg.keyboard.press('Control+y'); pg.wait_for_timeout(200)
     ck('Ctrl+Y refaz', L(pg, 'Achados') == 'Achados: alfa e gama.', L(pg, 'Achados'))
@@ -75,7 +77,10 @@ with sync_playwright() as p:
     pg.keyboard.press('1'); pg.keyboard.press('3'); pg.keyboard.press('Tab'); pg.wait_for_timeout(250)
     ck('Tab confirma e segue; opção com vírgula', L(pg, 'Coloração') == 'Coloração: azul, claro e verde.' and popup(pg), [L(pg, 'Coloração'), popup(pg)])
     pg.keyboard.press('Escape'); pg.wait_for_timeout(100)
-    chip(pg, 'Coloração').click(); pg.wait_for_timeout(150); pg.mouse.click(5, 880); pg.wait_for_timeout(200)
+    chip(pg, 'Coloração').click(); pg.wait_for_timeout(150)
+    # Clique fora do popup. y=880 (página 1400x900) cai fora da janela em 1024x600.
+    box = pg.evaluate("() => { var p=document.getElementById('popup').getBoundingClientRect(); var y = (p.top > 24) ? 8 : Math.min(p.bottom + 16, window.innerHeight - 8); return {x: 8, y: y}; }")
+    pg.mouse.click(box['x'], box['y']); pg.wait_for_timeout(200)
     ck('clicar fora fecha mantendo as marcadas', not popup(pg) and L(pg, 'Coloração') == 'Coloração: azul, claro e verde.', L(pg, 'Coloração'))
     ck('cópia/saída: texto final', 'Achados: alfa e beta.' in pg.evaluate('UFTest.reportText()'))
     pg.click('#repSearch'); pg.keyboard.type('beta'); pg.wait_for_timeout(500)

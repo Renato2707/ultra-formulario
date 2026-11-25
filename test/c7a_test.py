@@ -1,6 +1,7 @@
 """C7a: nódulo adicionado pela calculadora BI-RADS fica em parágrafo próprio, com a mesma separação do laudo
 (linha em branco se o laudo separa parágrafos assim; sem ela se o laudo usa uma linha por frase).
-Uso: UF_BANCO=<banco com o modelo Mamária Bilateral (padrão)> /workspace/.pwenv/bin/python test/c7a_test.py"""
+Uso: python test/c7a_test.py
+UF_BANCO=<banco com o modelo Mamária Bilateral (padrão)> é opcional; sem ele usa o banco mínimo embutido."""
 import os, sys, re
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = open(os.path.join(HERE, 'c7_test.py'), encoding='utf-8').read()

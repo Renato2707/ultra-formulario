@@ -1,14 +1,18 @@
 """C10/C10b/C10c: sessões de abas — abrir com mensagem visível; salvar só as abas realmente abertas.
-Uso: UF_BANCO=<banco> /workspace/.pwenv/bin/python test/c10_test.py
-     (sem UF_BANCO usa /workspace/banco-renato/banco-teste-birads.txt se existir)
+Uso: python test/c10_test.py
+     Sem UF_BANCO, usa um banco de exemplo embutido com modelos "X (padrão)".
+     UF_BANCO=<banco fora do repo> testa também com o banco do usuário (nada do conteúdo é impresso).
 """
 import json, os, sys
 from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(HERE)
-IDX = 'file://' + os.path.join(ROOT, 'index.html')
-BANK = os.environ.get('UF_BANCO') or '/workspace/banco-renato/banco-teste-birads.txt'
+sys.path.insert(0, HERE)
+import uf_testutil
+uf_testutil.install()
+ROOT = uf_testutil.repo_root()
+IDX = uf_testutil.index_url()
+BANK = uf_testutil.resolve_bank_path()
 NAMES = [
     'Abdome Total (padrão)',
     'Transvaginal (padrão)',

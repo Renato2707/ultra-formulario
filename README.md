@@ -30,12 +30,29 @@ dados de pacientes **nunca** são publicados (veja `.gitignore`). Os exemplos
 do `LEIA-ME-frases.txt` são genéricos.
 
 ## Testes
+Um comando roda todos os testes automatizados de `test/` em sequência e imprime
+um resumo (passou/falhou por arquivo e totais):
+
+    python test/run_all.py
+    python run_tests.py
+    run_tests.bat
+
+No Windows: instale Python 3 e o Playwright (`pip install playwright` e
+`python -m playwright install chromium`). O runner acha o Chrome, o Chromium
+ou o Edge sozinho; ou passe `--browser` / `UF_BROWSER`. A raiz do repositório
+é relativa ao script (sem caminhos fixos de máquina).
+
+Viewport (opcional): `--viewport 1366x768` ou `UF_VP=1024x600`. Sem isso, cada
+teste usa o tamanho que já definia. Banco clínico: só se `UF_BANCO` apontar
+para um arquivo fora do repositório; senão os testes usam bancos de exemplo
+embutidos, com modelos no formato `X (padrão)`.
+
 - `test/parser-test.html`: abra no navegador e escolha um banco .txt; mostra o
-  resultado do parser (nada é enviado).
-- `test/placement_test.py`: teste de posicionamento com Playwright
-  (`pip install playwright`, depois `python test/placement_test.py caminho/do/banco.txt`).
-  Gera `test/placement-report.csv`, que **não** deve ser publicado.
-  `python test/placement_test.py --diretivas` testa a ordem das diretivas com um banco genérico embutido.
+  resultado do parser (nada é enviado). Não entra no comando acima.
+- `test/placement_test.py`: `python test/placement_test.py --diretivas` (banco
+  genérico embutido) já roda no comando único. Com um banco fora do repo:
+  `python test/placement_test.py caminho/do/banco.txt` gera
+  `test/placement-report.csv`, que **não** deve ser publicado.
 - `test/d3_test.py`: correções da D3 (banco genérico embutido, pasta de dados simulada por `test/fakefs.js`).
 
 ## Documentos

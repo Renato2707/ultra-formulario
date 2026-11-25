@@ -1,6 +1,6 @@
 """C7: calculadora BI-RADS de US de mama (ACR BI-RADS v2025). Regras com página, hierarquia 5>4>0>6>3>2>1,
 4A/4B/4C obrigatório, sobrescrita, Limpar, colar laudo, vários nódulos, mama D/E, bloco "mais", ES5, tamanho.
-Uso: /workspace/.pwenv/bin/python test/c7_test.py
+Uso: python test/c7_test.py
 UF_BANCO=<banco com o trecho MAMAS da proposta C7, fora do repo>; sem ele usa um banco mínimo embutido.
 Nada do banco nem do laudo é impresso além dos nomes das verificações."""
 import os, sys, json, re, random, subprocess, tempfile, itertools
@@ -76,8 +76,9 @@ def tmp(t):
 
 # ---------- 0) ES5 (acorn ecmaVersion 5) e tamanho ----------
 AC = None
-for c in ['/tmp/ac/node_modules/acorn', os.path.join(ROOT, 'node_modules/acorn')]:
-    if os.path.isdir(c): AC = c
+for c in [os.environ.get('UF_ACORN'), os.path.join(tempfile.gettempdir(), 'uf-acorn', 'node_modules', 'acorn'),
+          '/tmp/ac/node_modules/acorn', os.path.join(ROOT, 'node_modules/acorn')]:
+    if c and os.path.isdir(c): AC = c; break
 if AC:
     js = "var a=require(%s),fs=require('fs'),bad=[];process.argv.slice(1).forEach(function(f){var s=fs.readFileSync(f,'utf8');var parts=f.slice(-5)==='.html'?(s.match(/<script>([\\s\\S]*?)<\\/script>/g)||[]).map(function(x){return x.replace(/<\\/?script>/g,'')}):[s];parts.forEach(function(p){try{a.parse(p,{ecmaVersion:5})}catch(e){bad.push(f+': '+e.message)}})});console.log(JSON.stringify(bad))" % json.dumps(AC)
     fl = [os.path.join(ROOT, 'js', f) for f in sorted(os.listdir(os.path.join(ROOT, 'js'))) if f.endswith('.js')] + [os.path.join(ROOT, 'index.html')]
