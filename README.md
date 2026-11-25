@@ -16,6 +16,9 @@ vez. O app grava nela o banco, as configurações e os rascunhos como arquivos
 comuns (veja `LEIA-ME-frases.txt`). Se o navegador pedir permissão de novo,
 clique em **Reconectar**. Sem pasta, use **Exportar** / **Importar**.
 
+## Sincronizar o banco (pendrive, Google Drive e GitHub privado)
+`sincronizar-banco.bat` (duplo clique) mantém o banco de frases e os templates intermediários iguais no pendrive, na pasta do Google Drive para computador e num **repositório GitHub privado só do banco**. Vale o arquivo mais novo; antes de substituir qualquer arquivo ele guarda um backup datado em `Trampo\Ultra-formulario (backups)\banco` (20 mais recentes). `sincronizar-banco (so conferir).bat` só mostra o que seria feito. Os caminhos ficam em `sincronizar-banco-config.ini`. O script só copia arquivos inteiros e não contém banco, senhas nem tokens. Precisa do Git for Windows e da conta GitHub logada só para a parte do GitHub; sem ele, ou sem internet/pendrive/Drive, o lugar é pulado e o resumo avisa.
+
 ## Editar o banco pelo app
 ⚙ Configurações › Banco de frases › **Editar banco**: edita o .txt dentro do app
 (números de linha, "Ir para a linha", Salvar com cópia de segurança). No
