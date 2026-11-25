@@ -67,7 +67,9 @@ with sync_playwright() as p:
     ck('8 3º nódulo depois dos colados, em parágrafo próprio', len(n) == 3 and 'às 7 horas' in L[n[2]] and ((blanks_between(L, n[1], n[2]) == 1) if usa_branco else n[2] == n[1] + 1), L[n[0]:n[-1] + 2])
     pg.context.close()
     # 9) banco de uma linha por frase (sem linhas em branco): nenhuma linha em branco é criada
-    pg = fresh(b, tmp(OWN)); fill(pg, NOD); ins(pg); add(pg); fill(pg, dict(NOD, lado='esquerda', cat='3')); ins(pg); L = lines(pg); n = nodidx(L)
+    # OWN has blank lines (usa_branco); this check needs a dense copy of the same phrases.
+    OWN_DENSE = '\n'.join([ln for ln in OWN.split('\n') if ln.strip() != ''])
+    pg = fresh(b, tmp(OWN_DENSE)); fill(pg, NOD); ins(pg); add(pg); fill(pg, dict(NOD, lado='esquerda', cat='3')); ins(pg); L = lines(pg); n = nodidx(L)
     ck('9 laudo de uma linha por frase: o novo nódulo na linha seguinte, sem linha em branco', len(n) == 2 and n[1] == n[0] + 1 and seps(pg) == 0, L[n[0]:n[1] + 1])
     pg.context.close()
     ck('sem erros de página', not ERR, ERR[:3])

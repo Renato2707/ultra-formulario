@@ -228,14 +228,22 @@
     kept.par.insertBefore(d, kept.ref ? kept.ref.nextSibling : kept.par.firstChild);
     return true;
   }
-  /* C7a: linha em branco posta antes de um achado inserido: sai se o achado saiu (sem linhas em branco sobrando) */
-  function blankLn(n) { return !n || n.nodeType === 1 && !n.querySelector('.fld') && trim(n.textContent || '') === ''; }
+  /* C7a: blank lines marked data-brsep belong to an inserted finding (data-brins).
+     They leave with that finding; adjacent marked blanks collapse to one. */
+  function blankLn(n) { return n && n.nodeType === 1 && !n.querySelector('.fld') && trim(n.textContent || '') === ''; }
+  function nextEl(n) { n = n ? n.nextSibling : null; while (n && n.nodeType !== 1) { n = n.nextSibling; } return n; }
+  function prevEl(n) { n = n ? n.previousSibling : null; while (n && n.nodeType !== 1) { n = n.previousSibling; } return n; }
+  function isIns(n) { return n && n.nodeType === 1 && n.getAttribute && n.getAttribute('data-brins') !== null; }
+  function isContent(n) { return n && n.nodeType === 1 && (trim(n.textContent || '') !== '' || (n.querySelector && n.querySelector('.fld'))); }
   function tidySep() {
-    var l = ed.querySelectorAll('[data-brsep]'), i, d, ch = false;
+    var l = ed.querySelectorAll('[data-brsep]'), i, d, ch = false, nx, pv;
     for (i = l.length - 1; i >= 0; i--) {
       d = l[i];
       if (trim(d.textContent || '') !== '' || d.querySelector('.fld')) { d.removeAttribute('data-brsep'); continue; }
-      if (blankLn(d.nextSibling) || blankLn(d.previousSibling)) { d.parentNode.removeChild(d); ch = true; }
+      nx = nextEl(d); pv = prevEl(d);
+      if (blankLn(nx)) { d.parentNode.removeChild(d); ch = true; continue; }   /* collapse double blanks */
+      if (isIns(nx) || (isIns(pv) && isContent(nx))) { continue; }
+      d.parentNode.removeChild(d); ch = true;
     }
     return ch;
   }

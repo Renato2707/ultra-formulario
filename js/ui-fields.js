@@ -147,6 +147,15 @@ UFUI.part('ui-fields', function (UI, R) {
     }
   }
   function afterChange(fast) {
+    /* C7a: remember if the report separates paragraphs with a blank line.
+       Cleared when the report is wiped; kept if later edits leave no blank (truncation). */
+    var ls = editorLines ? editorLines() : [], i, has = false, st = 0, blank;
+    for (i = 0; i < ls.length; i++) {
+      blank = trim(lineText(ls[i])) === '' && !(ls[i].querySelector && ls[i].querySelector('.fld'));
+      if (blank) { if (st === 1) { st = 2; } }
+      else { has = true; if (st === 2) { S.paraFromModel = true; } st = 1; }
+    }
+    if (!has) { S.paraFromModel = false; }
     selTidy();
     updTitle();
     syncHypotheses();

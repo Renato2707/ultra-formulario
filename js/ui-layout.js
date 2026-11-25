@@ -148,12 +148,44 @@ UFUI.part('ui-layout', function (UI, R) {
       if (at && at.el && at.el.parentNode && editor.contains(at.el)) {
         if (at.mode === 'replace') { at.el.innerHTML = html; how = 'line'; }
         else {
-          /* C7a: o laudo separa parágrafos com linha em branco: o novo achado ganha a sua (marcada, some se o achado sair) */
-          var nd = document.createElement('div'), pv = at.el.previousSibling, nx = at.el.nextSibling, sep = null;
-          var isBl = function (n) { return n && n.nodeType === 1 && !n.querySelector('.fld') && trim(n.textContent || '') === ''; };
+          /* C7a: if the report (or its loaded model) separates paragraphs with a blank line,
+             the new finding gets one before it and, if needed, one after; both are marked
+             (data-brsep) and leave with the finding (data-brins). */
+          var nd = document.createElement('div'), nx, sep = null, trail = null;
+          function nextEl(n) { n = n ? n.nextSibling : null; while (n && n.nodeType !== 1) { n = n.nextSibling; } return n; }
+          function lineIsBlank(n) { return n && n.nodeType === 1 && !n.querySelector('.fld') && trim(n.textContent || '') === ''; }
+          function editorHasContent() {
+            var ls = editorLines(), i, t;
+            for (i = 0; i < ls.length; i++) { t = trim(lineText(ls[i])); if (t || (ls[i].querySelector && ls[i].querySelector('.fld'))) { return true; } }
+            return false;
+          }
+          function editorHasBlank() {
+            var ls = editorLines(), i, st = 0, blank;
+            for (i = 0; i < ls.length; i++) {
+              blank = trim(lineText(ls[i])) === '' && !(ls[i].querySelector && ls[i].querySelector('.fld'));
+              if (blank) { if (st === 1) { st = 2; } }
+              else { if (st === 2) { return true; } st = 1; }
+            }
+            return false;
+          }
+          /* S.paraFromModel is set when the model is loaded and cleared if the report is wiped (empty). */
+          function usesBlankPara() { return editorHasContent() && (editorHasBlank() || !!S.paraFromModel); }
           nd.innerHTML = html;
-          if (isBl(pv) || isBl(nx)) { sep = document.createElement('div'); sep.setAttribute('data-brsep', '1'); sep.innerHTML = '<br>'; at.el.parentNode.insertBefore(sep, nx); }
-          at.el.parentNode.insertBefore(nd, sep ? sep.nextSibling : nx); how = 'after';
+          nd.setAttribute('data-brins', '1');
+          nx = nextEl(at.el);
+          if (usesBlankPara()) {
+            if (lineIsBlank(nx)) { at.el.parentNode.insertBefore(nd, nextEl(nx)); }
+            else {
+              sep = document.createElement('div'); sep.setAttribute('data-brsep', '1'); sep.innerHTML = '<br>';
+              at.el.parentNode.insertBefore(sep, nx);
+              at.el.parentNode.insertBefore(nd, nx);
+            }
+            if (!lineIsBlank(nextEl(nd))) {
+              trail = document.createElement('div'); trail.setAttribute('data-brsep', '1'); trail.innerHTML = '<br>';
+              nd.parentNode.insertBefore(trail, nextEl(nd));
+            }
+          } else { at.el.parentNode.insertBefore(nd, nx); }
+          how = 'after';
         }
         afterChange(true); optText = null; cs = [];
       }
