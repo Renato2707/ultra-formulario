@@ -11,6 +11,12 @@ O banco de frases **nunca** faz parte do repositório.
 >
 > Descrições de B15–B20 são um resumo a partir dos registros disponíveis.
 
+## [etapa-S1] Sincronização do banco entre pendrive, Google Drive e GitHub privado — testado no PC do Renato (arquivos de teste e uma execução real com o banco); NÃO usado ainda por ele no dia a dia
+- Novos arquivos na pasta do app: `sincronizar-banco.bat`, `sincronizar-banco (so conferir).bat`, `sincronizar-banco.ps1` e `sincronizar-banco-config.ini`. O app (HTML/JS) não mudou.
+- Compara `banco-de-frases.txt` e `templates intermediários.txt` nos 3 lugares por data de modificação e SHA256, copia o mais novo para os outros e confere a cópia. Antes de substituir, backup em `Trampo\Ultra-formulario (backups)\banco\AAAA-MM-DD_HH-MM-SS` (guarda os 20 mais recentes).
+- Não copia em caso de datas iguais com conteúdos diferentes, nem se o mais novo estiver vazio ou com menos da metade do tamanho do maior. Lugar ausente (sem pendrive, Drive, Git ou internet) é pulado, com aviso.
+- O banco fica em repositório **privado separado** (`ultra-formulario-banco`); este repositório público continua sem banco. O script não altera texto, só copia arquivos inteiros, e não mexe em rascunhos, backups do app, `dados.json` nem `configuracoes.json`.
+
 ## [etapa-C11b] Apagar uma linha crítica leva a marca junto; a marca não passa para a linha vizinha — testado só em Chromium automatizado, NÃO testado pelo usuário
 - Causa: a marca de linha crítica (sublinhado vermelho ondulado, contada em "N críticas") fica na linha do laudo. Ao apagar um trecho que vai de uma linha até a seguinte, o navegador mantém a primeira linha e puxa para dentro dela o resto da última. Assim a marca passava para a frase de baixo, que nunca foi crítica. No caso inverso, o texto de uma linha crítica puxado para uma linha comum perdia a marca.
 - Agora, depois de cada edição que junta linhas, a linha que sobrou só fica crítica se ainda tem texto da linha crítica (o começo dela, ou o fim). Apagar a linha crítica inteira apaga a marca. A linha de baixo continua comum. Uma linha comum apagada acima de uma crítica não tira nem move a marca. O contador "N críticas" acompanha.
