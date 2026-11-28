@@ -157,9 +157,12 @@ UFUI.part('ui-history', function (UI, R) {
       if (!$('popup').hidden) {
         var n = qsa($('popup'), '.opt[data-i]').length, pk = e.keyCode;
         /* C11: list opened on a CHOSEN choice: Backspace, Delete, Space and letters edit its text (the list closes) */
-        if (UI.popupFor && filledSel(UI.popupFor) && !e.ctrlKey && !e.metaKey && !e.altKey && (pk === 8 || pk === 46 || pk === 32 || (pk >= 65 && pk <= 90) || (pk >= 96 && pk <= 111) || pk >= 186)) { closePopup(); return; }
+        /* lote: number of the option, top row or numeric keypad (1-9) */
+        var dg = !e.ctrlKey && !e.metaKey && !e.altKey ? (pk >= 49 && pk <= 57 ? pk - 49 : (pk >= 97 && pk <= 105 ? pk - 97 : -1)) : -1;
+        if (dg >= n) { dg = -1; }
+        if (UI.popupFor && filledSel(UI.popupFor) && !e.ctrlKey && !e.metaKey && !e.altKey && dg < 0 && (pk === 8 || pk === 46 || pk === 32 || (pk >= 65 && pk <= 90) || (pk >= 96 && pk <= 111) || pk >= 186)) { closePopup(); return; }
         if (UI.popupSel) {   /* multi list: Space / number ticks, Enter = done (next field), Tab = done + move, Esc = keep as it was */
-          if (e.keyCode === 32 || (e.keyCode >= 49 && e.keyCode <= 57 && e.keyCode - 49 < n)) { e.preventDefault(); e.stopPropagation(); if (e.keyCode !== 32) { UI.popupIdx = e.keyCode - 49; popupKbd(); } multiToggle(UI.popupIdx); return; }
+          if (e.keyCode === 32 || dg >= 0) { e.preventDefault(); e.stopPropagation(); if (dg >= 0) { UI.popupIdx = dg; popupKbd(); } multiToggle(UI.popupIdx); return; }
           /* C6j: Enter marks/unmarks the focused option (list stays open); Enter on "Pronto" confirms */
           if (e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); if (UI.popupIdx >= n) { multiApply(true); } else { multiToggle(UI.popupIdx); } return; }
           if (e.keyCode === 9) { e.preventDefault(); e.stopPropagation(); multiApply(true, e.shiftKey); return; }
@@ -171,7 +174,7 @@ UFUI.part('ui-history', function (UI, R) {
         if (e.keyCode === 13) { e.preventDefault(); e.stopPropagation(); chooseOption(UI.popupIdx); return; }
         if (e.keyCode === 9) { e.preventDefault(); e.stopPropagation(); var pf = UI.popupFor; closePopup(); if (pf) { var rr = document.createRange(); rr.selectNode(pf); rr.collapse(e.shiftKey); editor.focus(); setRange(rr); } nextField(e.shiftKey); return; }
         if (e.keyCode === 27) { e.preventDefault(); closePopup(); editor.focus(); return; }
-        if (e.keyCode >= 49 && e.keyCode <= 57 && e.keyCode - 49 < n) { e.preventDefault(); chooseOption(e.keyCode - 49); return; }
+        if (dg >= 0) { e.preventDefault(); e.stopPropagation(); chooseOption(dg); return; }
         /* while the option list is open, typing must not overwrite the dropdown */
         if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.keyCode === 8 || e.keyCode === 46 || e.keyCode === 32 || e.keyCode >= 48)) {
           e.preventDefault(); toast(UI.popupSel ? 'Marque com Enter, Espaço ou o número; Tab ou "Pronto" confirma. Esc cancela.' : 'Escolha uma opção (setas + Enter, ou o número). Esc fecha a lista.'); return;

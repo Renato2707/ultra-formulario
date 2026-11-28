@@ -62,6 +62,28 @@ UFUI.part('ui-fields', function (UI, R) {
     if (!old.length) { return; }
     while (h < old.length && h < now.length && old[h].el === now[h] && old[h].t === lineText(now[h])) { h++; }
     while (e < old.length - h && e < now.length - h && old[old.length - 1 - e].el === now[now.length - 1 - e] && old[old.length - 1 - e].t === lineText(now[now.length - 1 - e])) { e++; }
+    /* lote: an edit that leaves 2+ lines (Enter, multi-line paste/typing over a selection): the browser copies the
+       class and data-* of the line it split onto every new line, so pasted plain text became "critical". A marked
+       line keeps the mark only when the text of a critical line survived in it (its start / end), when it is the
+       same unchanged line, or when it was just inserted with its own mark (no data-orig yet: bank/recognized line) */
+    if (now.length - h - e >= 2 || now.length - h - e > old.length - h - e) {
+      o0 = old.length - h - e ? old[h] : null; o1 = old.length - h - e ? old[old.length - 1 - e] : null;
+      var keepIt;
+      for (i = h; i < now.length - e; i++) {
+        d = now[i]; if (!hasCls(d, 'crit') && !hasCls(d, 'crit-instr')) { continue; }
+        if (d.getAttribute('data-orig') === null) { continue; }
+        t = lineText(d); src = null;
+        for (j = h; j < old.length - e && !src; j++) { if (old[j].el === d && old[j].t === t && old[j].c) { src = old[j]; } }
+        if (!src && t === d.getAttribute('data-orig') && critWord(t)) { continue; }   /* the critical text itself, moved down by Enter */
+        if (!src && i === h && o0 && o0.c) { for (p = 0; p < t.length && p < o0.t.length && t.charAt(p) === o0.t.charAt(p); p++) {} if (p && critWord(o0.t.substring(0, p))) { src = o0; } }
+        if (!src && i === now.length - 1 - e && o1 && o1.c) { for (s = 0; s < t.length && s < o1.t.length && t.charAt(t.length - 1 - s) === o1.t.charAt(o1.t.length - 1 - s); s++) {} if (s && critWord(o1.t.substring(o1.t.length - s))) { src = o1; } }
+        keepIt = src && hasCls(d, src.c) && d.getAttribute('data-orig') === src.at['data-orig'];
+        if (!keepIt) { critSet(d, src); }
+      }
+      for (j = h; j < old.length - e; j++) { if (old[j].c && now.indexOf(old[j].el) < 0) { critGone.push(old[j]); } }
+      if (critGone.length > 30) { critGone.splice(0, critGone.length - 30); }
+      return;
+    }
     if (old.length - h - e < 2 || now.length - h - e !== 1) { return; }   /* only a merge of 2+ old lines into one */
     d = now[h]; t = lineText(d); o0 = old[h]; o1 = old[old.length - 1 - e];
     for (s = 0; s < t.length && s < o1.t.length && t.charAt(t.length - 1 - s) === o1.t.charAt(o1.t.length - 1 - s); s++) {}

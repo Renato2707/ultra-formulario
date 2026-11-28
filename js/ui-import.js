@@ -8,7 +8,7 @@ UFUI.part('ui-import', function (UI, R) {
   var $, on, esc, qsa, trim, toast, S, editor, confirmModal, chipHtml, textLines, lineText, saveRange,
       setRange, focusEditor, restoreRange, exec, ensureNotEmpty, insertBlock, undoRemoval, afterChange,
       jumpNextCrit, nextField, multiChipHtml, normalize, clearRepMarks, loadedModel, renderNav, edText, edHtml,
-      undoInsert, useModel, wholeField, fieldInner;   /* de outros arquivos ui-*.js (ligados abaixo) */
+      undoInsert, useModel, wholeField, fieldInner, foldKeep;   /* de outros arquivos ui-*.js (ligados abaixo) */
   /* estado compartilhado entre arquivos: UI.PH */
   UI.interText = interText; UI.recognizeText = recognizeText;   /* usadas por outros arquivos */
 
@@ -17,7 +17,7 @@ UFUI.part('ui-import', function (UI, R) {
      with the same field chips, already filled with the pasted values (so the calculators read them). Lines that
      match nothing stay plain text. Nothing is guessed: a value is only taken where the bank has a field. */
   R(function () {
-    RG = { bank: null, pats: [], loose: [] };
+    RG = { bank: null, pats: [], loose: [], crit: [] };
     RG_UNIT = /^(mm|cm|cm\u00b3|cm3|ml|bpm|g|%|semanas?|dias?)([.,;:)]?)$/i;
   });
   function rgLit(t, loose) {   /* C6p loose: a unit word may be missing or repeated */
@@ -90,15 +90,40 @@ UFUI.part('ui-import', function (UI, R) {
     for (k = 0; k < f.options.length; k++) { o.push(rgLit(interText(f.options[k])).replace(/\\\*/g, '(?:\\*|_+(?:,_+)?)'));   /* C6p "*", C6o "___" */ }
     return o.join('\\s*\\/\\s*');
   }
+  /* lote: critical lines of the bank (***), compared folded: spaces/NBSP/tabs, accents, case, bullet and trailing
+     spaces do not matter; a field (* / ?[ ]) may hold a number, ___ or one of its options */
+  function rgSp(t) { return String(t).replace(/[\u00a0\u2007\u202f\t]/g, ' ').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, ''); }
+  function rgBare(t) { return rgSp(String(t).replace(/^\s*[\u2022\-\u2013]\s*/, '')); }
+  function rgCritAdd(body, crit) {
+    var ls = String(body || '').split('\n'), q, l, cc;
+    for (q = 0; q < (crit || []).length; q++) {
+      if (crit[q].kind !== 'line' || crit[q].bodyLine == null || ls[crit[q].bodyLine] == null) { continue; }
+      l = rgBare(ls[crit[q].bodyLine].replace(/\r$/, '')); if (l.length < 4 || RG.critSeen[l]) { continue; }
+      RG.critSeen[l] = 1; RG.critExact[l] = 1;
+      try { cc = rgCompile(foldKeep(l), false, 0); RG.crit.push(new RegExp('^' + cc.src + '$')); } catch (e) { /* skip */ }
+    }
+    for (q = 0; q < ls.length; q++) { l = rgBare(ls[q]); if (l) { RG.anyExact[l] = (RG.anyExact[l] || 0) + 1; } }
+  }
+  function rgIsCrit(line) {
+    var b = rgBare(line), f, i; if (b.length < 4 || !RG.crit.length) { return false; }
+    if (RG.plainExact[b] && !RG.critExact[b]) { return false; }   /* the same text is a plain (non-critical) line of the bank */
+    f = foldKeep(b);
+    for (i = 0; i < RG.crit.length; i++) { if (RG.crit[i].test(f)) { return true; } }
+    return false;
+  }
   function rgPats() {
     if (!S.bank) { return []; }
     if (RG.bank === S.bank) { return RG.pats; }
-    var bodies = [], i, j, k, ex, ls, l, c, lit;
+    var bodies = [], i, j, k, ex, ls, l, c, lit, it;
+    RG.crit = []; RG.critSeen = {}; RG.critExact = {}; RG.anyExact = {}; RG.plainExact = {};
     for (i = 0; i < S.bank.exams.length; i++) {
       ex = S.bank.exams[i];
-      for (j = 0; j < ex.templates.length; j++) { bodies.push(ex.templates[j].body); }
-      for (j = 0; j < (ex.sections || []).length; j++) { for (k = 0; k < ex.sections[j].phrases.length; k++) { bodies.push(ex.sections[j].phrases[k].body); } }
+      for (j = 0; j < ex.templates.length; j++) { bodies.push(ex.templates[j].body); rgCritAdd(ex.templates[j].body, ex.templates[j].critical); }
+      for (j = 0; j < (ex.sections || []).length; j++) { for (k = 0; k < ex.sections[j].phrases.length; k++) { it = ex.sections[j].phrases[k]; bodies.push(it.body); rgCritAdd(it.body, it.critical); } }
     }
+    for (l in RG.anyExact) { if (RG.anyExact.hasOwnProperty(l) && !RG.critExact[l]) { RG.plainExact[l] = 1; } }
+    /* a text that is critical somewhere and plain elsewhere counts as plain only when written exactly like the plain line */
+    for (l in RG.critExact) { if (RG.critExact.hasOwnProperty(l)) { RG.plainExact[l] = 0; } }
     RG.pats = []; RG.loose = []; RG.bank = S.bank; var seen = {};
     for (i = 0; i < bodies.length; i++) {
       ls = String(bodies[i] || '').split('\n');
@@ -169,7 +194,8 @@ UFUI.part('ui-import', function (UI, R) {
     var t = f.type === 'text' ? 't' : (f.decimal ? 'd' : 'n');
     if (t !== 't') { v = v.replace(/^\*\s*|\s*\*$/g, ''); }
     if (/^_+(,_+)?$/.test(v) || /^\*+(,\*+)?$/.test(v) || !v || v === UI.PH.t) { return chipHtml(f); }
-    return '<span class="fld f-ok" data-t="' + t + '" data-ph="' + UI.PH[t] + '">' + esc(v) + '</span>';
+    /* lote: data-paste = value came from the pasted text: a calculator keeps it as typed (as a manual edit) */
+    return '<span class="fld f-ok" data-t="' + t + '" data-ph="' + UI.PH[t] + '" data-paste="1">' + esc(v) + '</span>';
   }
   function rgHtml(c, m) {
     var out = '', i;
@@ -198,16 +224,18 @@ UFUI.part('ui-import', function (UI, R) {
   }
   /* text -> html of line divs, or null when no line was recognized */
   function recognizeText(text) {
-    var pats = rgPats(), ls = String(text).replace(/\r\n?/g, '\n').split('\n'), out = [], hit = 0, i, j, l, b, m, core;
-    if (!pats.length || ls.length < 1) { return null; }
+    var pats = rgPats(), ls = String(text).replace(/\r\n?/g, '\n').split('\n'), out = [], hit = 0, i, j, l, b, m, core, ck, op;
+    if ((!pats.length && !RG.crit.length) || ls.length < 1) { return null; }
     for (i = 0; i < ls.length; i++) {
       l = ls[i]; b = /^\s*[\u2022\-\u2013]\s*/.exec(l); core = l.replace(/^\s*[\u2022\-\u2013]\s*/, '').replace(/\s+$/, '');
       m = null;
       var pz = pats;
       if (core.length > 3) { for (j = 0; j < pats.length; j++) { m = pats[j].re.exec(core); if (m) { break; } } }
       if (!m && core.length > 3) { pz = RG.loose; for (j = 0; j < pz.length; j++) { try { m = pz[j].re.exec(core); } catch (e) { m = null; } if (m) { break; } } }
-      if (m) { hit++; out.push('<div>' + (b ? esc(b[0]) : '') + rgHtml(pz[j], m) + '</div>'); }
-      else { out.push('<div>' + (l ? esc(l) : '<br>') + '</div>'); }
+      ck = rgIsCrit(l); op = ck ? '<div class="crit">' : '<div>';   /* lote: critical line of the bank */
+      if (ck) { hit++; }
+      if (m) { hit++; out.push(op + (b ? esc(b[0]) : '') + rgHtml(pz[j], m) + '</div>'); }
+      else { out.push(op + (l ? esc(l) : '<br>') + '</div>'); }
     }
     return hit ? { html: out.join(''), hits: hit, lines: ls.length } : null;
   }
@@ -355,7 +383,7 @@ UFUI.part('ui-import', function (UI, R) {
   });
 
   return function () {   /* liga os nomes de outros arquivos (antes de rodar qualquer parte) */
-    $ = UI.$; on = UI.on; esc = UI.esc; qsa = UI.qsa; trim = UI.trim; toast = UI.toast; S = UI.S;
+    $ = UI.$; on = UI.on; esc = UI.esc; qsa = UI.qsa; trim = UI.trim; toast = UI.toast; S = UI.S; foldKeep = UI.foldKeep;
     editor = UI.editor; confirmModal = UI.confirmModal; chipHtml = UI.chipHtml; textLines = UI.textLines;
     lineText = UI.lineText; saveRange = UI.saveRange; setRange = UI.setRange; focusEditor = UI.focusEditor;
     restoreRange = UI.restoreRange; exec = UI.exec; ensureNotEmpty = UI.ensureNotEmpty;
