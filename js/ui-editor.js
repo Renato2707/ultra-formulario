@@ -168,6 +168,15 @@ UFUI.part('ui-editor', function (UI, R) {
     setRange(r);
     if (!r.collapsed) { exec('delete'); r = window.getSelection().getRangeAt(0); }
     var line = lineOf(r.startContainer);
+    /* lote: caret right in the editor box (empty report, or between lines): use the EMPTY line beside it, so the
+       inserted text takes that line instead of opening a new one under it (no blank line left before the text) */
+    if (!line && r.collapsed && r.startContainer === editor) {
+      var bs = [editor.childNodes[r.startOffset - 1], editor.childNodes[r.startOffset]], bi;
+      /* whole report deleted (select all): the browser leaves a bare <br>; give it a real empty line */
+      if (trim(editor.textContent || '') === '' && !editor.querySelector('div,p,.fld')) { editor.innerHTML = '<div><br></div>'; bs = [editor.firstChild]; }
+      for (bi = 0; bi < bs.length && !line; bi++) { if (bs[bi] && bs[bi].nodeType === 1 && BLOCK[bs[bi].nodeName] && trim(lineText(bs[bi])) === '' && !bs[bi].querySelector('.fld')) { line = bs[bi]; } }
+      if (line) { r = document.createRange(); r.selectNodeContents(line); r.collapse(true); setRange(r); }
+    }
     if (UI.canExecHtml) {
       if (!line || trim(lineText(line)) !== '') {
         if (line) { var r2 = document.createRange(); r2.selectNodeContents(line); r2.collapse(false); setRange(r2); }
