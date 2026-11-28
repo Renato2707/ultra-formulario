@@ -233,9 +233,10 @@ UFUI.part('ui-layout', function (UI, R) {
     });
     on(navList, 'mouseleave', function () { phTip.style.display = 'none'; tipFor = null; });
     on(navList, 'scroll', function () { phTip.style.display = 'none'; tipFor = null; });
-    on(navList, 'mousedown', function () { phTip.style.display = 'none'; tipFor = null; });
+    on(navList, 'mousedown', function () { phTip.style.display = 'none'; tipFor = null; rmCls(document.body, 'usekbd'); });   /* ZEN-9: anel de foco só no teclado */
     on(navList, 'keydown', function (e) {
       var c = navCard(e.target); if (!c) { return; }
+      addCls(document.body, 'usekbd');
       var l = navItems(), i = l.indexOf(c), k = e.keyCode, j = -1;
       if (k === 13 || k === 32) {
         e.preventDefault();
