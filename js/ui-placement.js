@@ -78,6 +78,13 @@ UFUI.part('ui-placement', function (UI, R) {
     }
     return out;
   }
+  /* lote: a list line of the template ("- ..." / "• ...") with its fields filled in (e.g. "- Índice de pulsatilidade (IP): 0,96") */
+  function fieldDataLine(el, orig) {
+    if (!el.querySelector('.fld') || !/^\s*[\u2022\-\u2013]/.test(lineText(el))) { return false; }
+    var cl = el.cloneNode(true), fs = qsa(cl, '.fld'), i;
+    for (i = 0; i < fs.length; i++) { fs[i].parentNode.replaceChild(document.createTextNode('___'), fs[i]); }
+    return !!orig[trim(lineText(cl))];
+  }
   /* -> { range, replace, blank } or null when the anchor is missing */
   function ruleTarget(rule) {
     var L = editorLines(), i, r = document.createRange();
@@ -105,6 +112,7 @@ UFUI.part('ui-placement', function (UI, R) {
            an edited/inserted line, or the line of ANOTHER directive (e.g. 'Tronco da veia porta') */
         var stops = examAnchors(rule.id), others = rule.secName ? otherSecVariants(rule.secName) : [], orig = tplOrigSet(), allDef = !hasCls(L[at], 'chg') && !!orig[trim(lineText(L[at]))], q, stop;
         while (L[last + 1] && !isBlankLine(L[last + 1]) && !isHypEl(L[last + 1]) && !hasCls(L[last + 1], 'chg') && L[last + 1].getAttribute('data-rule') === null) {
+          if (fieldDataLine(L[last + 1], orig)) { break; }   /* lote: "- Índice ... (IP): 0,96" = measurements of the template, not part of the text replaced */
           stop = false; for (q = 0; q < stops.length; q++) { if (anchorHits(stops[q], L[last + 1])) { stop = true; break; } }
           if (stop || mentionsOther(lineText(L[last + 1]), others)) { break; }   /* also stop at a line naming another section */
           last++; if (!orig[trim(lineText(L[last]))]) { allDef = false; }
@@ -182,6 +190,16 @@ UFUI.part('ui-placement', function (UI, R) {
     S.lastChoice = null; S.lastRemoval = null; focusEditor(); afterChange(true);
     return true;
   }
+  /* lote: a phrase titled "Hipótese ..." is hypothesis text: a SECTION directive (meant for the findings, e.g.
+     "@@SUBSTITUI = Artéria Cerebral Média") must not put it over the findings line; its own directive still counts */
+  function hypTitle(c) { return !!(c && c.ph && /^\s*hip[\u00f3o]tese\b/i.test(c.ph.title || '')); }
+  function hypBlockEnd() {
+    var L = editorLines(), i, h = -1, e, r;
+    for (i = 0; i < L.length; i++) { if (/^\s*hip[\u00f3o]tese\b[^:]*:\s*$/i.test(lineText(L[i]))) { h = i; } }
+    if (h < 0) { return null; }
+    e = h; while (L[e + 1] && !isBlankLine(L[e + 1])) { e++; }
+    r = document.createRange(); r.selectNodeContents(L[e]); r.collapse(false); return r;
+  }
   function insertCard(id, quiet) {
     var c = S.phraseIndex[id]; if (!c) { return; }
     var undoBefore = quiet ? null : edHtml(), undoBeforeText = quiet ? '' : edText();
@@ -192,10 +210,12 @@ UFUI.part('ui-placement', function (UI, R) {
     html = html.replace(/<div( class="([^"]*)")?>/g, function (t, a, cl) { return '<div class="' + (cl ? cl + ' ' : '') + 'chg" data-ins="' + tag + '">'; });
     if (hyp) { html = html.replace(/<div( class="[^"]*")?/g, function (t, cl) { return '<div' + (cl || '') + ' data-hyp="' + esc(hyp) + '"'; }); }
     /* precedence: phrase directive > section directive (both from the txt) > generic section-name matching */
-    var rule = null, kr = null, cand = placeChain(c.ph && c.ph.place).concat(placeChain(c.secPlace)).map(directiveRule), ci;
+    var rule = null, kr = null, cand = placeChain(c.ph && c.ph.place).concat(hypTitle(c) ? [] : placeChain(c.secPlace)).map(directiveRule), ci;
     for (ci = 0; ci < cand.length && !kr; ci++) { if (cand[ci]) { rule = cand[ci]; rule.secName = c.dispSec || c.section; kr = ruleTarget(rule); } }
     if (!kr) { rule = null; }
-    var tgt = kr ? null : findSectionTarget([c.dispSec, c.section]), msg = 'Inserida: ' + c.ph.title, how;
+    var hy = !kr && hypTitle(c) ? hypBlockEnd() : null;   /* lote: "Hipótese ..." phrase: end of the report's Hipótese block */
+    var tgt = kr || hy ? null : findSectionTarget([c.dispSec, c.section]), msg = 'Inserida: ' + c.ph.title, how;
+    if (hy) { tgt = { range: hy, how: 'hyp', replace: false }; }
     if (rule) { html = html.replace(/<div /g, '<div data-rule="' + rule.id + '" '); }
     if (kr) {
       how = 'rule:' + rule.id + (kr.replace ? ':replace' : ''); focusEditor(); setRange(kr.range); saveRange();
