@@ -2,7 +2,7 @@
    - relação IP umbilical / IP cerebral média (campo existente no banco), 2 casas;
    - RCP = IP cerebral média / IP umbilical, só se o texto tiver a linha; p5 de Ebbing 2007
      (UOG 30:287, Tabela 5, 21-39 semanas), interpolado linearmente por dia entre semanas inteiras.
-   Feto único. Só preenche campos que já existem. ES5 estrito. */
+   Feto único ou gemelar (um bloco por "FETO 1:" / "FETO 2:"). Só preenche campos que já existem. ES5 estrito. */
 (function () {
   'use strict';
   var H = null, editor = null, busy = false, gen = 0, on = { dop: true };
@@ -20,23 +20,30 @@
 
   function lineText(t) { var s = '', i; for (i = 0; i < t.length; i++) { s += t[i].s != null ? t[i].s : '#'; } return s; }
   function flds(t) { var o = [], i; for (i = 0; i < t.length; i++) { if (t[i].f && H.isNumFld(t[i].f)) { o.push(t[i].f); } } return o; }
+  /* lote: gemelar: cada "FETO 1:" / "Feto A:" (linha sem campos) abre um bloco; cada bloco tem os seus IP e as suas
+     linhas de resultado. Sem cabeçalho de feto = um bloco só (como antes). Mesmas fórmulas em cada bloco. */
+  var FETO_RE = /^feto\s+(\d{1,2}|[A-Z])\s*:?\s*$/i;
   function scan() {
-    var L = H.lines(), v = null, ua = null, acm = null, outs = [], li, t, s, c, fs;
+    var L = H.lines(), v = null, blocks = [], b = null, li, t, s, c, fs, i;
+    function nb() { b = { ua: null, acm: null, outs: [] }; blocks.push(b); }
+    nb();
     for (li = 0; li < L.length; li++) {
-      t = L[li]; s = lineText(t); c = s.replace(/^[\s•\-–·*]+/, ''); fs = flds(t);
+      t = L[li]; s = lineText(t); c = s.replace(/^[\s\u2022\-\u2013\u00b7*]+/, ''); fs = flds(t);
       if (/^\s*$/.test(s)) { v = null; continue; }
-      if (/cerebroplacent|\bRCP\b/i.test(c) && fs.length) { outs.push({ k: 'rcp', f: fs[0], w: /p5 para\s*#\s*semanas\s*:\s*#/i.test(s) && fs.length >= 3 ? fs[1] : null, p: fs.length >= 3 ? fs[2] : null }); continue; }
-      if (/IP\s+umbilical\s*\/\s*IP\s+cerebral\s+m[ée]dia/i.test(c) && fs.length) { outs.push({ k: 'rel', f: fs[0] }); continue; }
-      if (/IP\s+cerebral\s+m[ée]dia\s*\/\s*IP\s+umbilical/i.test(c) && /^rela[çc][ãa]o\s*:/i.test(c) && fs.length) { outs.push({ k: 'inv', f: fs[0] }); continue; }   /* C6c: linha invertida */
-      if (!fs.length && /^art[ée]ria\s+umbilical\b/i.test(c)) { v = 'ua'; continue; }
-      if (!fs.length && /^art[ée]ria\s+cerebral\s+m[ée]dia\b/i.test(c)) { v = 'acm'; continue; }
-      if (!fs.length) { if (/^(art[ée]ria|ducto|veia|fluxo|perfil)/i.test(c)) { v = null; } continue; }
+      if (!fs.length && FETO_RE.test(c.replace(/\s+$/, ''))) { if (b.ua || b.acm || b.outs.length) { nb(); } v = null; continue; }
+      if (/cerebroplacent|\bRCP\b/i.test(c) && fs.length) { b.outs.push({ k: 'rcp', f: fs[0], w: /p5 para\s*#\s*semanas\s*:\s*#/i.test(s) && fs.length >= 3 ? fs[1] : null, p: fs.length >= 3 ? fs[2] : null }); continue; }
+      if (/IP\s+umbilical\s*\/\s*IP\s+cerebral\s+m[\u00e9e]dia/i.test(c) && fs.length) { b.outs.push({ k: 'rel', f: fs[0] }); continue; }
+      if (/IP\s+cerebral\s+m[\u00e9e]dia\s*\/\s*IP\s+umbilical/i.test(c) && /^rela[\u00e7c][\u00e3a]o\s*:/i.test(c) && fs.length) { b.outs.push({ k: 'inv', f: fs[0] }); continue; }   /* C6c: linha invertida */
+      if (!fs.length && /^art[\u00e9e]ria\s+umbilical\b/i.test(c)) { v = 'ua'; continue; }
+      if (!fs.length && /^art[\u00e9e]ria\s+cerebral\s+m[\u00e9e]dia\b/i.test(c)) { v = 'acm'; continue; }
+      if (!fs.length) { if (/^(art[\u00e9e]ria|ducto|veia|fluxo|perfil)/i.test(c)) { v = null; } continue; }
       if (fs.length === 1 && /pulsatilidade|\(IP\)/i.test(c) && !/uterina/i.test(c) && v) {
-        if (v === 'ua') { ua = ua ? 'dup' : fs[0]; } else { acm = acm ? 'dup' : fs[0]; }
+        if (v === 'ua') { b.ua = b.ua ? 'dup' : fs[0]; } else { b.acm = b.acm ? 'dup' : fs[0]; }
       }
     }
-    if (ua === 'dup') { ua = null; } if (acm === 'dup') { acm = null; }   /* mais de um: ambíguo */
-    return { ua: ua, acm: acm, outs: outs };
+    for (i = 0; i < blocks.length; i++) { if (blocks[i].ua === 'dup') { blocks[i].ua = null; } if (blocks[i].acm === 'dup') { blocks[i].acm = null; } }   /* mais de um no mesmo bloco: ambíguo */
+    var outs = []; for (i = 0; i < blocks.length; i++) { outs = outs.concat(blocks[i].outs); }
+    return { ua: blocks[0].ua, acm: blocks[0].acm, outs: outs, blocks: blocks };
   }
 
   /* campo calculado (mesmo comportamento da C2/C3) */
@@ -44,12 +51,14 @@
     var cur = String(f.textContent || ''), auto = f.getAttribute('data-auto');
     if (val === null) {
       var ch = false;
+      f.removeAttribute('data-paste');   /* lote: sem as medidas, o valor colado não fica preso */
       if (auto !== null && cur === auto) { f.textContent = f.getAttribute('data-ph') || '___'; ch = true; }
       if (auto !== null) { f.removeAttribute('data-auto'); f.removeAttribute('data-src'); }
       return ch;
     }
     if (auto !== null && cur !== auto && f.getAttribute('data-src') === key) { return false; }
     if (auto === null && H.fldVal(f) !== null && f.getAttribute('data-man') === key) { return false; }
+    if (auto === null && f.getAttribute('data-paste') !== null) { f.removeAttribute('data-paste'); if (H.fldVal(f) !== null) { f.setAttribute('data-man', key); return false; } }   /* lote: valor colado = digitado à mão */
     var changed = cur !== val;
     if (changed) { f.textContent = val; }
     f.setAttribute('data-auto', val); f.setAttribute('data-src', key);
@@ -69,11 +78,13 @@
     busy = true; gen++;
     var changed = false, sc, a, m, key, i, o, rcp, lim, d, txt;
     try {
-      sc = scan(); a = sc.ua ? H.fldVal(sc.ua) : null; m = sc.acm ? H.fldVal(sc.acm) : null;
+      sc = scan(); d = igDays();
+      for (var bi = 0; bi < sc.blocks.length; bi++) {
+      a = sc.blocks[bi].ua ? H.fldVal(sc.blocks[bi].ua) : null; m = sc.blocks[bi].acm ? H.fldVal(sc.blocks[bi].acm) : null;
       var ok = on.dop && a !== null && m !== null && a > 0 && m > 0;
-      key = a + '|' + m; d = igDays();
-      for (i = 0; i < sc.outs.length; i++) {
-        o = sc.outs[i];
+      key = a + '|' + m;
+      for (i = 0; i < sc.blocks[bi].outs.length; i++) {
+        o = sc.blocks[bi].outs[i];
         if (o.k === 'rel') { if (put(o.f, ok ? f2(a / m) : null, 'rel:' + key)) { changed = true; } continue; }
         if (o.k === 'inv') { if (put(o.f, ok ? f2(m / a) : null, 'inv:' + key)) { changed = true; } continue; }
         rcp = ok ? f2(m / a) : null;
@@ -86,6 +97,7 @@
         /* classificação só se o valor no campo for o calculado; compara os valores mostrados (2 casas) */
         if (lim !== null && o.f.textContent === rcp && Math.round(m / a * 100) < Math.round(lim * 100)) { txt = ' (abaixo do p5)'; }
         if (setTag(o.f, txt)) { changed = true; }
+      }
       }
       var sp = editor.querySelectorAll('.uc-dop'), q;
       for (q = sp.length - 1; q >= 0; q--) { if (sp[q].ucGen !== gen) { sp[q].parentNode.removeChild(sp[q]); changed = true; } }
@@ -101,11 +113,14 @@
     var sel = window.getSelection ? window.getSelection() : null, n = sel && sel.rangeCount ? sel.getRangeAt(0).startContainer : null, f = null, sc, i, a, m, key, d;
     while (n && n !== editor) { if (H.hasCls(n, 'fld')) { f = n; break; } n = n.parentNode; }
     if (f) {
-      sc = scan(); a = sc.ua ? H.fldVal(sc.ua) : null; m = sc.acm ? H.fldVal(sc.acm) : null; key = a + '|' + m; d = igDays();
-      for (i = 0; i < sc.outs.length; i++) {
-        var o = sc.outs[i], k = null;
+      sc = scan(); d = igDays();
+      for (var bi = 0; bi < sc.blocks.length; bi++) {
+      a = sc.blocks[bi].ua ? H.fldVal(sc.blocks[bi].ua) : null; m = sc.blocks[bi].acm ? H.fldVal(sc.blocks[bi].acm) : null; key = a + '|' + m;
+      for (i = 0; i < sc.blocks[bi].outs.length; i++) {
+        var o = sc.blocks[bi].outs[i], k = null;
         if (o.f === f) { k = o.k + ':' + key; } else if (o.w === f) { k = 'w:' + key + '|' + d; } else if (o.p === f) { k = 'p:' + key + '|' + d; }
         if (k) { f.setAttribute('data-man', k); if (f.getAttribute('data-auto') !== null && f.textContent !== f.getAttribute('data-auto')) { f.setAttribute('data-src', k); } }
+      }
       }
     }
     run();
@@ -140,10 +155,17 @@
   }
   function status() {
     if (!H) { return null; }
-    var sc = scan(), a = sc.ua ? H.fldVal(sc.ua) : null, m = sc.acm ? H.fldVal(sc.acm) : null, n = sc.outs.length, q, btn = document.getElementById('ucDopOrd');
+    var sc = scan(), a = null, m = null, n = sc.outs.length, q, btn = document.getElementById('ucDopOrd');
     if (btn) { var inv = false; for (q = 0; q < sc.outs.length; q++) { if (sc.outs[q].k === 'inv') { inv = true; } } btn.setAttribute('data-ord', inv ? 'inv' : 'rel'); btn.disabled = !n; }
     if (!n) { return { ready: false, tip: 'Sem a linha "Relação" ou da RCP no laudo' }; }
-    return a && m ? { ready: true, tip: 'Pronto: AU/ACM ' + f2(a / m) + ', ACM/AU ' + f2(m / a) } : { ready: false, tip: 'Faltam o IP umbilical e o IP da cerebral média' };
+    var tips = [];
+    for (q = 0; q < sc.blocks.length; q++) {
+      if (!sc.blocks[q].outs.length) { continue; }
+      a = sc.blocks[q].ua ? H.fldVal(sc.blocks[q].ua) : null; m = sc.blocks[q].acm ? H.fldVal(sc.blocks[q].acm) : null;
+      if (!a || !m) { return { ready: false, tip: 'Faltam o IP umbilical e o IP da cerebral média' }; }
+      tips.push('AU/ACM ' + f2(a / m) + ', ACM/AU ' + f2(m / a));
+    }
+    return { ready: true, tip: 'Pronto: ' + tips.join('; ') };
   }
   /* botão discreto: inverte a linha "Relação" do laudo (AU/ACM <-> ACM/AU) */
   function extra(row) {

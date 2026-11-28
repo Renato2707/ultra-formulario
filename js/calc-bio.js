@@ -133,6 +133,7 @@
   function put(f, val, key, suf) {
     var cur = String(f.textContent || ''), auto = f.getAttribute('data-auto'), changed = false;
     if (val === null) {
+      f.removeAttribute('data-paste');   /* lote: sem as medidas, o valor colado não fica preso */
       if (auto !== null && cur === auto) { f.textContent = f.getAttribute('data-ph') || '___'; changed = true; }
       if (auto !== null) { f.removeAttribute('data-auto'); f.removeAttribute('data-src'); }
       if (sufOf(f)) { setSuf(f, null); changed = true; }
@@ -140,6 +141,7 @@
     }
     if (auto !== null && cur !== auto && f.getAttribute('data-src') === key) { if (sufOf(f)) { setSuf(f, null); return true; } return false; }
     if (auto === null && H.fldVal(f) !== null && f.getAttribute('data-man') === key) { return false; }
+    if (auto === null && f.getAttribute('data-paste') !== null) { f.removeAttribute('data-paste'); if (H.fldVal(f) !== null) { f.setAttribute('data-man', key); return false; } }   /* lote: valor colado = digitado à mão */
     if (cur !== val) { f.textContent = val; changed = true; }
     f.setAttribute('data-auto', val); f.setAttribute('data-src', key);
     if (suf !== undefined) { var before = sufOf(f) ? sufOf(f).textContent : null; setSuf(f, suf); if (before !== suf) { changed = true; } }
