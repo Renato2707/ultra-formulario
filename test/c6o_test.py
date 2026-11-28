@@ -149,7 +149,7 @@ with sync_playwright() as p:
     pg.click('[data-exam="Transvaginal"]'); pg.wait_for_timeout(400)
     info = pg.evaluate("""[].map.call(document.querySelectorAll('#navList [data-model]'), function (c) { var s = getComputedStyle(c); return [c.textContent, c.className.indexOf(' pad') >= 0, parseFloat(s.borderLeftWidth), parseFloat(s.marginBottom)]; })""")
     pad = [i for i in info if '(padrão)' in i[0]]; var = [i for i in info if '(padrão)' not in i[0]]
-    ck('2 cartão de modelo "(padrão)" com classe pad, borda e espaço maiores que o variante', pad and var and pad[0][1] and not var[0][1] and pad[0][2] > var[0][2] and pad[0][3] > var[0][3], info)
+    ck('2 cartão de modelo "(padrão)" com classe pad e barra à esquerda maior que o variante; mesmo espaço entre cartões (ZEN-9: sem espaço extra)', pad and var and pad[0][1] and not var[0][1] and pad[0][2] > var[0][2] and pad[0][3] == var[0][3], info)
     txt0 = pg.inner_text('#navList')
     ck('2 nenhum texto novo nos cartões', '\n'.join(i[0] for i in info).replace('Transvaginal (padrão)', '').replace('Transvaginal variante', '').strip() == '', info)
     pg.click('[data-go="3"]'); pg.wait_for_timeout(400)
