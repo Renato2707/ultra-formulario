@@ -83,6 +83,7 @@
     for (i = 0; i < tr.f.length; i++) { vals.push(fldVal(tr.f[i])); }
     var miss = false; for (i = 0; i < vals.length; i++) { if (vals[i] === null) { miss = true; } }
     if (miss) {
+      v.removeAttribute('data-paste');   /* lote: sem as medidas, o valor colado não fica preso */
       /* faltou medida: volta ao campo vazio só se o valor atual foi calculado por nós */
       if (auto !== null && cur === auto) { v.textContent = v.getAttribute('data-ph') || '___'; }
       v.removeAttribute('data-auto'); v.removeAttribute('data-src');
@@ -92,6 +93,7 @@
     /* edição manual: respeitar até as medidas mudarem */
     if (auto !== null && cur !== auto && v.getAttribute('data-src') === key) { return false; }
     if (auto === null && fldVal(v) !== null && v.getAttribute('data-man') === key) { return false; }
+    if (auto === null && v.getAttribute('data-paste') !== null) { v.removeAttribute('data-paste'); if (fldVal(v) !== null) { v.setAttribute('data-man', key); return false; } }   /* lote: valor colado = digitado à mão */
     if (kind === 'sum') {   /* C6d: tireoide = soma dos volumes dos lobos (cada um L x AP x T x 0,523); istmo não entra */
       var tot = 0; for (i = 0; i + 2 < vals.length; i += 3) { tot += vals[i] * vals[i + 1] * vals[i + 2] * 0.523 / 1000; }
       res = Math.round(tot);

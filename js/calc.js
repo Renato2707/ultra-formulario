@@ -38,7 +38,15 @@ var UFCalc = (function () {
 
   /* ---------- calculadora livre (execução da esquerda para a direita) ---------- */
   function Calc() { this.clear(); }
-  Calc.prototype.clear = function () { this.acc = null; this.op = null; this.cur = '0'; this.fresh = true; this.err = false; this.expr = ''; };
+  Calc.prototype.clear = function () { this.acc = null; this.op = null; this.cur = '0'; this.fresh = true; this.err = false; this.expr = ''; this.chain = ''; if (!this.hist) { this.hist = []; } };
+  /* lote: histórico das contas (só nesta aba, nada é gravado): a conta inteira e o resultado, a mais nova primeiro */
+  Calc.HIST_MAX = 10;
+  Calc.prototype.clearHist = function () { this.hist = []; };
+  Calc.prototype.recall = function (i) {   /* volta um resultado do histórico para o visor (para continuar a conta) */
+    var h = this.hist[i]; if (!h) { return; }
+    if (this.err) { this.clear(); }
+    this.cur = h.v; this.fresh = true;
+  };
   Calc.prototype.digit = function (d) {
     if (this.err) { this.clear(); }
     if (this.fresh) { this.cur = '0'; this.fresh = false; }
@@ -60,10 +68,11 @@ var UFCalc = (function () {
   Calc.prototype.value = function () { return parseFloat(this.cur === '.' ? '0' : this.cur); };
   Calc.prototype.operator = function (op) {
     if (this.err) { this.clear(); }
-    if (this.op && this.fresh) { this.op = op; this.expr = fmt(this.acc) + ' ' + SYM[op]; return; }
+    if (this.op && this.fresh) { this.op = op; this.expr = fmt(this.acc) + ' ' + SYM[op]; this.chain = this.chain.replace(/\S+ $/, SYM[op] + ' '); return; }
     var v = this.value();
+    this.chain += fmt(v) + ' ' + SYM[op] + ' ';
     this.acc = this.op ? apply(this.acc, this.op, v) : v;
-    if (!isFinite(this.acc)) { this.err = true; this.cur = 'erro'; this.op = null; this.expr = ''; this.fresh = true; return; }
+    if (!isFinite(this.acc)) { this.err = true; this.cur = 'erro'; this.op = null; this.expr = ''; this.chain = ''; this.fresh = true; return; }
     this.acc = Number(this.acc.toPrecision(15));
     this.op = op; this.cur = plain(Number(this.acc.toPrecision(10))); this.fresh = true; this.expr = fmt(this.acc) + ' ' + SYM[op];
   };
@@ -71,22 +80,34 @@ var UFCalc = (function () {
     if (this.err || !this.op) { this.fresh = true; return; }
     var v = this.value(), a = fmt(this.acc), r = apply(this.acc, this.op, v);
     this.expr = a + ' ' + SYM[this.op] + ' ' + fmt(v) + ' =';
-    this.op = null; this.acc = null; this.fresh = true;
+    var full = this.chain + fmt(v) + ' =';
+    this.op = null; this.acc = null; this.fresh = true; this.chain = '';
     if (!isFinite(r)) { this.err = true; this.cur = 'erro'; return; }
     this.cur = plain(Number(r.toPrecision(10)));
+    this.hist.unshift({ t: full, r: fmt(Number(this.cur)), v: this.cur });
+    if (this.hist.length > Calc.HIST_MAX) { this.hist.length = Calc.HIST_MAX; }
   };
   Calc.prototype.display = function () { return this.err ? 'erro' : (this.fresh ? fmt(parseFloat(this.cur)) : this.cur.replace('.', ',')); };
   var SYM = { '+': '+', '-': '\u2212', '*': '\u00d7', '/': '\u00f7' };
 
   function buildCalc(body) {
-    var c = new Calc(), box = el('div', 'uc-calc'), expr = el('div', 'uc-expr'), disp = el('div', 'uc-disp', '0'), keys = el('div', 'uc-keys'), i, b;
+    var c = new Calc(), box = el('div', 'uc-calc'), expr = el('div', 'uc-expr'), disp = el('div', 'uc-disp', '0'), keys = el('div', 'uc-keys'), hist = el('div', 'uc-hist'), i, b;
+    hist.id = 'ucHist';
     box.setAttribute('tabindex', '0'); box.setAttribute('title', 'Teclado: 0-9 , . + - * / Enter Backspace Esc');
     disp.setAttribute('aria-live', 'polite'); disp.id = 'ucDisp'; expr.id = 'ucExpr';
-    function show() { disp.innerHTML = ''; disp.appendChild(document.createTextNode(c.display())); expr.innerHTML = ''; expr.appendChild(document.createTextNode(c.expr || '\u00a0')); }
+    function show() {
+      disp.innerHTML = ''; disp.appendChild(document.createTextNode(c.display())); expr.innerHTML = ''; expr.appendChild(document.createTextNode(c.expr || '\u00a0'));
+      var h, j; hist.innerHTML = '';
+      for (j = 0; j < c.hist.length; j++) {
+        h = el('div', 'uc-hi'); h.setAttribute('data-hi', String(j)); h.title = c.hist[j].t + ' ' + c.hist[j].r;
+        h.appendChild(el('span', 'uc-hi-t', c.hist[j].t + ' ')); h.appendChild(el('b', 'uc-hi-r', c.hist[j].r)); hist.appendChild(h);
+      }
+      hist.style.display = c.hist.length ? '' : 'none';
+    }
     function act(k) {
       if (/^[0-9]$/.test(k) || k === '.') { c.digit(k); }
       else if (SYM[k]) { c.operator(k); } else if (k === '=') { c.equals(); }
-      else if (k === 'C') { c.clear(); } else if (k === 'B') { c.back(); }
+      else if (k === 'C') { c.clear(); } else if (k === 'B') { c.back(); } else if (k === 'CH') { c.clear(); c.clearHist(); }
       show();
     }
     var L = [['C', 'C', 'uc-fn'], ['B', '\u232b', 'uc-fn'], ['/', '\u00f7', 'uc-op'], ['*', '\u00d7', 'uc-op'],
@@ -112,7 +133,9 @@ var UFCalc = (function () {
       if (e.preventDefault) { e.preventDefault(); } if (e.stopPropagation) { e.stopPropagation(); }
       act(m);
     });
-    box.appendChild(expr); box.appendChild(disp); box.appendChild(keys); body.appendChild(box);
+    on(hist, 'mousedown', noFocusSteal);
+    on(hist, 'click', function (e) { var t = e.target || e.srcElement; while (t && t !== hist && !(t.getAttribute && t.getAttribute('data-hi') !== null)) { t = t.parentNode; } if (t && t !== hist) { c.recall(parseInt(t.getAttribute('data-hi'), 10)); show(); try { box.focus(); } catch (x) {} } });
+    box.appendChild(expr); box.appendChild(disp); box.appendChild(keys); box.appendChild(hist); body.appendChild(box);
     show();
     return { calc: c, box: box, press: act, show: show };
   }
@@ -226,7 +249,7 @@ var UFCalc = (function () {
     onEditorChange: function (fn) { if (typeof fn === 'function') { edSubs.push(fn); } },
     format: fmt, parseNum: parseNum, _calc: null
   };
-  register({ id: 'livre', title: 'Calculadora', build: function (b) { api._calc = buildCalc(b); }, reset: function () { if (api._calc) { api._calc.press('C'); } } });
+  register({ id: 'livre', title: 'Calculadora', build: function (b) { api._calc = buildCalc(b); }, reset: function () { if (api._calc) { api._calc.press('CH'); } } });
   /* C6e: tudo da obstetrícia num cartão só: IG relatada + linhas de PFE, IG, percentis e Doppler (módulos C3-C5) */
   register({ id: 'obst', title: 'Obstetrícia', build: function (b) { var ig = el('div', 'uc-ig'); ig.setAttribute('data-calc-part', 'ig'); b.appendChild(ig); buildIg(ig); }, reset: function () { if (api._igSet) { api._igSet('', ''); } } });
   return api;
