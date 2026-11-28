@@ -391,6 +391,10 @@ mark.hl.cur{background:#ffb74d;background:var(--hl-cur)}
 .uc-calc{outline:0;border:1px solid #d9d9d9;border:1px solid var(--line);border-radius:6px;padding:6px}
 .uc-calc:focus{border-color:#5a6f8f;border-color:var(--accent)}
 .uc-expr{font-size:12px;min-height:15px;text-align:right;color:#6b6b6b;color:var(--muted);white-space:nowrap;overflow:hidden}
+.uc-hist{max-height:150px;overflow-y:auto;margin-top:6px;border-top:1px solid #d9d9d9;border-top:1px solid var(--line);padding-top:3px}
+.uc-hi{font-size:12px;text-align:right;padding:1px 4px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;color:#6b6b6b;color:var(--muted)}
+.uc-hi:hover{background:#f0f0f0;background:var(--hover)}
+.uc-hi-r{color:inherit;font-weight:600}
 .uc-disp{font-size:22px;text-align:right;padding:2px 4px 6px;white-space:nowrap;overflow:hidden;font-variant-numeric:tabular-nums}
 .uc-keys:after{content:"";display:table;clear:both}
 .uc-k{float:left;width:23%;margin:1%;height:34px;font:inherit;font-size:16px;border:1px solid #d9d9d9;border:1px solid var(--line);border-radius:4px;background:#fff;background:var(--panel);color:inherit;cursor:pointer}

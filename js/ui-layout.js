@@ -431,13 +431,16 @@ UFUI.part('ui-layout', function (UI, R) {
     });
     /* C6c: a highlighted (selected) choice chip opens with ArrowDown, Alt+ArrowDown or Enter instead of moving the caret */
     on(editor, 'keydown', function (e) {
-      var k = e.keyCode; if (!$('popup').hidden || e.ctrlKey || e.metaKey || e.shiftKey || (k !== 40 && k !== 13)) { return; }
+      var k = e.keyCode, dg = k >= 49 && k <= 57 ? k - 49 : (k >= 97 && k <= 105 ? k - 97 : -1);   /* lote: 1-9 (also keypad) = that option */
+      if (!$('popup').hidden || e.ctrlKey || e.metaKey || e.altKey && dg >= 0 || e.shiftKey || (k !== 40 && k !== 13 && dg < 0)) { return; }
       var sel = window.getSelection(), r = sel.rangeCount ? sel.getRangeAt(0) : null, c;
       if (!r || r.collapsed) { return; }
       c = r.startContainer.nodeType === 1 ? r.startContainer.childNodes[r.startOffset] : null;
       if (!c || c.nodeType !== 1 || !hasCls(c, 'fld') || c.getAttribute('data-t') !== 's' || r.endContainer !== r.startContainer || r.endOffset !== r.startOffset + 1) { return; }
+      if (dg >= 0) { var no = []; try { no = JSON.parse(c.getAttribute('data-o')) || []; } catch (x) { no = []; } if (dg >= no.length) { e.preventDefault(); return; } }   /* no such option: the number must not overwrite the field */
       e.preventDefault(); if (e.stopPropagation) { e.stopPropagation(); }
       openSelect(c);
+      if (dg >= 0) { if (UI.popupSel) { UI.popupIdx = dg; UI.popupKbd(); UI.multiToggle(dg); } else { chooseOption(dg); } }
     });
     /* caret as plain text right after a chip: typing must not merge into the field value */
     chipExit = null;
